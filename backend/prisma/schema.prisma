@@ -275,8 +275,6 @@ model Contract {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
-  payments        Payment[]
-
   @@map("contracts")
 }
 
@@ -340,8 +338,8 @@ model Document {
 
 model Payment {
   id          String        @id @default(uuid())
-  contractId  String
-  contract    Contract      @relation(fields: [contractId], references: [id])
+  quoteId     String
+  orderId     String        @unique
   amount      Decimal       @db.Decimal(12, 2)
   method      String
   status      PaymentStatus @default(PENDING)

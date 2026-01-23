@@ -9,18 +9,13 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { PaymeeService } from './paymee.service';
+import { FlouciService } from './flouci.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('payments')
 export class PaymentsController {
-  constructor(private paymeeService: PaymeeService) {}
+  constructor(private flouciService: FlouciService) {}
 
-  /**
-   * Initialize payment for a validated quote
-   * POST /payments/init
-   * Body: { quoteId: string, deliveryType: 'HOME_DELIVERY' | 'AGENCY_PICKUP' }
-   */
   @Post('init')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
@@ -28,55 +23,29 @@ export class PaymentsController {
     @Body() data: { quoteId: string; deliveryType: string },
     @Request() req: any,
   ) {
-    return this.paymeeService.createPaymentOrder(
+    return this.flouciService.createPaymentOrder(
       data.quoteId,
       data.deliveryType,
       req.user.id,
     );
   }
 
-  /**
-   * Webhook endpoint for Paymee callbacks
-   * POST /payments/webhook
-   */
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   async handleWebhook(@Body() payload: any) {
-    return this.paymeeService.handleWebhookCallback(payload);
+    return this.flouciService.handleWebhookCallback(payload);
   }
 
-  /**
-   * Get payment status
-   * GET /payments/:id/status
-   */
   @Get(':id/status')
   @UseGuards(JwtAuthGuard)
   async getPaymentStatus(@Param('id') id: string) {
-    return this.paymeeService.getPaymentStatus(id);
+    return this.flouciService.getPaymentStatus(id);
   }
 
-  /**
-   * Verify payment with Paymee
-   * GET /payments/:orderId/verify
-   */
-  @Get(':orderId/verify')
+  @Get(':paymentId/verify')
   @UseGuards(JwtAuthGuard)
-  async verifyPayment(@Param('orderId') orderId: string) {
-    const isVerified = await this.paymeeService.verifyPaymentWithPaymee(orderId);
+  async verifyPayment(@Param('paymentId') paymentId: string) {
+    const isVerified = await this.flouciService.verifyPaymentWithFlouci(paymentId);
     return { verified: isVerified };
-  }
-
-  /**
-   * Refund a payment
-   * POST /payments/:id/refund
-   */
-  @Post(':id/refund')
-  @UseGuards(JwtAuthGuard)
-  async refundPayment(
-    @Param('id') paymentId: string,
-    @Body() data: { reason: string },
-    @Request() req: any,
-  ) {
-    return this.paymeeService.refundPayment(paymentId, data.reason);
   }
 }

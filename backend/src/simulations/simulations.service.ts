@@ -20,11 +20,20 @@ export class SimulationsService {
     formulaType: FormulaType;
     conventionId?: string;
     selectedGuarantees?: string[];
+    franchiseRate?: number;
+    bgLimit?: number;
+    dcCapital?: number;
   }) {
     const vehicle = await this.vehiclesService.create(data.vehicle);
     const vehicleAge = this.vehiclesService.calculateVehicleAge(vehicle.firstCirculationDate);
 
-    // Age restrictions removed - not required per specifications
+    // Validate age restrictions
+    if (data.formulaType === FormulaType.TOUS_RISQUES_0 && vehicleAge >= 2) {
+      throw new BadRequestException('Tous Risques 0% is only available for vehicles less than 2 years old');
+    }
+    if (data.formulaType === FormulaType.DOMMAGES_COLLISIONS && vehicleAge >= 10) {
+      throw new BadRequestException('Dommages Collision is only available for vehicles less than 10 years old');
+    }
 
     const simulation = await this.prisma.simulation.create({
       data: {
@@ -34,6 +43,9 @@ export class SimulationsService {
         bonusMalus: new Decimal(data.bonusMalus),
         usage: data.usage,
         formulaType: data.formulaType,
+        franchiseRate: data.franchiseRate ? new Decimal(data.franchiseRate) : null,
+        bgLimit: data.bgLimit,
+        dcCapital: data.dcCapital ? new Decimal(data.dcCapital) : null,
       },
       include: { vehicle: true },
     });
@@ -99,6 +111,9 @@ export class SimulationsService {
     formulaType?: FormulaType;
     conventionId?: string;
     selectedGuarantees?: string[];
+    franchiseRate?: number;
+    bgLimit?: number;
+    dcCapital?: number;
   }) {
     const simulation = await this.findById(id);
 
@@ -113,7 +128,12 @@ export class SimulationsService {
     // Validate formula change with vehicle age
     if (data.formulaType) {
       const vehicleAge = this.vehiclesService.calculateVehicleAge(simulation.vehicle.firstCirculationDate);
-      // Age restrictions removed - not required per specifications
+      if (data.formulaType === FormulaType.TOUS_RISQUES_0 && vehicleAge >= 2) {
+        throw new BadRequestException('Tous Risques 0% is only available for vehicles less than 2 years old');
+      }
+      if (data.formulaType === FormulaType.DOMMAGES_COLLISIONS && vehicleAge >= 10) {
+        throw new BadRequestException('Dommages Collision is only available for vehicles less than 10 years old');
+      }
     }
 
     const updated = await this.prisma.simulation.update({
@@ -123,6 +143,9 @@ export class SimulationsService {
         ...(data.usage && { usage: data.usage }),
         ...(data.formulaType && { formulaType: data.formulaType }),
         ...(data.conventionId !== undefined && { conventionId: data.conventionId }),
+        ...(data.franchiseRate !== undefined && { franchiseRate: data.franchiseRate ? new Decimal(data.franchiseRate) : null }),
+        ...(data.bgLimit !== undefined && { bgLimit: data.bgLimit }),
+        ...(data.dcCapital !== undefined && { dcCapital: data.dcCapital ? new Decimal(data.dcCapital) : null }),
       },
     });
 
@@ -170,7 +193,14 @@ export class SimulationsService {
     }
 
     const vehicleAge = this.vehiclesService.calculateVehicleAge(simulation.vehicle.firstCirculationDate);
-    // Age restrictions removed - not required per specifications
+    
+    // Validate age restrictions
+    if (simulation.formulaType === FormulaType.TOUS_RISQUES_0 && vehicleAge >= 2) {
+      throw new BadRequestException('Tous Risques 0% is only available for vehicles less than 2 years old');
+    }
+    if (simulation.formulaType === FormulaType.DOMMAGES_COLLISIONS && vehicleAge >= 10) {
+      throw new BadRequestException('Dommages Collision is only available for vehicles less than 10 years old');
+    }
 
     await this.auditService.log(
       userId,

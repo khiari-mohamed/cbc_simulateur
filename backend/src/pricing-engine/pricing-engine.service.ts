@@ -18,6 +18,7 @@ interface SimulationData {
   formulaType: FormulaType;
   selectedGuarantees: string[];
   selectedCapitals?: Record<string, Decimal>;
+  franchiseRate?: number;
 }
 
 interface PricingResult {
@@ -136,7 +137,8 @@ export class PricingEngineService {
 
     // 7. TOUS_RISQUES_0 (Only if formula is TOUS_RISQUES_0)
     if (simulation.formulaType === FormulaType.TOUS_RISQUES_0) {
-      const trResult = await this.calculateTOUS_RISQUES_0(companyId, vehicle, vehicleAge, simulation, conventionId);
+      const franchiseRate = simulation.franchiseRate ?? 0;
+      const trResult = await this.calculateTOUS_RISQUES_0(companyId, vehicle, vehicleAge, simulation, franchiseRate, conventionId);
       if (trResult) {
         console.log('✅ TOUS_RISQUES_0 calculated:', trResult.prime.toString());
         items.push(trResult);
@@ -209,7 +211,11 @@ export class PricingEngineService {
     }
 
     // CDC EXACT CALCULATION
-    const frais = new Decimal(40); // Excel ARS: 40 DT fixe (toutes compagnies)
+    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+    
+    // Excel: LLOYD = 30 DT, AMANA = 20 DT
+    const frais = company?.name === 'LLOYD' ? new Decimal(30) : new Decimal(20);
+    
     const taxe12Percent = primeNette.mul(0.12);
     const taxe2Percent = primeRC.add(frais).mul(0.02);
     const taxes = taxe12Percent.add(taxe2Percent);
@@ -268,7 +274,15 @@ export class PricingEngineService {
       throw new BadRequestException('Dommages Collision cannot be combined with Tous Risques');
     }
 
-    // Age restrictions removed - not required per specifications
+    // Rule 2: DOMMAGES_COLLISIONS only for vehicles < 10 years
+    if (formulaType === FormulaType.DOMMAGES_COLLISIONS && vehicleAge >= 10) {
+      throw new BadRequestException('Dommages Collision is only available for vehicles less than 10 years old');
+    }
+
+    // Rule 3: TOUS_RISQUES_0 only for vehicles < 2 years
+    if (formulaType === FormulaType.TOUS_RISQUES_0 && vehicleAge >= 2) {
+      throw new BadRequestException('Tous Risques 0% is only available for vehicles less than 2 years old');
+    }
 
     // Rule 4: STANDARD formula excludes TOUS_RISQUES_0 and DOMMAGES_COLLISIONS
     if (formulaType === FormulaType.STANDARD) {
@@ -285,11 +299,14 @@ export class PricingEngineService {
       return null;
     }
 
+    // Find RC pricing rule based on CV (fiscal horsepower)
     const rule = await this.prisma.pricingRule.findFirst({
       where: {
         companyId,
         guaranteeId: guarantee.id,
         isActive: true,
+        minPower: { lte: vehicle.fiscalHorsepower },
+        maxPower: { gte: vehicle.fiscalHorsepower },
         OR: [
           { usageType: simulation.usage },
           { usageType: null },
@@ -300,10 +317,11 @@ export class PricingEngineService {
     });
     
     if (!rule || !rule.fixedPremium) {
-      console.log('❌ RC pricing rule not found for company:', companyId);
+      console.log('❌ RC pricing rule not found for company:', companyId, 'CV:', vehicle.fiscalHorsepower);
       return null;
     }
 
+    // Apply bonus/malus to base RC premium
     let prime = new Decimal(rule.fixedPremium);
     prime = prime.mul(simulation.bonusMalus);
 
@@ -391,9 +409,29 @@ export class PricingEngineService {
 
     const company = await this.prisma.company.findUnique({ where: { id: companyId } });
     
-    // Excel: LLOYD = 5000 DT / 25 DT, AMANA = 4000 DT / 32 DT
-    const capital = company?.name === 'LLOYD' ? new Decimal(5000) : new Decimal(4000);
-    const prime = company?.name === 'LLOYD' ? new Decimal(25) : new Decimal(32);
+    // Excel: LLOYD = 5000/21 or 10000/42, AMANA = 4000/32 or 8000/64
+    let capital: Decimal;
+    let prime: Decimal;
+    
+    if (company?.name === 'LLOYD') {
+      // Default to 5000/21, but allow 10000/42 if selected
+      if (selectedCapital && selectedCapital.gte(10000)) {
+        capital = new Decimal(10000);
+        prime = new Decimal(42);
+      } else {
+        capital = new Decimal(5000);
+        prime = new Decimal(21);
+      }
+    } else {
+      // AMANA: Default to 4000/32, but allow 8000/64 if selected
+      if (selectedCapital && selectedCapital.gte(8000)) {
+        capital = new Decimal(8000);
+        prime = new Decimal(64);
+      } else {
+        capital = new Decimal(4000);
+        prime = new Decimal(32);
+      }
+    }
 
     return {
       guaranteeCode: 'PERSONNES_TRANSPORTEES',
@@ -407,8 +445,10 @@ export class PricingEngineService {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'ASSISTANCE' } });
     if (!guarantee) return null;
 
-    // Excel ARS: 121 DT fixe (toutes compagnies)
-    const prime = new Decimal(121);
+    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+    
+    // Excel: LLOYD = 115 DT, AMANA = 90 DT
+    const prime = company?.name === 'LLOYD' ? new Decimal(115) : new Decimal(90);
 
     return {
       guaranteeCode: 'ASSISTANCE',
@@ -418,25 +458,25 @@ export class PricingEngineService {
     };
   }
 
-  private async calculateTOUS_RISQUES_0(companyId: string, vehicle: VehicleData, vehicleAge: number, simulation: SimulationData, conventionId?: string) {
-    // Age restriction removed - not required per specifications
-
+  private async calculateTOUS_RISQUES_0(companyId: string, vehicle: VehicleData, vehicleAge: number, simulation: SimulationData, franchiseRate: number, conventionId?: string) {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'TOUS_RISQUES_ZERO' } });
     if (!guarantee) {
       console.log('❌ TOUS_RISQUES_ZERO guarantee not found');
       return null;
     }
 
-    const rule = await this.getPricingRule(companyId, guarantee.id, FormulaType.TOUS_RISQUES_0, conventionId);
-    if (!rule) {
-      console.log('❌ TOUS_RISQUES_0 pricing rule not found');
-      return null;
-    }
+    // Get franchise-specific rates from Excel Page 4
+    const franchiseRates = {
+      0: { rate: new Decimal(0.032), fixed: new Decimal(22) },
+      1: { rate: new Decimal(0.0265), fixed: new Decimal(21.75) },
+      2: { rate: new Decimal(0.021), fixed: new Decimal(19) },
+      4: { rate: new Decimal(0.017), fixed: new Decimal(15) },
+    };
 
-    // Formula: ((newValue * taux) + prime_fixe) * taux_reduction * bonus/malus
-    const rate = rule.baseRate || new Decimal(0.03222);
-    const fixedPremium = rule.fixedPremium || new Decimal(0);
-    let prime = vehicle.newValue.mul(rate).add(fixedPremium);
+    const selectedFranchise = franchiseRates[franchiseRate as keyof typeof franchiseRates] || franchiseRates[0];
+
+    // Formula: ((newValue * rate) + fixedPremium) * reductionRate * bonus/malus
+    let prime = vehicle.newValue.mul(selectedFranchise.rate).add(selectedFranchise.fixed);
 
     // Apply reduction rate
     const reductionRate = await this.reductionRatesService.getReductionRate(companyId, 'TOUS_RISQUES_0', conventionId);
@@ -454,8 +494,6 @@ export class PricingEngineService {
   }
 
   private async calculateDOMMAGES_COLLISIONS(companyId: string, vehicle: VehicleData, vehicleAge: number, simulation: SimulationData, selectedCapital?: Decimal, conventionId?: string) {
-    // Age restriction removed - not required per specifications
-
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'DOMMAGES_COLLISIONS' } });
     if (!guarantee) return null;
 
@@ -526,8 +564,11 @@ export class PricingEngineService {
       };
     }
 
-    // Formula: Capital * 0.08
-    const prime = capital.mul(0.08);
+    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+    
+    // Excel: LLOYD = 8%, AMANA = 7%
+    const rate = company?.name === 'LLOYD' ? new Decimal(0.08) : new Decimal(0.07);
+    const prime = capital.mul(rate);
 
     return {
       guaranteeCode: 'BG',

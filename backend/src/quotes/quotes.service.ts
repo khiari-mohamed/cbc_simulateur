@@ -37,7 +37,12 @@ export class QuotesService {
         usage: simulation.usage,
         formulaType: simulation.formulaType,
         selectedGuarantees: simulation.guarantees.map(g => g.guarantee.code),
+        selectedCapitals: {
+          BG: simulation.bgLimit ? new (require('@prisma/client').Decimal)(simulation.bgLimit) : new (require('@prisma/client').Decimal)(0),
+          DOMMAGES_COLLISIONS: simulation.dcCapital || new (require('@prisma/client').Decimal)(0),
+        },
       },
+      simulation.conventionId || undefined,
     );
 
     const quoteNumber = await this.generateQuoteNumber();
