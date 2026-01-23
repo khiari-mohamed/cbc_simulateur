@@ -1,12 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import { MainLayout } from '../../../components/layout/MainLayout';
-import { Users, Mail, Phone, Calendar } from 'lucide-react';
+import { Mail, Phone, Calendar } from 'lucide-react';
 import api from '../../../lib/api/client';
 import { Role } from '../../../types';
 
 export const UsersPage = () => {
-  const { t } = useTranslation();
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {

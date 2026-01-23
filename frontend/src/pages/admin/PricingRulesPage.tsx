@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit, Trash2, Filter, Shield } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import api from '../../lib/api/client';
@@ -9,7 +8,6 @@ import toast from 'react-hot-toast';
 import { PricingRuleModal } from '../../components/admin/PricingRuleModal';
 
 export const PricingRulesPage = () => {
-  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRule, setSelectedRule] = useState<any>(null);

@@ -13,6 +13,7 @@ interface CoverageSelectionStepProps {
   franchiseRate?: number;
   bgLimit?: number;
   dcCapital?: number;
+  firstCirculationDate: Date;
   onUpdate: (data: { 
     formulaType: FormulaType; 
     selectedGuarantees: string[]; 
@@ -26,16 +27,15 @@ interface CoverageSelectionStepProps {
 }
 
 export const CoverageSelectionStep = ({
-  vehicleAge,
   formulaType,
   selectedGuarantees,
   conventionId,
   franchiseRate,
   bgLimit,
   dcCapital,
+  firstCirculationDate,
   onUpdate,
   onNext,
-  onBack,
 }: CoverageSelectionStepProps) => {
   const [localFormula, setLocalFormula] = useState<FormulaType | ''>(formulaType || '');
   const [localGuarantees, setLocalGuarantees] = useState<string[]>(selectedGuarantees);
@@ -62,18 +62,27 @@ export const CoverageSelectionStep = ({
 
   const optionalGuarantees = guarantees?.filter(g => g.isOptional && g.isActive) || [];
 
-  // Age restrictions removed - not required per specifications
-  const canSelectTousRisques = true;
-  const canSelectDommagesCollision = true;
+  // Calculate vehicle age
+  const calculateAge = (date: Date): number => {
+    const now = new Date();
+    const circulation = new Date(date);
+    const age = now.getFullYear() - circulation.getFullYear();
+    const hasNotReachedBirthday = now < new Date(now.getFullYear(), circulation.getMonth(), circulation.getDate());
+    return hasNotReachedBirthday ? age - 1 : age;
+  };
+
+  const vehicleAge = calculateAge(firstCirculationDate);
+  const canSelectTousRisques = vehicleAge < 2;
+  const canSelectDommagesCollision = vehicleAge < 10;
 
   useEffect(() => {
     if (localFormula === FormulaType.TOUS_RISQUES_0) {
-      const brisDeGlaces = optionalGuarantees.find(g => g.code === 'BG');
-      if (brisDeGlaces && !localGuarantees.includes(brisDeGlaces.id)) {
-        setLocalGuarantees([...localGuarantees, brisDeGlaces.id]);
+      const brisDeGlacesGuarantee = optionalGuarantees.find(g => g.code === 'BG');
+      if (brisDeGlacesGuarantee && !localGuarantees.includes(brisDeGlacesGuarantee.id)) {
+        setLocalGuarantees([...localGuarantees, brisDeGlacesGuarantee.id]);
       }
     }
-  }, [localFormula, optionalGuarantees]);
+  }, [localFormula, optionalGuarantees, localGuarantees]);
 
   const handleFormulaChange = (formula: string) => {
     setLocalFormula(formula as FormulaType);
@@ -132,7 +141,6 @@ export const CoverageSelectionStep = ({
   };
 
   const isBrisDeGlacesFree = localFormula === FormulaType.TOUS_RISQUES_0;
-  const brisDeGlaces = optionalGuarantees.find(g => g.code === 'BG');
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -210,7 +210,7 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
             onChange={(e) => setFormData({ ...formData, usageType: e.target.value })}
           >
             <option value="">Tous</option>
-            <option value={UsageType.PRIVATE}>Privé</option>
+            <option value={UsageType.PRIVATE_BUSINESS}>Privé et affaires</option>
             <option value={UsageType.COMMERCIAL}>Commercial</option>
             <option value={UsageType.TAXI}>Taxi</option>
             <option value={UsageType.RENTAL}>Location</option>

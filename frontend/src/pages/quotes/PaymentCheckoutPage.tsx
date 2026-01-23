@@ -54,9 +54,9 @@ export const PaymentCheckoutPage = () => {
       return response;
     },
     onSuccess: (response) => {
-      // Redirect to Paymee payment gateway
-      if (response.paymeeUrl) {
-        window.location.href = response.paymeeUrl;
+      // Redirect to Flouci payment gateway
+      if (response.flouciUrl) {
+        window.location.href = response.flouciUrl;
       } else {
         toast.error('Impossible d\'accéder à la passerelle de paiement');
       }
@@ -290,7 +290,7 @@ export const PaymentCheckoutPage = () => {
                       Paiement sécurisé
                     </p>
                     <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                      Via Paymee - Passerelle de paiement tunisienne
+                      Via Flouci - Passerelle de paiement tunisienne
                     </p>
                   </div>
                 </div>

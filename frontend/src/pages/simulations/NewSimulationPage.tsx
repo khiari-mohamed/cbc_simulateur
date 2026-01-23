@@ -159,16 +159,16 @@ export const NewSimulationPage = () => {
               onBack={prevStep}
             />
           )}
-          {currentStep === 3 && (
+          {currentStep === 3 && simulationData.vehicle?.firstCirculationDate && (
             <CoverageSelectionStep
-              vehicleAge={simulationData.vehicle?.firstCirculationDate ? 
-                Math.floor((new Date().getTime() - new Date(simulationData.vehicle.firstCirculationDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 0}
+              vehicleAge={Math.floor((new Date().getTime() - new Date(simulationData.vehicle.firstCirculationDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000))}
               formulaType={simulationData.formulaType}
               selectedGuarantees={simulationData.selectedGuarantees || []}
               conventionId={simulationData.conventionId}
               franchiseRate={simulationData.franchiseRate}
               bgLimit={simulationData.bgLimit}
               dcCapital={simulationData.dcCapital}
+              firstCirculationDate={new Date(simulationData.vehicle.firstCirculationDate)}
               onUpdate={(data) => updateData(data)}
               onNext={nextStep}
               onBack={prevStep}

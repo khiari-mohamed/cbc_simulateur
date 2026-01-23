@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {  useMutation, useQueryClient } from '@tanstack/react-query';
 import { User, Lock, Globe, Moon, Sun, Bell } from 'lucide-react';
 import { Card, CardHeader, CardBody, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';

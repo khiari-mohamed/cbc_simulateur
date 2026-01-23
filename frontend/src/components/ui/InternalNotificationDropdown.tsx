@@ -1,12 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Users, AlertTriangle, CheckCircle, XCircle, Clock, Bell } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useInternalNotifications, useUnreadInternalCount } from '../../hooks/useInternalNotifications';
 
 export const InternalNotificationDropdown = () => {
-  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   

@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, XCircle, Eye, FileText, AlertCircle, Edit, Download } from 'lucide-react';
+import { CheckCircle, XCircle, Eye, FileText, AlertCircle, Edit } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { DocumentUpload } from '../../components/documents/DocumentUpload';
 import api from '../../lib/api/client';
 import toast from 'react-hot-toast';
-import { QuoteStatus } from '../../types';
 
 export const GestionnaireValidationPage = () => {
   const navigate = useNavigate();

@@ -22,8 +22,6 @@ const vehicleSchema = z.object({
   path: ['firstCirculationDate'],
 });
 
-type VehicleForm = z.infer<typeof vehicleSchema>;
-
 interface VehicleInfoStepProps {
   data?: VehicleData;
   onUpdate: (data: VehicleData) => void;
@@ -32,8 +30,8 @@ interface VehicleInfoStepProps {
 
 export const VehicleInfoStep = ({ data, onUpdate, onNext }: VehicleInfoStepProps) => {
   const { t } = useLanguage();
-  const { register, handleSubmit, formState: { errors, isValid }, watch } = useForm<VehicleForm>({
-    resolver: zodResolver(vehicleSchema),
+  const { register, handleSubmit, formState: { errors, isValid }, watch } = useForm({
+    resolver: zodResolver(vehicleSchema) as any,
     defaultValues: data,
     mode: 'onChange',
   });
@@ -46,8 +44,8 @@ export const VehicleInfoStep = ({ data, onUpdate, onNext }: VehicleInfoStepProps
     }
   }, [formData, isValid, onUpdate]);
 
-  const onSubmit = (formData: VehicleForm) => {
-    onUpdate(formData);
+  const onSubmit = (formData: any) => {
+    onUpdate(formData as VehicleData);
     onNext();
   };
 

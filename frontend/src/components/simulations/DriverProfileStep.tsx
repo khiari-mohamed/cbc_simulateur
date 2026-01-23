@@ -5,7 +5,6 @@ import { useEffect } from 'react';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { User } from 'lucide-react';
-import { UsageType } from '../../types';
 
 const driverSchema = z.object({
   bonusMalus: z.coerce.number().min(0.5, 'Minimum 0.5').max(3.5, 'Maximum 3.5'),
@@ -21,9 +20,9 @@ interface DriverProfileStepProps {
   onBack: () => void;
 }
 
-export const DriverProfileStep = ({ data, onUpdate, onNext, onBack }: DriverProfileStepProps) => {
-  const { register, handleSubmit, formState: { errors, isValid }, watch } = useForm<DriverForm>({
-    resolver: zodResolver(driverSchema),
+export const DriverProfileStep = ({ data, onUpdate, onNext }: DriverProfileStepProps) => {
+  const { register, handleSubmit, formState: { errors, isValid }, watch } = useForm({
+    resolver: zodResolver(driverSchema) as any,
     defaultValues: data,
     mode: 'onChange',
   });
@@ -36,8 +35,8 @@ export const DriverProfileStep = ({ data, onUpdate, onNext, onBack }: DriverProf
     }
   }, [formData, isValid, onUpdate]);
 
-  const onSubmit = (formData: DriverForm) => {
-    onUpdate(formData);
+  const onSubmit = (formData: any) => {
+    onUpdate(formData as DriverForm);
     onNext();
   };
 

@@ -142,7 +142,7 @@ export const ReportsPage = () => {
                   }}
                 />
                 <Bar dataKey="value" radius={[0, 8, 8, 0]}>
-                  {quotesChartData.map((entry, index) => (
+                  {quotesChartData.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index]} />
                   ))}
                 </Bar>

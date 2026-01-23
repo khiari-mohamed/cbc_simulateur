@@ -8,10 +8,10 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { GoogleButton } from '../../components/ui/GoogleButton';
 import { AuthLayout } from './AuthLayout';
-import { UserPlus, ArrowLeft, Shield } from 'lucide-react';
+import {  ArrowLeft, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/api/client';
-import { Role } from '../../types';
+
 
 const registerSchema = z.object({
   email: z.string().email('Email invalide'),

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FileCheck, Download, Calendar, Building2, AlertCircle } from 'lucide-react';
+import { FileCheck, Download, Calendar, Building2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useLanguage } from '../../contexts/LanguageContext';
 import api from '../../lib/api/client';

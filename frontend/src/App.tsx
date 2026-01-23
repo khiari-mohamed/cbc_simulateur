@@ -11,7 +11,7 @@ import { GoogleCallback } from './pages/auth/GoogleCallback';
 import { CompaniesPage } from './pages/admin/companies/CompaniesPage';
 import { ConventionsPage } from './pages/admin/Conventions/ConventionsPage';
 import { GuaranteesPage } from './pages/admin/Guarantees/GuaranteesPage';
-import { UsersPage } from './pages/admin/users/UsersPage';
+
 import { UsersManagementPage } from './pages/admin/users/UsersManagementPage';
 import { ReportsPage } from './pages/admin/reports/ReportsPage';
 import { PricingRulesPage } from './pages/admin/PricingRulesPage';

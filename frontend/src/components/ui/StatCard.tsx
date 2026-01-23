@@ -7,13 +7,17 @@ interface StatCardProps {
   icon: LucideIcon;
   trend?: string;
   subtitle?: string;
+  onClick?: () => void;
 }
 
-export const StatCard = ({ title, value, icon: Icon, trend, subtitle }: StatCardProps) => {
+export const StatCard = ({ title, value, icon: Icon, trend, subtitle, onClick }: StatCardProps) => {
   const isPositive = trend?.startsWith('+');
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
+    <div 
+      className={`bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-4 sm:p-6 ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+      onClick={onClick}
+    >
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>

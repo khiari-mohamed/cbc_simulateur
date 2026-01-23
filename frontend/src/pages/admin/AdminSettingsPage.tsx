@@ -1,6 +1,6 @@
-import { useState } from 'react';
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Settings, Shield, Percent, Users, Save } from 'lucide-react';
+import { Settings, Shield, Percent, Users } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -9,7 +9,6 @@ import toast from 'react-hot-toast';
 
 export const AdminSettingsPage = () => {
   const queryClient = useQueryClient();
-  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   const { data: users } = useQuery({
     queryKey: ['users'],

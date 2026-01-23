@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, Mail, Phone, Calendar, Shield, CheckCircle, XCircle, UserPlus } from 'lucide-react';
+import { Mail, Phone, Calendar, Shield, CheckCircle, XCircle, UserPlus } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import api from '../../../lib/api/client';
@@ -34,16 +34,6 @@ export const UsersManagementPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('2FA mis à jour');
-    },
-    onError: () => toast.error('Erreur'),
-  });
-
-  const updateRoleMutation = useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: Role }) =>
-      api.patch(`/users/${userId}/role`, { role }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('Rôle mis à jour');
     },
     onError: () => toast.error('Erreur'),
   });

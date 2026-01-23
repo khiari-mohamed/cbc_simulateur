@@ -39,7 +39,7 @@ export const AdminDashboard = () => {
   const totalQuotes = stats?.reporting?.quotes?.total || 0;
 
   // Prepare chart data from recent quotes
-  const chartData = stats?.quotes?.slice(0, 10).reverse().map((quote: any, idx: number) => ({
+  const chartData = stats?.quotes?.slice(0, 10).reverse().map((quote: any) => ({
     name: new Date(quote.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
     prime: Number(quote.primeNette),
   })) || [];
