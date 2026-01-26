@@ -70,7 +70,7 @@ export class ReductionRatesService {
    * Get all reduction rates for a company (for admin display)
    */
   async getCompanyReductionRates(companyId: string) {
-    const reducibleGuarantees = ['VOL', 'INCENDIE', 'TOUS_RISQUES_0', 'DOMMAGES_COLLISIONS'];
+    const reducibleGuarantees = ['VOL', 'INCENDIE', 'TOUS_RISQUES_ZERO', 'DOMMAGES_COLLISIONS'];
 
     const rates = await Promise.all(
       reducibleGuarantees.map(async (code) => ({

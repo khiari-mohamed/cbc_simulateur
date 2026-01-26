@@ -40,7 +40,9 @@ export class QuotesService {
         selectedCapitals: {
           BG: simulation.bgLimit ? new (require('@prisma/client').Decimal)(simulation.bgLimit) : new (require('@prisma/client').Decimal)(0),
           DOMMAGES_COLLISIONS: simulation.dcCapital || new (require('@prisma/client').Decimal)(0),
+          PERSONNES_TRANSPORTEES: new (require('@prisma/client').Decimal)(5000), // Default PTA capital
         },
+        franchiseRate: simulation.franchiseRate ? Number(simulation.franchiseRate) : 0,
       },
       simulation.conventionId || undefined,
     );
@@ -175,9 +177,31 @@ export class QuotesService {
   }
 
   async submit(id: string, userId: string) {
-    const quote = await this.prisma.quote.findUnique({ where: { id } });
+    const quote = await this.prisma.quote.findUnique({ 
+      where: { id },
+      include: { 
+        user: true
+      },
+    });
     if (!quote || quote.userId !== userId) {
       throw new Error('Quote not found or access denied');
+    }
+
+    // CDC: Documents are mandatory before submission
+    const userDocs = await this.prisma.document.findMany({ where: { userId } });
+    const requiredDocs = ['CARTE_GRISE', 'CIN', 'VISITE_TECHNIQUE', 'VIGNETTE'];
+    const uploadedDocTypes = userDocs.map(d => d.type);
+    const missingDocs = requiredDocs.filter(type => !uploadedDocTypes.includes(type));
+    
+    // Check for RNE if user is a company (has company-related data)
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (user && user.role === 'CLIENT_ADHERENT') {
+      // For now, we assume all clients might need RNE - this can be refined based on business logic
+      // requiredDocs.push('RNE'); // Uncomment if RNE is mandatory for all
+    }
+    
+    if (missingDocs.length > 0) {
+      throw new Error(`Documents manquants: ${missingDocs.join(', ')}. Veuillez télécharger tous les documents requis avant de soumettre.`);
     }
 
     const updated = await this.prisma.quote.update({
@@ -298,16 +322,15 @@ export class QuotesService {
   }
 
   async updateWithNote(id: string, data: any, note: string, validatedBy: string) {
-    const quote = await this.prisma.quote.findUnique({ where: { id } });
+    const quote = await this.prisma.quote.findUnique({ 
+      where: { id },
+      include: { user: true },
+    });
     
     if (!quote) {
       throw new Error('Quote not found');
     }
 
-    // If quote is already SUBMITTED, it means gestionnaire is validating with note
-    // The note should be sent as modification
-    const isFirstValidation = quote.status === QuoteStatus.SUBMITTED;
-    
     const updated = await this.prisma.quote.update({
       where: { id },
       data: {
@@ -320,23 +343,52 @@ export class QuotesService {
       include: { user: true },
     });
 
-    // Notify based on whether it's first validation or modification
-    if (isFirstValidation) {
-      // First validation with note - treat as modification
+    // Notify client about modification
+    this.notificationsService.notifyQuoteModified(
+      updated.user,
+      updated.quoteNumber,
+      note,
+    ).catch(err => console.error('Failed to send notification:', err.message));
+
+    return updated;
+  }
+
+  async modifyQuote(id: string, modifications: any, note: string, modifiedBy: string) {
+    const quote = await this.prisma.quote.findUnique({ 
+      where: { id },
+      include: { user: true, simulation: { include: { vehicle: true } } },
+    });
+    
+    if (!quote) {
+      throw new Error('Quote not found');
+    }
+
+    // Recalculate if pricing data changed
+    if (modifications.pricingData) {
+      const updated = await this.prisma.quote.update({
+        where: { id },
+        data: {
+          primeNette: modifications.pricingData.primeNette,
+          frais: modifications.pricingData.frais,
+          taxes: modifications.pricingData.taxes,
+          totalAPayer: modifications.pricingData.totalAPayer,
+          modificationNote: note,
+          validatedById: modifiedBy,
+          validatedAt: new Date(),
+        },
+        include: { user: true },
+      });
+
       this.notificationsService.notifyQuoteModified(
         updated.user,
         updated.quoteNumber,
         note,
       ).catch(err => console.error('Failed to send notification:', err.message));
-    } else {
-      // Simple validation
-      this.notificationsService.notifyQuoteValidated(
-        updated.user,
-        updated.quoteNumber,
-      ).catch(err => console.error('Failed to send notification:', err.message));
+
+      return updated;
     }
 
-    return updated;
+    return this.updateWithNote(id, modifications, note, modifiedBy);
   }
 
   private async generateQuoteNumber(): Promise<string> {

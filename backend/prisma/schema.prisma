@@ -95,17 +95,22 @@ model User {
   createdContracts    Contract[]        @relation("ContractCreator")
   notifications       Notification[]
   quoteComparisons    QuoteComparison[]
+  documents           Document[]
 
   @@map("users")
 }
 
 model Company {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  code        String   @unique
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  name         String   @unique
+  code         String   @unique
+  contractFees Decimal? @db.Decimal(12, 2)
+  fpac         Decimal  @default(0.5) @db.Decimal(12, 2)
+  fssr         Decimal  @default(0.3) @db.Decimal(12, 2)
+  fg           Decimal  @default(3.0) @db.Decimal(12, 2)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   pricingRules PricingRule[]
   quotes       Quote[]
@@ -307,12 +312,22 @@ model PricingRule {
   formulaType     FormulaType?
   minPower        Int?
   maxPower        Int?
+  bonusMalusClass Int?
   minAge          Int?
   maxAge          Int?
+  minCapital      Decimal?     @db.Decimal(12, 2)
+  maxCapital      Decimal?     @db.Decimal(12, 2)
+  minMarketValue  Decimal?     @db.Decimal(12, 2)
+  maxMarketValue  Decimal?     @db.Decimal(12, 2)
+  franchiseRate   Int?
+  ratePercentage  Decimal?     @db.Decimal(12, 6)
   baseRate        Decimal?     @db.Decimal(12, 4)
   fixedPremium    Decimal?     @db.Decimal(12, 2)
   multiplier      Decimal?     @db.Decimal(12, 4)
   reductionRate   Decimal?     @db.Decimal(5, 2)
+  tierLevel       Int?
+  tierRate        Decimal?     @db.Decimal(12, 6)
+  basePremium     Decimal?     @db.Decimal(12, 2)
   usageType       UsageType?
   validFrom       DateTime     @default(now())
   validTo         DateTime?
@@ -325,8 +340,10 @@ model PricingRule {
 
 model Document {
   id          String   @id @default(uuid())
-  quoteId     String
-  quote       Quote    @relation(fields: [quoteId], references: [id])
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  quoteId     String?
+  quote       Quote?   @relation(fields: [quoteId], references: [id])
   type        String
   fileName    String
   filePath    String

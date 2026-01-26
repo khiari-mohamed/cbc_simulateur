@@ -28,13 +28,17 @@ export class NotificationsService {
     private config: ConfigService,
     private prisma: PrismaService,
   ) {
+    const smtpPort = parseInt(this.config.get('SMTP_PORT') || '25');
     this.transporter = nodemailer.createTransport({
       host: this.config.get('SMTP_HOST'),
-      port: this.config.get('SMTP_PORT'),
-      secure: true, // SSL
+      port: smtpPort,
+      secure: false,
       auth: {
         user: this.config.get('SMTP_USER'),
         pass: this.config.get('SMTP_PASSWORD'),
+      },
+      tls: {
+        rejectUnauthorized: false,
       },
     });
   }
@@ -314,14 +318,15 @@ export class NotificationsService {
   }
 
   async sendOTP(to: string, otp: string) {
-    console.log('🔐 OTP for', to, ':', otp); // Log OTP AVANT envoi email
+    console.log('🔐 OTP for', to, ':', otp);
     
     const logoUrl = `${this.config.get('FRONTEND_URL')}/Image1.png`;
     try {
-      await this.transporter.sendMail({
+      const mailOptions = {
         from: this.config.get('SMTP_FROM'),
         to,
-        subject: 'Code de vérification OTP - Application ARS',
+        subject: 'Code OTP - ARS Tunisia',
+        text: `Votre code de vérification OTP est: ${otp}\n\nCe code expire dans 10 minutes.\n\nSi vous n'avez pas demandé ce code, ignorez cet email.\n\nARS Tunisia - Courtier en Assurances`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
             <div style="background: #003366; padding: 30px; text-align: center;">
@@ -350,10 +355,17 @@ export class NotificationsService {
             </div>
           </div>
         `,
-      });
-    } catch (error) {
-      console.log('OTP Email not sent (SMTP error):', error.message);
+      };
+      
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log('✅ OTP Email sent successfully:', info.messageId);
+      console.log('📧 Accepted:', info.accepted);
+      console.log('❌ Rejected:', info.rejected);
+    } catch (error: any) {
+      console.error('❌ OTP Email failed:', error.message);
+      console.error('Full error:', error);
       console.log('🔑 For development, use this OTP:', otp);
+      throw error;
     }
   }
 

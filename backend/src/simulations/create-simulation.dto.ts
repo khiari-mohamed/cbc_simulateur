@@ -30,16 +30,11 @@ export class CreateSimulationDto {
   selectedGuarantees?: string[];
 
   @IsOptional()
-  @Transform(({ value }) => parseFloat(value))
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  @Max(4)
+  @IsNumber()
   franchiseRate?: number;
 
   @IsOptional()
   @IsNumber()
-  @Min(500)
-  @Max(3000)
   bgLimit?: number;
 
   @IsOptional()

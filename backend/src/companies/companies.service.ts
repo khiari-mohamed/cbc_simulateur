@@ -73,7 +73,7 @@ export class CompaniesService {
     return company;
   }
 
-  async update(id: string, data: { name?: string }, userId: string) {
+  async update(id: string, data: { name?: string; contractFees?: number; fpac?: number; fssr?: number; fg?: number }, userId: string) {
     const existing = await this.findById(id);
 
     if (data.name && data.name !== existing.name) {
@@ -87,7 +87,13 @@ export class CompaniesService {
 
     const updated = await this.prisma.company.update({
       where: { id },
-      data,
+      data: {
+        ...(data.name && { name: data.name }),
+        ...(data.contractFees !== undefined && { contractFees: data.contractFees }),
+        ...(data.fpac !== undefined && { fpac: data.fpac }),
+        ...(data.fssr !== undefined && { fssr: data.fssr }),
+        ...(data.fg !== undefined && { fg: data.fg }),
+      },
     });
 
     await this.auditService.log(
@@ -95,8 +101,8 @@ export class CompaniesService {
       'COMPANY_UPDATED',
       'Company',
       id,
-      { name: existing.name },
-      { name: updated.name },
+      { name: existing.name, contractFees: existing.contractFees, fpac: existing.fpac, fssr: existing.fssr, fg: existing.fg },
+      { name: updated.name, contractFees: updated.contractFees, fpac: updated.fpac, fssr: updated.fssr, fg: updated.fg },
     );
 
     return updated;

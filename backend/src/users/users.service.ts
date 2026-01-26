@@ -167,4 +167,28 @@ export class UsersService {
       data: { isActive: true },
     });
   }
+
+  async delete(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Safe deletion: if user has dependent data, perform soft-deactivate to avoid breaking references
+    const deps = await this.prisma.$transaction([
+      this.prisma.quote.count({ where: { userId } }),
+      this.prisma.simulation.count({ where: { userId } }),
+      this.prisma.contract.count({ where: { userId } }),
+      this.prisma.document.count({ where: { userId } }),
+    ]);
+    const hasDeps = deps.some((c) => c > 0);
+
+    if (hasDeps) {
+      await this.prisma.user.update({ where: { id: userId }, data: { isActive: false } });
+      return { message: 'User has dependent records; account deactivated instead of hard delete' };
+    }
+
+    await this.prisma.user.delete({ where: { id: userId } });
+    return { message: 'User deleted successfully' };
+  }
 }

@@ -9,28 +9,35 @@ export class DocumentsService {
     private internalNotificationsService: InternalNotificationsService,
   ) {}
 
-  async upload(quoteId: string, type: string, fileName: string, filePath: string) {
+  async upload(quoteId: string | undefined, userId: string | undefined, type: string, fileName: string, filePath: string) {
     const document = await this.prisma.document.create({
-      data: { quoteId, type, fileName, filePath },
-      include: {
-        quote: {
-          include: { user: true },
-        },
-      },
+      data: { quoteId, userId, type, fileName, filePath },
     });
 
-    // Notify gestionnaires about new document
-    this.internalNotificationsService.notifyDocumentUploaded(
-      document.quote.quoteNumber,
-      `${document.quote.user.firstName} ${document.quote.user.lastName}`,
-      type,
-    ).catch(err => console.error('Failed to send internal notification:', err.message));
+    if (quoteId) {
+      const quote = await this.prisma.quote.findUnique({
+        where: { id: quoteId },
+        include: { user: true },
+      });
+      
+      if (quote) {
+        this.internalNotificationsService.notifyDocumentUploaded(
+          quote.quoteNumber,
+          `${quote.user.firstName} ${quote.user.lastName}`,
+          type,
+        ).catch(err => console.error('Failed to send internal notification:', err.message));
+      }
+    }
 
     return document;
   }
 
   async findByQuote(quoteId: string) {
     return this.prisma.document.findMany({ where: { quoteId } });
+  }
+
+  async findByUser(userId: string) {
+    return this.prisma.document.findMany({ where: { userId } });
   }
 
   async findById(id: string) {
@@ -57,6 +64,7 @@ export class DocumentsService {
     });
 
     if (!document) throw new Error('Document not found');
+    if (!document.quote) throw new Error('Quote not found for document');
 
     // Internal notification to admin about document rejection
     const admins = await this.prisma.user.findMany({

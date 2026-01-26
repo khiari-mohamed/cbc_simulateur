@@ -15,6 +15,19 @@ import { Role } from '@prisma/client';
 export class DocumentsController {
   constructor(private documentsService: DocumentsService) {}
 
+  @Get('required-types')
+  getRequiredTypes() {
+    // Central list for required documents; frontend can use this to render checklist
+    return [
+      { type: 'CARTE_GRISE', label: 'Carte grise', required: true },
+      { type: 'CIN', label: 'Carte d\'identité (CIN)', required: true },
+      { type: 'VISITE_TECHNIQUE', label: 'Visite technique', required: true },
+      { type: 'VIGNETTE', label: 'Vignette', required: true },
+      // RNE may be required for company clients; enforce conditionally on submit if applicable
+      { type: 'RNE', label: 'Registre du Commerce (RNE)', required: false },
+    ];
+  }
+
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -44,16 +57,26 @@ export class DocumentsController {
     if (!file) {
       throw new BadRequestException('File is required');
     }
-    const { quoteId, type } = req.body;
-    if (!quoteId || !type) {
-      throw new BadRequestException('quoteId and type are required');
+    const { quoteId, userId, type } = req.body;
+    if ((!quoteId && !userId) || !type) {
+      throw new BadRequestException('Either quoteId or userId and type are required');
     }
-    return this.documentsService.upload(quoteId, type, file.originalname, file.path);
+    return this.documentsService.upload(quoteId, userId, type, file.originalname, file.path);
   }
 
   @Get('quote/:quoteId')
   findByQuote(@Param('quoteId') quoteId: string) {
     return this.documentsService.findByQuote(quoteId);
+  }
+
+  @Get('my')
+  findMy(@Request() req: any) {
+    return this.documentsService.findByUser(req.user.userId);
+  }
+
+  @Get('user/:userId')
+  findByUser(@Param('userId') userId: string) {
+    return this.documentsService.findByUser(userId);
   }
 
   @Post(':id/validate')

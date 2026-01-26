@@ -75,4 +75,11 @@ export class UsersController {
   activate(@Param('id') id: string) {
     return this.usersService.activate(id);
   }
+
+  @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMINISTRATEUR_ARS)
+  delete(@Param('id') id: string) {
+    return this.usersService.delete(id);
+  }
 }

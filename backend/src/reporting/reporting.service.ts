@@ -98,6 +98,7 @@ export class ReportingService {
         rejectionRate: Number(rejectionRate.toFixed(2)),
       },
       byCompany: quotesByCompanyWithNames,
+      byConvention: await this.getStatisticsByConvention(startDate, endDate),
     };
   }
 
