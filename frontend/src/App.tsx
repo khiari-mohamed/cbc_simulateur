@@ -35,6 +35,7 @@ import { ContractsPage } from './pages/Contracts/ContractsPage';
 import { ContractDetailPage } from './pages/Contracts/ContractDetailPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
+import { DocumentsPage } from './pages/DocumentsPage';
 import { Role } from './types/index';
 
 const queryClient = new QueryClient();
@@ -92,6 +93,7 @@ function App() {
                 <Route path="/contracts" element={<ContractsPage />} />
                 <Route path="/contracts/:contractNumber" element={<ContractDetailPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
+                <Route path="/documents" element={<DocumentsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route
                   path="/admin/companies"

@@ -17,6 +17,7 @@ import {
   DollarSign,
   ClipboardCheck,
   X,
+  Upload,
 } from 'lucide-react';
 
 interface NavItem {
@@ -32,6 +33,7 @@ const getNavItems = (t: (key: string) => string): NavItem[] => [
   { icon: List, label: t('nav.simulations'), path: '/simulations', roles: [Role.CLIENT_ADHERENT] },
   { icon: FileCheck, label: t('nav.quotes'), path: '/quotes', roles: [Role.CLIENT_ADHERENT] },
   { icon: FileSignature, label: t('nav.contracts'), path: '/contracts', roles: [Role.CLIENT_ADHERENT] },
+  { icon: Upload, label: 'Mes Documents', path: '/documents', roles: [Role.CLIENT_ADHERENT] },
   { icon: Building2, label: t('nav.companies'), path: '/admin/companies', roles: [Role.ADMINISTRATEUR_ARS] },
   { icon: Shield, label: t('nav.conventions'), path: '/admin/conventions', roles: [Role.ADMINISTRATEUR_ARS] },
   { icon: Shield, label: t('nav.guarantees'), path: '/admin/guarantees', roles: [Role.ADMINISTRATEUR_ARS] },

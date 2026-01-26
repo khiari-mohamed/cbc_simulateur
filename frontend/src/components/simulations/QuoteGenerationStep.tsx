@@ -48,6 +48,7 @@ export const QuoteGenerationStep = ({
     },
   });
 
+  // Companies will be injected via coverage step selection; fallback to all active if none provided
   const { data: companies } = useQuery({
     queryKey: ['companies', 'active'],
     queryFn: async () => {
@@ -58,22 +59,23 @@ export const QuoteGenerationStep = ({
 
   const generateQuotesMutation = useMutation({
     mutationFn: async (simId: string) => {
-      if (!companies || companies.length === 0) {
-        throw new Error('Aucune compagnie disponible');
+      // Read selected companies from localStorage written by CoverageSelectionStep via simulationData if present
+      const selection = JSON.parse(localStorage.getItem('simulationData') || '{}');
+      const companyIds: string[] = selection.companyIds && selection.companyIds.length ? selection.companyIds : (companies || []).map((c: any) => c.id).slice(0, 2);
+      if (!companyIds || companyIds.length === 0) {
+        throw new Error('Aucune compagnie sélectionnée');
       }
-      
-      const quotePromises = companies.map((company: any) =>
-        api.post('/quotes/generate', { simulationId: simId, companyId: company.id })
-          .then(res => {
-            console.log('Quote generated for', company.name, res.data);
-            return res.data;
-          })
+
+      const quotePromises = companyIds.map((companyId: string) =>
+        api.post('/quotes/generate', { simulationId: simId, companyId })
+          .then(res => res.data)
           .catch((err) => {
-            console.error('Failed to generate quote for', company.name, err.response?.data || err.message);
+            // Return error as null to continue, we will display individual errors via toast
+            toast.error(err.response?.data?.message || 'Erreur lors de la génération');
             return null;
           })
       );
-      
+
       const results = await Promise.all(quotePromises);
       return results.filter(q => q !== null);
     },

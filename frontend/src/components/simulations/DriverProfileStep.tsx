@@ -2,12 +2,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useEffect } from 'react';
-import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { User } from 'lucide-react';
 
 const driverSchema = z.object({
-  bonusMalus: z.coerce.number().min(0.5, 'Minimum 0.5').max(3.5, 'Maximum 3.5'),
+  // CDC: Bonus/Malus class 1..8
+  bonusMalus: z.coerce.number().int().min(1, 'Classe minimale 1').max(8, 'Classe maximale 8'),
   usage: z.string().min(1, 'Usage requis'),
 });
 
@@ -40,18 +40,6 @@ export const DriverProfileStep = ({ data, onUpdate, onNext }: DriverProfileStepP
     onNext();
   };
 
-  const bonusMalus = watch('bonusMalus');
-
-  const getReduction = (bonus: number) => {
-    if (bonus < 1) return Math.round((1 - bonus) * 100);
-    return 0;
-  };
-
-  const getMajoration = (malus: number) => {
-    if (malus > 1) return Math.round((malus - 1) * 100);
-    return 0;
-  };
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="flex items-center gap-3 mb-6">
@@ -70,34 +58,23 @@ export const DriverProfileStep = ({ data, onUpdate, onNext }: DriverProfileStepP
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Input
-            label="Coefficient Bonus/Malus"
-            type="number"
-            step="0.01"
-            placeholder="Ex: 0.5 à 3.5"
+          <Select
+            label="Classe Bonus/Malus"
             {...register('bonusMalus')}
             error={errors.bonusMalus?.message}
             required
+            options={[
+              { value: '', label: 'Sélectionner une classe (1 à 8)' },
+              { value: '1', label: 'Classe 1' },
+              { value: '2', label: 'Classe 2' },
+              { value: '3', label: 'Classe 3' },
+              { value: '4', label: 'Classe 4' },
+              { value: '5', label: 'Classe 5' },
+              { value: '6', label: 'Classe 6' },
+              { value: '7', label: 'Classe 7' },
+              { value: '8', label: 'Classe 8' },
+            ]}
           />
-          {bonusMalus && (
-            <div className="mt-2">
-              {bonusMalus < 1 && (
-                <p className="text-sm text-green-600 dark:text-green-400">
-                  ✓ Bonus de {getReduction(bonusMalus)}% (réduction)
-                </p>
-              )}
-              {bonusMalus === 1 && (
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  = Coefficient neutre
-                </p>
-              )}
-              {bonusMalus > 1 && (
-                <p className="text-sm text-orange-600 dark:text-orange-400">
-                  ⚠ Malus de {getMajoration(bonusMalus)}% (majoration)
-                </p>
-              )}
-            </div>
-          )}
         </div>
 
         <Select
@@ -107,20 +84,19 @@ export const DriverProfileStep = ({ data, onUpdate, onNext }: DriverProfileStepP
           required
           options={[
             { value: '', label: 'Sélectionner un usage' },
-            { value: 'PRIVATE_BUSINESS', label: 'Privé et Affaires' },
+            { value: 'PRIVATE_BUSINESS', label: 'Promenade et Affaires' },
+            { value: 'COMMERCIAL', label: 'Affaire' },
           ]}
         />
       </div>
 
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
         <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-          📋 Coefficient Bonus/Malus
+          📋 Classe Bonus/Malus
         </h3>
         <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-          <li>• <strong>0.5</strong> : Bonus maximal (50% de réduction)</li>
-          <li>• <strong>1.0</strong> : Coefficient neutre (aucun sinistre)</li>
-          <li>• <strong>&gt; 1.0</strong> : Malus (majoration selon sinistres)</li>
-          <li>• <strong>3.5</strong> : Malus maximal</li>
+          <li>• Classes <strong>1 à 8</strong> conformes au tableau RC</li>
+          <li>• La classe sélectionnée sera appliquée au tableau RC côté serveur</li>
         </ul>
       </div>
     </form>

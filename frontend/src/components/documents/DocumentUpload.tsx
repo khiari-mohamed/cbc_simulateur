@@ -11,36 +11,24 @@ interface DocumentUploadProps {
   readonly?: boolean;
 }
 
-// Document requirements by customer type
-const DOCUMENT_TYPES_PARTICULIER = [
-  { value: 'CIN', label: 'Carte d\'identité nationale (CIN)', required: true },
-  { value: 'PERMIS', label: 'Permis de conduire', required: true },
-  { value: 'CARTE_GRISE', label: 'Carte grise', required: true },
-  { value: 'VIGNETTE', label: 'Vignette', required: true },
-  { value: 'VISITE_TECHNIQUE', label: 'Visite technique', required: true },
-];
-
-const DOCUMENT_TYPES_SOCIETE = [
-  { value: 'RNE', label: 'RNE (Registre National des Entreprises)', required: true },
-  { value: 'REGISTRE_COMMERCE', label: 'Extrait du Registre de Commerce', required: true },
-  { value: 'PATENTE', label: 'Patente commerciale', required: true },
-  { value: 'STATUTS', label: 'Statuts de la société', required: true },
-  { value: 'CIN_REPRESENTANT', label: 'CIN du représentant légal', required: true },
-  { value: 'CARTE_GRISE', label: 'Carte grise', required: true },
-  { value: 'VIGNETTE', label: 'Vignette', required: true },
-  { value: 'VISITE_TECHNIQUE', label: 'Visite technique', required: true },
-];
-
-const COMMON_DOCUMENTS = [
-  { value: 'OTHER', label: 'Autre document', required: false },
-];
+// Fetch required document types from backend (authoritative)
+const useRequiredDocTypes = () => {
+  const { data } = useQuery({
+    queryKey: ['documents', 'required-types'],
+    queryFn: async () => {
+      const { data } = await api.get('/documents/required-types');
+      return data as { type: string; label: string; required: boolean }[];
+    },
+  });
+  return data || [];
+};
 
 export const DocumentUpload = ({ quoteId, readonly = false }: DocumentUploadProps) => {
   const queryClient = useQueryClient();
   const [selectedType, setSelectedType] = useState('');
   const [uploading, setUploading] = useState(false);
   const [customerType, setCustomerType] = useState<'PARTICULIER' | 'SOCIETE' | null>(null);
-  const [documentTypes, setDocumentTypes] = useState<typeof DOCUMENT_TYPES_PARTICULIER>([]);
+  const [documentTypes, setDocumentTypes] = useState<{ value: string; label: string; required: boolean }[]>([]);
 
   const { data: documents, isLoading } = useQuery({
     queryKey: ['documents', quoteId],
@@ -60,24 +48,18 @@ export const DocumentUpload = ({ quoteId, readonly = false }: DocumentUploadProp
     enabled: !!quoteId,
   });
 
-  // Determine customer type and set available document types
+  const requiredTypes = useRequiredDocTypes();
+
+  // Determine available document types (no hardcoding, backend-driven)
   useEffect(() => {
     if (quote) {
-      // Check if user is a business (societe) or individual (particulier)
-      // Based on user role or simulation data
-      const isBusinessUser = quote.user?.type === 'SOCIETE' || quote.simulation?.customerType === 'SOCIETE';
-      const type = isBusinessUser ? 'SOCIETE' : 'PARTICULIER';
-      
-      setCustomerType(type);
-      
-      const types = type === 'SOCIETE' 
-        ? [...DOCUMENT_TYPES_SOCIETE, ...COMMON_DOCUMENTS]
-        : [...DOCUMENT_TYPES_PARTICULIER, ...COMMON_DOCUMENTS];
-      
-      setDocumentTypes(types);
-      setSelectedType(types[0].value);
+      // Current backend does not expose customer type; keep neutral list from backend
+      setCustomerType(null);
+      const mapped = requiredTypes.map((t) => ({ value: t.type, label: t.label, required: t.required }));
+      setDocumentTypes(mapped);
+      if (mapped.length > 0) setSelectedType(mapped[0].value);
     }
-  }, [quote]);
+  }, [quote, requiredTypes]);
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {

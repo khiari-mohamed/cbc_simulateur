@@ -1,10 +1,14 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MainLayout } from '../../../components/layout/MainLayout';
-import { Mail, Phone, Calendar } from 'lucide-react';
+import { Mail, Phone, Calendar, Trash2 } from 'lucide-react';
+import { Button } from '../../../components/ui/Button';
 import api from '../../../lib/api/client';
 import { Role } from '../../../types';
+import toast from 'react-hot-toast';
 
 export const UsersPage = () => {
+  const queryClient = useQueryClient();
+  
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
@@ -12,6 +16,21 @@ export const UsersPage = () => {
       return data;
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (userId: string) => api.delete(`/users/${userId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('Utilisateur supprimé avec succès');
+    },
+    onError: () => toast.error('Erreur lors de la suppression'),
+  });
+
+  const handleDelete = (userId: string, userName: string) => {
+    if (confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur ${userName} ?`)) {
+      deleteMutation.mutate(userId);
+    }
+  };
 
   const getRoleBadge = (role: Role) => {
     const styles = {
@@ -92,6 +111,16 @@ export const UsersPage = () => {
                         Inscrit le {new Date(user.createdAt).toLocaleDateString('fr-FR')}
                       </div>
                     </div>
+                  </div>
+                  <div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(user.id, `${user.firstName} ${user.lastName}`)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
               </div>

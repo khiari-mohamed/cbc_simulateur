@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Mail, Phone, Calendar, Shield, CheckCircle, XCircle, UserPlus } from 'lucide-react';
+import { Mail, Phone, Calendar, Shield, CheckCircle, XCircle, UserPlus, Trash2 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import api from '../../../lib/api/client';
@@ -68,6 +68,21 @@ export const UsersManagementPage = () => {
     },
     onError: () => toast.error('Erreur'),
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (userId: string) => api.delete(`/users/${userId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('Utilisateur supprimé avec succès');
+    },
+    onError: () => toast.error('Erreur lors de la suppression'),
+  });
+
+  const handleDelete = (userId: string, userName: string) => {
+    if (confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur ${userName} ?`)) {
+      deleteMutation.mutate(userId);
+    }
+  };
 
   const getRoleBadge = (role: Role) => {
     const styles = {
@@ -218,6 +233,15 @@ export const UsersManagementPage = () => {
                       >
                         <UserPlus className="w-3 h-3 mr-1" />
                         Assigner convention
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDelete(user.id, `${user.firstName} ${user.lastName}`)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        Supprimer
                       </Button>
                     </div>
                   </div>

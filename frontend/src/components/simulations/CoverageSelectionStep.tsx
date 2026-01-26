@@ -21,6 +21,7 @@ interface CoverageSelectionStepProps {
     franchiseRate?: number;
     bgLimit?: number;
     dcCapital?: number;
+    companyIds?: string[];
   }) => void;
   onNext: () => void;
   onBack: () => void;
@@ -43,6 +44,7 @@ export const CoverageSelectionStep = ({
   const [localFranchiseRate, setLocalFranchiseRate] = useState<number>(franchiseRate || 0);
   const [localBgLimit, setLocalBgLimit] = useState<number>(bgLimit || 1000);
   const [localDcCapital, setLocalDcCapital] = useState<number>(dcCapital || 1000);
+  const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
 
   const { data: guarantees } = useQuery({
     queryKey: ['guarantees'],
@@ -62,6 +64,14 @@ export const CoverageSelectionStep = ({
 
   const optionalGuarantees = guarantees?.filter(g => g.isOptional && g.isActive) || [];
 
+  const { data: companies } = useQuery({
+    queryKey: ['companies', 'active'],
+    queryFn: async () => {
+      const { data } = await api.get('/companies');
+      return data.filter((c: any) => c.isActive);
+    },
+  });
+
   // Calculate vehicle age
   const calculateAge = (date: Date): number => {
     const now = new Date();
@@ -72,6 +82,23 @@ export const CoverageSelectionStep = ({
   };
 
   const vehicleAge = calculateAge(firstCirculationDate);
+  
+  // DC capital step enforcement based on CDC
+  const snapDcCapital = (value: number, marketValue?: number) => {
+    if (!marketValue) return value;
+    const maxAllowed = Math.min(marketValue * 0.5, 100000);
+    let capped = Math.max(1000, Math.min(value, maxAllowed));
+    if (capped <= 10000) {
+      capped = Math.round(capped / 1000) * 1000;
+    } else if (capped <= 20000) {
+      capped = Math.round((capped - 10000) / 5000) * 5000 + 10000;
+    } else if (capped <= 50000) {
+      capped = Math.round((capped - 20000) / 10000) * 10000 + 20000;
+    } else {
+      capped = Math.round((capped - 50000) / 25000) * 25000 + 50000;
+    }
+    return Math.max(1000, Math.min(capped, maxAllowed));
+  };
   const canSelectTousRisques = vehicleAge < 2;
   const canSelectDommagesCollision = vehicleAge < 10;
 
@@ -135,6 +162,7 @@ export const CoverageSelectionStep = ({
         franchiseRate: localFranchiseRate,
         bgLimit: localBgLimit,
         dcCapital: localDcCapital,
+        companyIds: selectedCompanies,
       });
       onNext();
     }
@@ -340,7 +368,9 @@ export const CoverageSelectionStep = ({
               step="1000"
               value={localDcCapital}
               onChange={(e) => {
-                const capital = Number(e.target.value);
+                const raw = Number(e.target.value);
+                const marketValue = (window as any).currentSimulationMarketValue;
+                const capital = snapDcCapital(raw, marketValue);
                 setLocalDcCapital(capital);
                 onUpdate({
                   formulaType: localFormula,
@@ -409,6 +439,36 @@ export const CoverageSelectionStep = ({
             { value: '3000', label: '3 000 DT' },
           ]}
         />
+      )}
+
+      {companies && companies.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            Compagnies (choisir 1 ou 2)
+          </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {companies.map((c: any) => {
+              const checked = selectedCompanies.includes(c.id);
+              return (
+                <label key={c.id} className={`flex items-center p-3 border rounded-lg ${checked ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'}`}>
+                  <input
+                    type="checkbox"
+                    className="mr-3"
+                    checked={checked}
+                    onChange={(e) => {
+                      const next = e.target.checked
+                        ? [...selectedCompanies, c.id]
+                        : selectedCompanies.filter(id => id !== c.id);
+                      if (next.length <= 2) setSelectedCompanies(next);
+                    }}
+                  />
+                  <span className="text-sm text-gray-900 dark:text-white">{c.name}</span>
+                </label>
+              );
+            })}
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Vous pouvez comparer jusqu'à 2 compagnies.</p>
+        </div>
       )}
 
       {optionalGuarantees.length > 0 && (
