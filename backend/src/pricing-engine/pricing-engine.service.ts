@@ -326,7 +326,7 @@ export class PricingEngineService {
         minPower: { lte: vehicle.fiscalHorsepower },
         maxPower: { gte: vehicle.fiscalHorsepower },
         bonusMalusClass: bonusMalusClass,
-        ...(conventionId && { conventionId }),
+        conventionId: conventionId || null,
       },
     });
     
@@ -349,7 +349,7 @@ export class PricingEngineService {
         companyId,
         guaranteeId: guarantee.id,
         isActive: true,
-        ...(conventionId && { conventionId }),
+        conventionId: conventionId || null,
       },
     });
     
@@ -411,7 +411,7 @@ export class PricingEngineService {
         companyId,
         guaranteeId: guarantee.id,
         isActive: true,
-        ...(conventionId && { conventionId }),
+        conventionId: conventionId || null,
       },
       orderBy: { minCapital: 'desc' },
     });
@@ -448,7 +448,7 @@ export class PricingEngineService {
         companyId,
         guaranteeId: guarantee.id,
         isActive: true,
-        ...(conventionId && { conventionId }),
+        conventionId: conventionId || null,
       },
     });
     
@@ -480,7 +480,7 @@ export class PricingEngineService {
         guaranteeId: guarantee.id,
         franchiseRate: franchiseRate,
         isActive: true,
-        ...(conventionId && { conventionId }),
+        conventionId: conventionId || null,
       },
     });
 
@@ -522,7 +522,7 @@ export class PricingEngineService {
           minCapital: capital,
           maxCapital: capital,
           isActive: true,
-          ...(conventionId && { conventionId }),
+          conventionId: conventionId || null,
         },
       });
 
@@ -549,7 +549,7 @@ export class PricingEngineService {
           basePremium: { not: null },
           usageType: 'PRIVATE_BUSINESS',
           isActive: true,
-          ...(conventionId && { conventionId }),
+          conventionId: conventionId || null,
         },
       });
 
@@ -562,7 +562,7 @@ export class PricingEngineService {
           tierLevel: { not: null },
           usageType: 'PRIVATE_BUSINESS',
           isActive: true,
-          ...(conventionId && { conventionId }),
+          conventionId: conventionId || null,
         },
         orderBy: { tierLevel: 'asc' },
       });
@@ -662,7 +662,7 @@ export class PricingEngineService {
         companyId,
         guaranteeId: guarantee.id,
         isActive: true,
-        ...(conventionId && { conventionId }),
+        conventionId: conventionId || null,
       },
     });
 
@@ -689,7 +689,7 @@ export class PricingEngineService {
         companyId,
         guaranteeId,
         isActive: true,
-        ...(conventionId && { conventionId }),
+        conventionId: conventionId || null,
         OR: [
           { formulaType: formulaType },
           { formulaType: null },
@@ -716,7 +716,7 @@ export class PricingEngineService {
         companyId,
         guaranteeId: guarantee.id,
         isActive: true,
-        ...(conventionId && { conventionId }),
+        conventionId: conventionId || null,
       },
     });
     
@@ -747,7 +747,7 @@ export class PricingEngineService {
         guaranteeId: guarantee.id,
         formulaType: FormulaType.TOUS_RISQUES_0,
         isActive: true,
-        ...(conventionId && { conventionId }),
+        conventionId: conventionId || null,
       },
     });
     
@@ -770,7 +770,7 @@ export class PricingEngineService {
         companyId,
         guaranteeId: guarantee.id,
         isActive: true,
-        ...(conventionId && { conventionId }),
+        conventionId: conventionId || null,
       },
     });
     

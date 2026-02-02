@@ -13,7 +13,10 @@ export class CompaniesController {
   constructor(private companiesService: CompaniesService) {}
 
   @Get()
-  findAll(@Query('includeInactive') includeInactive?: string) {
+  findAll(@Query('includeInactive') includeInactive?: string, @Query('conventionId') conventionId?: string) {
+    if (conventionId) {
+      return this.companiesService.findByConvention(conventionId, includeInactive === 'true');
+    }
     return this.companiesService.findAll(includeInactive === 'true');
   }
 

@@ -18,8 +18,9 @@ export class PricingRulesController {
   findAll(
     @Query('companyId') companyId?: string,
     @Query('guaranteeId') guaranteeId?: string,
+    @Query('bonusMalusClass') bonusMalusClass?: string,
   ) {
-    return this.pricingRulesService.findAll(companyId, guaranteeId);
+    return this.pricingRulesService.findAll(companyId, guaranteeId, bonusMalusClass);
   }
 
   @Get('optional-guarantees')

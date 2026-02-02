@@ -234,6 +234,9 @@ export class PdfService {
       });
     };
 
+    const logoPath = path.join(process.cwd(), '..', 'frontend', 'public', 'Image1.png');
+    const logoBase64 = fs.existsSync(logoPath) ? fs.readFileSync(logoPath).toString('base64') : '';
+
     return `
 <!DOCTYPE html>
 <html>
@@ -241,32 +244,38 @@ export class PdfService {
   <meta charset="UTF-8">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Arial', sans-serif; color: #333; line-height: 1.6; }
-    .header { background: #003366; color: white; padding: 30px; text-align: center; }
-    .header h1 { font-size: 28px; margin-bottom: 10px; }
-    .header p { font-size: 14px; opacity: 0.9; }
-    .content { padding: 30px; }
-    .section { margin-bottom: 25px; }
-    .section-title { background: #f0f0f0; padding: 10px 15px; font-weight: bold; font-size: 16px; margin-bottom: 15px; border-left: 4px solid #003366; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-    .info-item { padding: 8px 0; }
-    .info-label { font-weight: bold; color: #666; font-size: 13px; }
-    .info-value { color: #333; font-size: 14px; margin-top: 3px; }
-    .status-badge { display: inline-block; padding: 5px 15px; background: #28a745; color: white; border-radius: 20px; font-size: 12px; font-weight: bold; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th { background: #003366; color: white; padding: 12px; text-align: left; font-size: 13px; }
-    td { padding: 10px 12px; border-bottom: 1px solid #ddd; font-size: 13px; }
-    .total-section { background: #f8f8f8; padding: 20px; margin-top: 20px; border-radius: 5px; }
-    .total-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
-    .total-row.final { font-size: 18px; font-weight: bold; color: #003366; border-top: 2px solid #003366; padding-top: 15px; margin-top: 10px; }
-    .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; border-top: 1px solid #ddd; margin-top: 30px; }
-    .terms { background: #f9f9f9; padding: 15px; margin-top: 20px; font-size: 11px; border-left: 3px solid #003366; }
+    body { font-family: 'Arial', sans-serif; color: #333; line-height: 1.3; font-size: 11px; }
+    .header { background: #d52b36; color: white; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .header-logo { height: 40px; }
+    .header-text { flex: 1; text-align: center; }
+    .header h1 { font-size: 20px; margin-bottom: 3px; }
+    .header p { font-size: 11px; opacity: 0.9; }
+    .content { padding: 15px 20px; }
+    .section { margin-bottom: 12px; }
+    .section-title { background: #f0f0f0; padding: 6px 10px; font-weight: bold; font-size: 12px; margin-bottom: 8px; border-left: 3px solid #d52b36; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .info-item { padding: 4px 0; }
+    .info-label { font-weight: bold; color: #666; font-size: 10px; }
+    .info-value { color: #333; font-size: 11px; margin-top: 2px; }
+    .status-badge { display: inline-block; padding: 3px 10px; background: #28a745; color: white; border-radius: 10px; font-size: 9px; font-weight: bold; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th { background: #d52b36; color: white; padding: 6px 8px; text-align: left; font-size: 10px; }
+    td { padding: 5px 8px; border-bottom: 1px solid #ddd; font-size: 10px; }
+    .total-section { background: #f8f8f8; padding: 12px; margin-top: 12px; border-radius: 3px; }
+    .total-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 11px; }
+    .total-row.final { font-size: 14px; font-weight: bold; color: #d52b36; border-top: 2px solid #d52b36; padding-top: 8px; margin-top: 6px; }
+    .footer { text-align: center; padding: 10px; font-size: 9px; color: #666; border-top: 1px solid #ddd; margin-top: 15px; }
+    .terms { background: #f9f9f9; padding: 10px; margin-top: 10px; font-size: 9px; border-left: 3px solid #d52b36; }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>ARS ASSURANCE</h1>
-    <p>Contrat d'Assurance Automobile</p>
+    ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" class="header-logo" alt="Logo" />` : ''}
+    <div class="header-text">
+      <h1>ARS ASSURANCE</h1>
+      <p>Contrat d'Assurance Automobile</p>
+    </div>
+    <div style="width: 40px;"></div>
   </div>
 
   <div class="content">
@@ -274,7 +283,7 @@ export class PdfService {
       <div class="section-title">Informations du Contrat</div>
       <div class="info-grid">
         <div class="info-item">
-          <div class="info-label">Numéro de Contrat</div>
+          <div class="info-label">N° Contrat</div>
           <div class="info-value">${contract.contractNumber}</div>
         </div>
         <div class="info-item">
@@ -282,11 +291,11 @@ export class PdfService {
           <div class="info-value"><span class="status-badge">${contract.status}</span></div>
         </div>
         <div class="info-item">
-          <div class="info-label">Date de Début</div>
+          <div class="info-label">Date Début</div>
           <div class="info-value">${formatDate(contract.startDate)}</div>
         </div>
         <div class="info-item">
-          <div class="info-label">Date de Fin</div>
+          <div class="info-label">Date Fin</div>
           <div class="info-value">${formatDate(contract.endDate)}</div>
         </div>
         <div class="info-item">
@@ -315,7 +324,29 @@ export class PdfService {
     </div>
 
     <div class="section">
-      <div class="section-title">Garanties du Contrat</div>
+      <div class="section-title">Véhicule Assuré</div>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">Immatriculation</div>
+          <div class="info-value">${contract.quote.simulation?.vehicle?.registration || 'N/A'}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">CV / Places</div>
+          <div class="info-value">${contract.quote.simulation?.vehicle?.fiscalHorsepower || 'N/A'} CV / ${contract.quote.simulation?.vehicle?.numberOfSeats || 'N/A'} places</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">1ère Circulation</div>
+          <div class="info-value">${contract.quote.simulation?.vehicle?.firstCirculationDate ? formatDate(contract.quote.simulation.vehicle.firstCirculationDate) : 'N/A'}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Valeur Neuf / Vénale</div>
+          <div class="info-value">${contract.quote.simulation?.vehicle?.newValue ? formatCurrency(contract.quote.simulation.vehicle.newValue) : 'N/A'} / ${contract.quote.simulation?.vehicle?.marketValue ? formatCurrency(contract.quote.simulation.vehicle.marketValue) : 'N/A'}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Garanties Souscrites</div>
       <table>
         <thead>
           <tr>
@@ -361,25 +392,25 @@ export class PdfService {
         <span>F.G</span>
         <span>${formatCurrency(contract.quote.fg)}</span>
       </div>
+      ${contract.deliveryFee > 0 ? `
+      <div class="total-row">
+        <span>Frais de Livraison</span>
+        <span>${formatCurrency(contract.deliveryFee)}</span>
+      </div>
+      ` : ''}
       <div class="total-row final">
-        <span>TOTAL ANNUEL</span>
-        <span>${formatCurrency(contract.quote.totalAPayer)}</span>
+        <span>TOTAL PAYÉ</span>
+        <span>${formatCurrency(Number(contract.quote.totalAPayer) + Number(contract.deliveryFee))}</span>
       </div>
     </div>
 
     <div class="terms">
-      <strong>Conditions Générales:</strong><br>
-      - Le contrat est valable pour une durée d'un an renouvelable.<br>
-      - L'assuré s'engage à déclarer tout sinistre dans les 5 jours ouvrables.<br>
-      - Le paiement de la prime doit être effectué avant la prise d'effet du contrat.<br>
-      - Toute modification doit être notifiée à la compagnie dans les 15 jours.
+      <strong>Conditions:</strong> Contrat valable 1 an renouvelable • Déclaration sinistre sous 5 jours • Paiement avant prise d'effet • Modification à notifier sous 15 jours
     </div>
   </div>
 
   <div class="footer">
-    <p><strong>Document officiel - Contrat d'assurance</strong></p>
-    <p>ARS Assurance - Courtier en Assurances Agréé</p>
-    <p>Date d'émission: ${formatDate(contract.createdAt)}</p>
+    <p>Document officiel - Contrat d'assurance • ARS Assurance - Courtier Agréé • Émis le ${formatDate(contract.createdAt)}</p>
   </div>
 </body>
 </html>

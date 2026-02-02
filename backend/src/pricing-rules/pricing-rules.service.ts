@@ -11,13 +11,20 @@ export class PricingRulesService {
     private auditService: AuditService,
   ) {}
 
-  async findAll(companyId?: string, guaranteeId?: string) {
-    return this.prisma.pricingRule.findMany({
-      where: {
-        ...(companyId && { companyId }),
-        ...(guaranteeId && { guaranteeId }),
-        isActive: true,
-      },
+  async findAll(companyId?: string, guaranteeId?: string, bonusMalusClass?: string) {
+    console.log('🔍 Filtering pricing rules:', { companyId, guaranteeId, bonusMalusClass });
+    
+    const where: any = {
+      ...(companyId && { companyId }),
+      ...(guaranteeId && { guaranteeId }),
+      ...(bonusMalusClass && { bonusMalusClass: parseInt(bonusMalusClass) }),
+      isActive: true,
+    };
+    
+    console.log('📋 Where clause:', JSON.stringify(where, null, 2));
+    
+    const results = await this.prisma.pricingRule.findMany({
+      where,
       include: {
         company: { select: { id: true, name: true, code: true } },
         guarantee: { select: { id: true, code: true, nameFr: true } },
@@ -25,6 +32,9 @@ export class PricingRulesService {
       },
       orderBy: { createdAt: 'desc' },
     });
+    
+    console.log(`✅ Found ${results.length} pricing rules`);
+    return results;
   }
 
   async findById(id: string) {

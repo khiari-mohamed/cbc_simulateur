@@ -29,6 +29,22 @@ export class QuotesService {
       throw new Error('Simulation not found');
     }
 
+    // Get ALL active guarantees (both mandatory and optional selected)
+    const allGuarantees = await this.prisma.guarantee.findMany({
+      where: { isActive: true },
+    });
+
+    // Mandatory guarantees (always included)
+    const mandatoryGuarantees = allGuarantees.filter(g => !g.isOptional).map(g => g.code);
+    
+    // Optional guarantees that user selected
+    const selectedOptionalGuarantees = simulation.guarantees
+      .filter(sg => sg.guarantee.isOptional)
+      .map(sg => sg.guarantee.code);
+    
+    // Combine: ALL mandatory + selected optional
+    const allSelectedGuarantees = [...new Set([...mandatoryGuarantees, ...selectedOptionalGuarantees])];
+
     const pricing = await this.pricingEngine.calculatePremium(
       companyId,
       simulation.vehicle,
@@ -36,7 +52,7 @@ export class QuotesService {
         bonusMalus: simulation.bonusMalus,
         usage: simulation.usage,
         formulaType: simulation.formulaType,
-        selectedGuarantees: simulation.guarantees.map(g => g.guarantee.code),
+        selectedGuarantees: allSelectedGuarantees,
         selectedCapitals: {
           BG: simulation.bgLimit ? new (require('@prisma/client').Decimal)(simulation.bgLimit) : new (require('@prisma/client').Decimal)(0),
           DOMMAGES_COLLISIONS: simulation.dcCapital || new (require('@prisma/client').Decimal)(0),

@@ -120,17 +120,25 @@ model Company {
 }
 
 model Convention {
-  id          String   @id @default(uuid())
-  name        String
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id])
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                      String   @id @default(uuid())
+  name                    String
+  companyId               String
+  company                 Company  @relation(fields: [companyId], references: [id])
+  reductionTousRisques    Decimal? @default(1.0) @db.Decimal(5, 2)
+  reductionDommagesCollision Decimal? @default(1.0) @db.Decimal(5, 2)
+  reductionVol            Decimal? @default(1.0) @db.Decimal(5, 2)
+  reductionIncendie       Decimal? @default(1.0) @db.Decimal(5, 2)
+  startDate               DateTime @default(now())
+  endDate                 DateTime?
+  status                  String   @default("ACTIVE")
+  isActive                Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   users        UserConvention[]
   simulations  Simulation[]
   pricingRules PricingRule[]
+  guarantees   ConventionGuarantee[]
 
   @@map("conventions")
 }
@@ -297,6 +305,7 @@ model Guarantee {
   pricingRules         PricingRule[]
   simulationGuarantees SimulationGuarantee[]
   quoteItems           QuoteItem[]
+  conventions          ConventionGuarantee[]
 
   @@map("guarantees")
 }
@@ -408,4 +417,15 @@ model Notification {
   createdAt DateTime            @default(now())
 
   @@map("notifications")
+}
+
+model ConventionGuarantee {
+  conventionId String
+  guaranteeId  String
+  convention   Convention @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+  guarantee    Guarantee  @relation(fields: [guaranteeId], references: [id], onDelete: Cascade)
+  assignedAt   DateTime   @default(now())
+
+  @@id([conventionId, guaranteeId])
+  @@map("convention_guarantees")
 }

@@ -150,4 +150,15 @@ export class CompaniesService {
 
     return updated;
   }
+
+  async findByConvention(conventionId: string, includeInactive = false) {
+    const convention = await this.prisma.convention.findUnique({
+      where: { id: conventionId },
+      include: { company: true },
+    });
+    if (!convention) {
+      throw new NotFoundException('Convention not found');
+    }
+    return [convention.company];
+  }
 }

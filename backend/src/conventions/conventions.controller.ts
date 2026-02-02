@@ -63,4 +63,10 @@ export class ConventionsController {
   unassign(@Param('userId') userId: string, @Param('conventionId') conventionId: string) {
     return this.conventionsService.unassignUser(userId, conventionId);
   }
+
+  @Post(':id/guarantees')
+  @Roles(Role.ADMINISTRATEUR_ARS)
+  assignGuarantees(@Param('id') id: string, @Body() dto: { guaranteeIds: string[] }, @Request() req: any) {
+    return this.conventionsService.assignGuarantees(id, dto.guaranteeIds, req.user.id);
+  }
 }

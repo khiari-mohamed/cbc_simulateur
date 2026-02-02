@@ -13,7 +13,10 @@ export class GuaranteesController {
   constructor(private guaranteesService: GuaranteesService) {}
 
   @Get()
-  findAll(@Query('includeInactive') includeInactive?: string) {
+  findAll(@Query('includeInactive') includeInactive?: string, @Query('conventionId') conventionId?: string) {
+    if (conventionId) {
+      return this.guaranteesService.findByConvention(conventionId, includeInactive === 'true');
+    }
     return this.guaranteesService.findAll(includeInactive === 'true');
   }
 

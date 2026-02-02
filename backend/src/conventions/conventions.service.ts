@@ -14,11 +14,15 @@ export class ConventionsService {
       where: includeInactive ? {} : { isActive: true },
       include: {
         company: { select: { id: true, name: true, code: true, isActive: true } },
+        guarantees: {
+          include: { guarantee: true },
+        },
         _count: {
           select: {
             users: true,
             simulations: true,
             pricingRules: true,
+            guarantees: true,
           },
         },
       },
@@ -42,6 +46,9 @@ export class ConventionsService {
             },
           },
         },
+        guarantees: {
+          include: { guarantee: true },
+        },
         pricingRules: {
           where: { isActive: true },
           include: { guarantee: true },
@@ -63,7 +70,17 @@ export class ConventionsService {
     });
   }
 
-  async create(data: { name: string; companyId: string }, userId?: string) {
+  async create(data: { 
+    name: string; 
+    companyId: string;
+    reductionTousRisques?: number;
+    reductionDommagesCollision?: number;
+    reductionVol?: number;
+    reductionIncendie?: number;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }, userId?: string) {
     const company = await this.prisma.company.findUnique({
       where: { id: data.companyId },
     });
@@ -72,7 +89,17 @@ export class ConventionsService {
     }
 
     const convention = await this.prisma.convention.create({
-      data,
+      data: {
+        name: data.name,
+        companyId: data.companyId,
+        reductionTousRisques: data.reductionTousRisques,
+        reductionDommagesCollision: data.reductionDommagesCollision,
+        reductionVol: data.reductionVol,
+        reductionIncendie: data.reductionIncendie,
+        startDate: data.startDate ? new Date(data.startDate) : undefined,
+        endDate: data.endDate ? new Date(data.endDate) : undefined,
+        status: data.status || 'ACTIVE',
+      },
       include: { company: true },
     });
 
@@ -88,12 +115,30 @@ export class ConventionsService {
     return convention;
   }
 
-  async update(id: string, data: { name?: string }, userId?: string) {
+  async update(id: string, data: { 
+    name?: string;
+    reductionTousRisques?: number;
+    reductionDommagesCollision?: number;
+    reductionVol?: number;
+    reductionIncendie?: number;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }, userId?: string) {
     const existing = await this.findById(id);
 
     const updated = await this.prisma.convention.update({
       where: { id },
-      data,
+      data: {
+        ...(data.name && { name: data.name }),
+        ...(data.reductionTousRisques !== undefined && { reductionTousRisques: data.reductionTousRisques }),
+        ...(data.reductionDommagesCollision !== undefined && { reductionDommagesCollision: data.reductionDommagesCollision }),
+        ...(data.reductionVol !== undefined && { reductionVol: data.reductionVol }),
+        ...(data.reductionIncendie !== undefined && { reductionIncendie: data.reductionIncendie }),
+        ...(data.startDate && { startDate: new Date(data.startDate) }),
+        ...(data.endDate && { endDate: new Date(data.endDate) }),
+        ...(data.status && { status: data.status }),
+      },
       include: { company: true },
     });
 
@@ -159,6 +204,22 @@ export class ConventionsService {
 
     if (existing) {
       throw new ConflictException('User already assigned to this convention');
+    }
+
+    // Check for active conventions with same company
+    const userConventions = await this.prisma.userConvention.findMany({
+      where: { userId },
+      include: { convention: true },
+    });
+
+    const hasActiveConventionForCompany = userConventions.some(
+      uc => uc.convention?.isActive && uc.convention?.companyId === convention.companyId
+    );
+
+    if (hasActiveConventionForCompany) {
+      throw new ConflictException(
+        'User already has an active convention for this company. Deactivate the existing convention first to avoid pricing ambiguity.'
+      );
     }
 
     const assignment = await this.prisma.userConvention.create({
@@ -247,5 +308,35 @@ export class ConventionsService {
       },
     });
     return userConventions.map(uc => uc.convention);
+  }
+
+  async assignGuarantees(conventionId: string, guaranteeIds: string[], adminId: string) {
+    await this.findById(conventionId);
+
+    await this.prisma.conventionGuarantee.deleteMany({
+      where: { conventionId },
+    });
+
+    if (guaranteeIds.length > 0) {
+      await this.prisma.conventionGuarantee.createMany({
+        data: guaranteeIds.map(guaranteeId => ({
+          conventionId,
+          guaranteeId,
+        })),
+      });
+    }
+
+    if (adminId && adminId !== 'system') {
+      await this.auditService.log(
+        adminId,
+        'GUARANTEES_ASSIGNED_TO_CONVENTION',
+        'Convention',
+        conventionId,
+        null,
+        { guaranteeIds },
+      );
+    }
+
+    return this.findById(conventionId);
   }
 }

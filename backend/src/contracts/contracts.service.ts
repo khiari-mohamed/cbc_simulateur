@@ -166,6 +166,26 @@ export class ContractsService {
     });
   }
 
+  async findByContractNumber(contractNumber: string) {
+    return this.prisma.contract.findUnique({
+      where: { contractNumber },
+      include: {
+        quote: {
+          include: {
+            company: true,
+            items: { include: { guarantee: true } },
+            simulation: {
+              include: {
+                vehicle: true,
+              },
+            },
+          },
+        },
+        user: true,
+      },
+    });
+  }
+
   private async generateContractNumber(): Promise<string> {
     const count = await this.prisma.contract.count();
     return `C${new Date().getFullYear()}${String(count + 1).padStart(6, '0')}`;

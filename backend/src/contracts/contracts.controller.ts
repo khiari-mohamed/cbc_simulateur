@@ -34,6 +34,11 @@ export class ContractsController {
     return this.contractsService.findByUser(req.user.id);
   }
 
+  @Get(':contractNumber')
+  async findByContractNumber(@Param('contractNumber') contractNumber: string) {
+    return this.contractsService.findByContractNumber(contractNumber);
+  }
+
   @Get(':id/download')
   async downloadPdf(@Param('id') id: string, @Res() res: Response) {
     const contract = await this.contractsService.findById(id);

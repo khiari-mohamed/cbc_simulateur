@@ -13,6 +13,7 @@ export class ReductionRatesService {
   /**
    * Get reduction rate for a specific guarantee and convention
    * Reduction rates apply to: VOL, INCENDIE, TOUS_RISQUES_0, DOMMAGES_COLLISIONS
+   * Priority: Convention-level rates > Pricing rule rates > 1.0 (no reduction)
    */
   async getReductionRate(
     companyId: string,
@@ -37,13 +38,35 @@ export class ReductionRatesService {
       return new Decimal(1);
     }
 
-    // Find the pricing rule with reduction rate
+    // Priority 1: Check convention-level reduction rates
+    if (conventionId) {
+      const convention = await this.prisma.convention.findUnique({
+        where: { id: conventionId },
+      });
+
+      if (convention) {
+        // Map guarantee codes to convention fields
+        const conventionRateMap: Record<string, Decimal | null> = {
+          'TOUS_RISQUES_ZERO': convention.reductionTousRisques,
+          'DOMMAGES_COLLISIONS': convention.reductionDommagesCollision,
+          'VOL': convention.reductionVol,
+          'INCENDIE': convention.reductionIncendie,
+        };
+
+        const conventionRate = conventionRateMap[guaranteeCode];
+        if (conventionRate && !conventionRate.eq(1)) {
+          return conventionRate;
+        }
+      }
+    }
+
+    // Priority 2: Check pricing rule reduction rate
     const rule = await this.prisma.pricingRule.findFirst({
       where: {
         company: { id: companyId },
         guarantee: { code: guaranteeCode },
         isActive: true,
-        ...(conventionId && { conventionId }),
+        conventionId: conventionId || null,
       },
       orderBy: { createdAt: 'desc' },
     });

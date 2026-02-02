@@ -138,4 +138,19 @@ export class GuaranteesService {
       },
     });
   }
+
+  async findByConvention(conventionId: string, includeInactive = false) {
+    const conventionGuarantees = await this.prisma.conventionGuarantee.findMany({
+      where: { conventionId },
+      include: {
+        guarantee: true,
+      },
+    });
+    
+    const filtered = conventionGuarantees
+      .map(cg => cg.guarantee)
+      .filter(g => includeInactive || g.isActive);
+    
+    return filtered;
+  }
 }
