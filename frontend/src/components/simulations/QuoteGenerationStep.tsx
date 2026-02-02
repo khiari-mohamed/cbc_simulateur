@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, } from '@tanstack/react-query';
 import { FileText, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import api from '../../lib/api/client';
@@ -49,21 +49,14 @@ export const QuoteGenerationStep = ({
   });
 
   // Companies will be injected via coverage step selection; fallback to all active if none provided
-  const { data: companies } = useQuery({
-    queryKey: ['companies', 'active'],
-    queryFn: async () => {
-      const { data } = await api.get('/companies');
-      return data.filter((c: any) => c.isActive);
-    },
-  });
-
   const generateQuotesMutation = useMutation({
     mutationFn: async (simId: string) => {
       // Read selected companies from localStorage written by CoverageSelectionStep via simulationData if present
       const selection = JSON.parse(localStorage.getItem('simulationData') || '{}');
-      const companyIds: string[] = selection.companyIds && selection.companyIds.length ? selection.companyIds : (companies || []).map((c: any) => c.id).slice(0, 2);
+      const companyIds: string[] = selection.companyIds && selection.companyIds.length ? selection.companyIds : [];
+      
       if (!companyIds || companyIds.length === 0) {
-        throw new Error('Aucune compagnie sélectionnée');
+        throw new Error('Veuillez sélectionner au moins une compagnie');
       }
 
       const quotePromises = companyIds.map((companyId: string) =>
@@ -228,7 +221,7 @@ export const QuoteGenerationStep = ({
                 key={quote.id}
                 className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4"
               >
-                <div className="flex justify-between items-start mb-3">
+                <div className="flex justify-between items-start mb-4">
                   <div>
                     <h4 className="font-semibold text-gray-900 dark:text-white">
                       {quote.company.name}
@@ -244,17 +237,80 @@ export const QuoteGenerationStep = ({
                     <p className="text-xs text-gray-500 dark:text-gray-400">TTC</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="flex justify-between">
+
+                {/* Detailed Breakdown */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mb-3">
+                  <h5 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Détail des garanties
+                  </h5>
+                  <div className="space-y-1.5">
+                    {quote.items && quote.items.map((item: any) => (
+                      <div key={item.id} className="flex justify-between text-xs">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          {item.guarantee.nameFr}
+                        </span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {parseFloat(item.prime).toLocaleString()} DT
+                        </span>
+                      </div>
+                    ))}
+                    
+                    {/* Show "Non accordée" for AMANA-specific guarantees */}
+                    {quote.company.code === 'AMANA' && (
+                      <>
+                        {/* Incendie Suite Émeutes - always NC for AMANA */}
+                        {!quote.items?.some((i: any) => i.guarantee.code === 'INCENDIE_EMEUTES') && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              Incendie suite émeutes
+                            </span>
+                            <span className="text-red-600 dark:text-red-400 font-medium">
+                              ❌ Non accordée
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* CAT NAT - NC if not Tous Risques */}
+                        {simulationData.formulaType !== 'TOUS_RISQUES_0' && 
+                         !quote.items?.some((i: any) => i.guarantee.code === 'CATASTROPHES_NATURELLES') && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              Dommages suite CAT NAT
+                            </span>
+                            <span className="text-red-600 dark:text-red-400 font-medium">
+                              ❌ Non accordée (Tous Risques uniquement)
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Totals */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-1">
+                  <div className="flex justify-between text-xs">
                     <span className="text-gray-600 dark:text-gray-400">Prime nette</span>
-                    <span className="text-gray-900 dark:text-white">
-                      {quote.primeNette.toLocaleString()}
+                    <span className="text-gray-900 dark:text-white font-medium">
+                      {quote.primeNette.toLocaleString()} DT
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Taxes</span>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600 dark:text-gray-400">Frais</span>
                     <span className="text-gray-900 dark:text-white">
-                      {quote.taxes.toLocaleString()}
+                      {quote.frais.toLocaleString()} DT
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs bg-amber-50 dark:bg-amber-900/20 px-2 py-1.5 rounded">
+                    <span className="text-amber-700 dark:text-amber-400 font-semibold">Taxes</span>
+                    <span className="text-amber-900 dark:text-amber-300 font-bold">
+                      {quote.taxes.toLocaleString()} DT
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600 dark:text-gray-400">F.P.A.C + F.S.S.R + F.G</span>
+                    <span className="text-gray-900 dark:text-white">
+                      {(Number(quote.fpac) + Number(quote.fssr) + Number(quote.fg)).toFixed(2)} DT
                     </span>
                   </div>
                 </div>

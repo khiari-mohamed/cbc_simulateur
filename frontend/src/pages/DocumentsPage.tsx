@@ -1,9 +1,16 @@
-import { useQuery } from '@tanstack/react-query';
-import { FileText, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { FileText, CheckCircle, XCircle, AlertCircle, Eye, RefreshCw, Trash2, Loader2 } from 'lucide-react';
 import { Card, CardHeader, CardBody, CardTitle } from '../components/ui/Card';
-import api from '../lib/api/client';
+import { Button } from '../components/ui/Button';
+import api, { getApiBaseUrl } from '../lib/api/client';
+import toast from 'react-hot-toast';
+import { useState } from 'react';
 
 export const DocumentsPage = () => {
+  const queryClient = useQueryClient();
+  const [viewingDoc, setViewingDoc] = useState<string | null>(null);
+  const [deletingDoc, setDeletingDoc] = useState<{ id: string; name: string } | null>(null);
+
   const { data: documents, isLoading } = useQuery({
     queryKey: ['documents', 'my'],
     queryFn: async () => {
@@ -15,9 +22,43 @@ export const DocumentsPage = () => {
   const requiredDocs = [
     { type: 'CIN', label: 'Carte d\'identité nationale' },
     { type: 'CARTE_GRISE', label: 'Carte grise' },
+    { type: 'PERMIS', label: 'Permis de conduire' },
     { type: 'VISITE_TECHNIQUE', label: 'Visite technique' },
     { type: 'VIGNETTE', label: 'Vignette' },
+    { type: 'RNE', label: 'RNE' },
   ];
+
+  const deleteMutation = useMutation({
+    mutationFn: async (docId: string) => {
+      await api.delete(`/documents/${docId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents', 'my'] });
+      toast.success('Document supprimé avec succès');
+    },
+    onError: () => {
+      toast.error('Erreur lors de la suppression');
+    },
+  });
+
+  const handleView = (docId: string) => {
+    setViewingDoc(docId);
+  };
+
+  const handleReplace = (docId: string) => {
+    document.getElementById(`replace-${docId}`)?.click();
+  };
+
+  const handleDelete = (docId: string, docName: string) => {
+    setDeletingDoc({ id: docId, name: docName });
+  };
+
+  const confirmDelete = () => {
+    if (deletingDoc) {
+      deleteMutation.mutate(deletingDoc.id);
+      setDeletingDoc(null);
+    }
+  };
 
   const uploadedTypes = documents?.map((d: any) => d.type) || [];
   const missingDocs = requiredDocs.filter(doc => !uploadedTypes.includes(doc.type));
@@ -64,19 +105,19 @@ export const DocumentsPage = () => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
           ) : documents && documents.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {documents.map((doc: any) => (
                 <div
                   key={doc.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                 >
                   <div className="flex items-center gap-3">
                     <FileText className="w-5 h-5 text-gray-400" />
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
                         {doc.fileName}
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
                         {requiredDocs.find(d => d.type === doc.type)?.label || doc.type}
                       </p>
                       <p className="text-xs text-gray-400 dark:text-gray-500">
@@ -86,20 +127,47 @@ export const DocumentsPage = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     {doc.isValidated ? (
-                      <>
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                        <span className="text-sm text-green-600 dark:text-green-400">
-                          Validé
-                        </span>
-                      </>
+                      <CheckCircle className="w-5 h-5 text-green-600" />
                     ) : (
-                      <>
-                        <XCircle className="w-5 h-5 text-orange-600" />
-                        <span className="text-sm text-orange-600 dark:text-orange-400">
-                          En attente
-                        </span>
-                      </>
+                      <XCircle className="w-5 h-5 text-orange-600" />
                     )}
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {doc.isValidated ? 'Validé' : 'En attente'}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleView(doc.id)}
+                      className="flex items-center gap-1"
+                    >
+                      <Eye className="w-4 h-4" />
+                      Voir
+                    </Button>
+                    <input
+                      id={`replace-${doc.id}`}
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      className="hidden"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleReplace(doc.id)}
+                      className="flex items-center gap-1"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Remplacer
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(doc.id, doc.fileName)}
+                      disabled={deleteMutation.isPending}
+                      className="flex items-center gap-1 text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Supprimer
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -124,6 +192,71 @@ export const DocumentsPage = () => {
           Vous pourrez les télécharger à l'étape de confirmation de votre simulation.
         </p>
       </div>
+
+      {/* Document Viewer Modal */}
+      {viewingDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={() => setViewingDoc(null)}>
+          <div className="relative w-11/12 h-5/6 bg-white dark:bg-gray-800 rounded-lg shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Aperçu du document</h3>
+              <button
+                onClick={() => setViewingDoc(null)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="w-full h-full p-4">
+              <iframe
+                src={`${getApiBaseUrl()}/documents/${viewingDoc}/view?token=${localStorage.getItem('access_token')}`}
+                className="w-full h-full border-0 rounded"
+                title="Document viewer"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={() => setDeletingDoc(null)}>
+          <div className="relative w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Supprimer le document</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Cette action est irréversible</p>
+              </div>
+            </div>
+            <p className="text-gray-700 dark:text-gray-300 mb-6">
+              Êtes-vous sûr de vouloir supprimer <span className="font-semibold">{deletingDoc.name}</span> ?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setDeletingDoc(null)}
+              >
+                Annuler
+              </Button>
+              <Button
+                variant="danger"
+                onClick={confirmDelete}
+                disabled={deleteMutation.isPending}
+                className="flex items-center gap-2"
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                Supprimer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Param, UseGuards, UseInterceptors, UploadedFile, Request, BadRequestException, Res, StreamableFile } from '@nestjs/common';
+import { Controller, Post, Get, Param, UseGuards, UseInterceptors, UploadedFile, Request, BadRequestException, Res, StreamableFile, Query, UnauthorizedException, Delete } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -11,24 +11,25 @@ import { Roles } from '../common/roles.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('documents')
-@UseGuards(JwtAuthGuard)
 export class DocumentsController {
   constructor(private documentsService: DocumentsService) {}
 
   @Get('required-types')
+  @UseGuards(JwtAuthGuard)
   getRequiredTypes() {
-    // Central list for required documents; frontend can use this to render checklist
+    // Per CDC notes: Add PERMIS, make only CARTE_GRISE and CIN mandatory
     return [
       { type: 'CARTE_GRISE', label: 'Carte grise', required: true },
       { type: 'CIN', label: 'Carte d\'identité (CIN)', required: true },
-      { type: 'VISITE_TECHNIQUE', label: 'Visite technique', required: true },
-      { type: 'VIGNETTE', label: 'Vignette', required: true },
-      // RNE may be required for company clients; enforce conditionally on submit if applicable
+      { type: 'PERMIS', label: 'Permis de conduire', required: false },
+      { type: 'VISITE_TECHNIQUE', label: 'Visite technique', required: false },
+      { type: 'VIGNETTE', label: 'Vignette', required: false },
       { type: 'RNE', label: 'Registre du Commerce (RNE)', required: false },
     ];
   }
 
   @Post('upload')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -57,40 +58,82 @@ export class DocumentsController {
     if (!file) {
       throw new BadRequestException('File is required');
     }
-    const { quoteId, userId, type } = req.body;
-    if ((!quoteId && !userId) || !type) {
-      throw new BadRequestException('Either quoteId or userId and type are required');
+    const { quoteId, type } = req.body;
+    const userId = req.user?.id || req.user?.userId; // Get from authenticated user
+    
+    console.log('🔍 Upload request user:', req.user);
+    console.log('🔍 Extracted userId:', userId);
+    
+    if (!quoteId || !type) {
+      throw new BadRequestException('quoteId and type are required');
     }
     return this.documentsService.upload(quoteId, userId, type, file.originalname, file.path);
   }
 
   @Get('quote/:quoteId')
+  @UseGuards(JwtAuthGuard)
   findByQuote(@Param('quoteId') quoteId: string) {
     return this.documentsService.findByQuote(quoteId);
   }
 
   @Get('my')
+  @UseGuards(JwtAuthGuard)
   findMy(@Request() req: any) {
     return this.documentsService.findByUser(req.user.userId);
   }
 
   @Get('user/:userId')
+  @UseGuards(JwtAuthGuard)
   findByUser(@Param('userId') userId: string) {
     return this.documentsService.findByUser(userId);
   }
 
   @Post(':id/validate')
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMINISTRATEUR_ARS, Role.GESTIONNAIRE_VALIDATION_ARS)
   validate(@Param('id') id: string) {
     return this.documentsService.validate(id);
   }
 
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  async delete(@Param('id') id: string, @Request() req: any) {
+    return this.documentsService.delete(id, req.user?.id || req.user?.userId);
+  }
+
   @Get(':id/view')
-  @UseGuards(RolesGuard)
-  @Roles(Role.ADMINISTRATEUR_ARS, Role.GESTIONNAIRE_VALIDATION_ARS)
-  async view(@Param('id') id: string, @Res({ passthrough: true }) res: Response) {
+  async view(
+    @Param('id') id: string,
+    @Query('token') token: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (!token) {
+      throw new UnauthorizedException('Token required');
+    }
+
+    let userId: string;
+    let userRole: string;
+    
+    try {
+      const decoded = await this.documentsService.verifyToken(token);
+      userId = decoded.userId;
+      userRole = decoded.role;
+    } catch (err) {
+      console.error('Token verification failed:', err.message);
+      throw new UnauthorizedException('Invalid token');
+    }
+    
     const document = await this.documentsService.findById(id);
+    
+    if (document.quoteId) {
+      const quote = await this.documentsService.findQuoteById(document.quoteId);
+      if (quote.userId !== userId && userRole !== 'ADMINISTRATEUR_ARS' && userRole !== 'GESTIONNAIRE_VALIDATION_ARS') {
+        throw new BadRequestException('Unauthorized access to document');
+      }
+    } else if (document.userId && document.userId !== userId && userRole !== 'ADMINISTRATEUR_ARS') {
+      throw new BadRequestException('Unauthorized access to document');
+    }
+    
     const file = createReadStream(document.filePath);
     res.set({
       'Content-Type': this.getContentType(document.fileName),

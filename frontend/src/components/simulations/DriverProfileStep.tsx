@@ -1,7 +1,6 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useEffect } from 'react';
 import { Select } from '../ui/Select';
 import { User } from 'lucide-react';
 
@@ -21,19 +20,11 @@ interface DriverProfileStepProps {
 }
 
 export const DriverProfileStep = ({ data, onUpdate, onNext }: DriverProfileStepProps) => {
-  const { register, handleSubmit, formState: { errors, isValid }, watch } = useForm({
+  const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(driverSchema) as any,
     defaultValues: data,
     mode: 'onChange',
   });
-
-  const formData = watch();
-
-  useEffect(() => {
-    if (isValid && formData.bonusMalus && formData.usage) {
-      onUpdate(formData as { bonusMalus: number; usage: string });
-    }
-  }, [formData, isValid, onUpdate]);
 
   const onSubmit = (formData: any) => {
     onUpdate(formData as DriverForm);
@@ -85,20 +76,16 @@ export const DriverProfileStep = ({ data, onUpdate, onNext }: DriverProfileStepP
           options={[
             { value: '', label: 'Sélectionner un usage' },
             { value: 'PRIVATE_BUSINESS', label: 'Promenade et Affaires' },
-            { value: 'COMMERCIAL', label: 'Affaire' },
           ]}
         />
       </div>
 
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-          📋 Classe Bonus/Malus
-        </h3>
-        <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-          <li>• Classes <strong>1 à 8</strong> conformes au tableau RC</li>
-          <li>• La classe sélectionnée sera appliquée au tableau RC côté serveur</li>
-        </ul>
-      </div>
+      <button
+        type="submit"
+        className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        Continuer
+      </button>
     </form>
   );
 };

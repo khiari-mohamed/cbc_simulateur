@@ -36,9 +36,7 @@ export const ConfirmationStep = ({ simulationId, onBack }: ConfirmationStepProps
   });
 
   // Determine required documents based on customer type
-  const requiredDocs = simulation?.user?.type === 'SOCIETE' || simulation?.customerType === 'SOCIETE'
-    ? ['RNE', 'REGISTRE_COMMERCE', 'PATENTE', 'STATUTS', 'CIN_REPRESENTANT', 'CARTE_GRISE', 'VIGNETTE', 'VISITE_TECHNIQUE']
-    : ['CIN', 'PERMIS', 'CARTE_GRISE', 'VIGNETTE', 'VISITE_TECHNIQUE'];
+  const requiredDocs = ['CARTE_GRISE', 'CIN']; // Per CDC notes: only these 2 are mandatory
   const uploadedTypes = documents?.map((d: any) => d.type) || [];
   const missingDocs = requiredDocs.filter(type => !uploadedTypes.includes(type));
   const canSubmit = missingDocs.length === 0;
@@ -172,6 +170,13 @@ export const ConfirmationStep = ({ simulationId, onBack }: ConfirmationStepProps
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     N° {quote.quoteNumber}
                   </p>
+                  {simulation.vehicle && (
+                    <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <span>VN: {simulation.vehicle.newValue.toLocaleString()} DT</span>
+                      <span>VV: {simulation.vehicle.marketValue.toLocaleString()} DT</span>
+                      <span>CV: {simulation.vehicle.fiscalHorsepower}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-xl font-bold text-blue-600 dark:text-blue-400">

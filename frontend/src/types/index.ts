@@ -97,6 +97,7 @@ export type Quote = {
   fssr: number;
   fg: number;
   totalAPayer: number;
+  items?: QuoteItem[];
   pdfPath?: string;
   createdAt: string;
 };
@@ -117,8 +118,16 @@ export type Convention = {
   name: string;
   companyId: string;
   company: { id: string; name: string; code: string; isActive: boolean };
+  reductionTousRisques?: number;
+  reductionDommagesCollision?: number;
+  reductionVol?: number;
+  reductionIncendie?: number;
+  startDate?: string;
+  endDate?: string;
+  status?: string;
   isActive: boolean;
-  _count?: { users: number; simulations: number; pricingRules: number };
+  guarantees?: { guarantee: Guarantee }[];
+  _count?: { users: number; simulations: number; pricingRules: number; guarantees: number };
   createdAt?: string;
   updatedAt?: string;
 };

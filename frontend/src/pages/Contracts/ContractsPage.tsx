@@ -103,12 +103,21 @@ export const ContractsPage = () => {
                 <div className="text-right">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Prime annuelle</p>
                   <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    {contract.quote?.totalAPayer?.toLocaleString()} MAD
+                    {contract.quote?.totalAPayer?.toLocaleString()} DT
                   </p>
                 </div>
               </div>
 
               <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/contracts/${contract.contractNumber}`)}
+                  className="flex items-center gap-2"
+                >
+                  <FileCheck className="w-4 h-4" />
+                  Voir
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"

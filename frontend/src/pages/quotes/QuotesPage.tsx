@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Download, Calendar, Building2, GitCompare } from 'lucide-react';
+import { FileText, Download, Calendar, Building2, GitCompare, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useLanguage } from '../../contexts/LanguageContext';
 import api from '../../lib/api/client';
@@ -12,6 +12,11 @@ export const QuotesPage = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [selectedQuotes, setSelectedQuotes] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [selectedCV, setSelectedCV] = useState<string>('');
+  const itemsPerPage = 20;
 
   const { data: quotes, isLoading } = useQuery({
     queryKey: ['quotes'],
@@ -20,6 +25,58 @@ export const QuotesPage = () => {
       return data;
     },
   });
+
+  // Filter quotes by date range and CV
+  const filteredQuotes = quotes?.filter((quote: any) => {
+    // Date filter
+    let dateMatch = true;
+    if (startDate || endDate) {
+      const quoteNumber = quote.quoteNumber;
+      const timestampStr = quoteNumber.substring(5, 18);
+      const quoteTimestamp = parseInt(timestampStr);
+      const quoteDate = new Date(quoteTimestamp);
+      
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateMatch = quoteDate >= start && quoteDate <= end;
+      } else if (startDate) {
+        const start = new Date(startDate);
+        dateMatch = quoteDate >= start;
+      } else if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateMatch = quoteDate <= end;
+      }
+    }
+    
+    // CV filter
+    let cvMatch = true;
+    if (selectedCV) {
+      const vehicleCV = quote.simulation?.vehicle?.fiscalHorsepower;
+      if (vehicleCV) {
+        if (selectedCV === '4') cvMatch = vehicleCV <= 4;
+        else if (selectedCV === '5-6') cvMatch = vehicleCV >= 5 && vehicleCV <= 6;
+        else if (selectedCV === '7-10') cvMatch = vehicleCV >= 7 && vehicleCV <= 10;
+        else if (selectedCV === '11-14') cvMatch = vehicleCV >= 11 && vehicleCV <= 14;
+        else if (selectedCV === '15+') cvMatch = vehicleCV >= 15;
+      }
+    }
+    
+    return dateMatch && cvMatch;
+  }) || [];
+
+  // Pagination
+  const totalPages = Math.ceil(filteredQuotes.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedQuotes = filteredQuotes.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  const handleDateFilter = () => {
+    setCurrentPage(1);
+  };
 
   const toggleQuoteSelection = (quoteId: string) => {
     setSelectedQuotes(prev =>
@@ -98,13 +155,82 @@ export const QuotesPage = () => {
           )}
         </div>
 
+        {/* Filters */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-4 items-end">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Date de début
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  handleDateFilter();
+                }}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Date de fin
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  handleDateFilter();
+                }}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Classe (CV)
+              </label>
+              <select
+                value={selectedCV}
+                onChange={(e) => {
+                  setSelectedCV(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="">Toutes les classes</option>
+                <option value="4">≤ 4 CV</option>
+                <option value="5-6">5 à 6 CV</option>
+                <option value="7-10">7 à 10 CV</option>
+                <option value="11-14">11 à 14 CV</option>
+                <option value="15+">≥ 15 CV</option>
+              </select>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setStartDate('');
+                setEndDate('');
+                setSelectedCV('');
+                setCurrentPage(1);
+              }}
+            >
+              Réinitialiser
+            </Button>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            {filteredQuotes.length} devis trouvé{filteredQuotes.length > 1 ? 's' : ''}
+          </p>
+        </div>
+
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : quotes && quotes.length > 0 ? (
-          <div className="grid gap-4">
-            {quotes.map((quote: any) => (
+          <>
+            <div className="grid gap-4">
+              {paginatedQuotes.map((quote: any) => (
               <div
                 key={quote.id}
                 className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border-2 p-6 transition-all ${
@@ -257,8 +383,40 @@ export const QuotesPage = () => {
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Page {currentPage} sur {totalPages} ({filteredQuotes.length} devis)
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="flex items-center gap-1"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Précédent
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="flex items-center gap-1"
+                  >
+                    Suivant
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
             <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />

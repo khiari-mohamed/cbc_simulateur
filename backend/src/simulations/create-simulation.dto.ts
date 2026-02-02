@@ -10,8 +10,8 @@ export class CreateSimulationDto {
 
   @Transform(({ value }) => parseFloat(value))
   @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0.5)
-  @Max(3.5)
+  @Min(1)
+  @Max(8)
   bonusMalus: number;
 
   @IsEnum(UsageType)

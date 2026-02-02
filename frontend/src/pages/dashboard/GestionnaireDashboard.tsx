@@ -221,7 +221,7 @@ export const GestionnaireDashboard = () => {
               {pendingQuotes.map((quote: any) => (
                 <Link
                   key={quote.id}
-                  to="/admin/gestionnaire-validation"
+                  to={`/admin/quotes/${quote.id}/edit`}
                   className="block p-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                 >
                   <div className="flex items-center justify-between">

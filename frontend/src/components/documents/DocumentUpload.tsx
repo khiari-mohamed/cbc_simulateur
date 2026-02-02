@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Upload, File, CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, File, CheckCircle, XCircle, Loader2, AlertCircle, Eye, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import api from '../../lib/api/client';
+import api, { getApiBaseUrl } from '../../lib/api/client';
 import toast from 'react-hot-toast';
 
 interface DocumentUploadProps {
@@ -29,6 +29,8 @@ export const DocumentUpload = ({ quoteId, readonly = false }: DocumentUploadProp
   const [uploading, setUploading] = useState(false);
   const [customerType, setCustomerType] = useState<'PARTICULIER' | 'SOCIETE' | null>(null);
   const [documentTypes, setDocumentTypes] = useState<{ value: string; label: string; required: boolean }[]>([]);
+  const [viewingDoc, setViewingDoc] = useState<string | null>(null);
+  const [deletingDoc, setDeletingDoc] = useState<{ id: string; name: string } | null>(null);
 
   const { data: documents, isLoading } = useQuery({
     queryKey: ['documents', quoteId],
@@ -79,12 +81,13 @@ export const DocumentUpload = ({ quoteId, readonly = false }: DocumentUploadProp
     },
   });
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, docType?: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 50 * 1024 * 1024) {
       toast.error('Fichier trop volumineux (max 50MB)');
+      e.target.value = ''; // Reset input
       return;
     }
 
@@ -92,8 +95,41 @@ export const DocumentUpload = ({ quoteId, readonly = false }: DocumentUploadProp
     const formData = new FormData();
     formData.append('file', file);
     formData.append('quoteId', quoteId);
-    formData.append('type', selectedType);
+    formData.append('type', docType || selectedType);
     uploadMutation.mutate(formData);
+    e.target.value = ''; // Reset input after upload
+  };
+
+  const handleView = (docId: string) => {
+    setViewingDoc(docId);
+  };
+
+  const handleReplace = (docId: string) => {
+    document.getElementById(`replace-${docId}`)?.click();
+  };
+
+  const deleteMutation = useMutation({
+    mutationFn: async (docId: string) => {
+      await api.delete(`/documents/${docId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents', quoteId] });
+      toast.success('Document supprimé avec succès');
+    },
+    onError: () => {
+      toast.error('Erreur lors de la suppression');
+    },
+  });
+
+  const handleDelete = (docId: string, docName: string) => {
+    setDeletingDoc({ id: docId, name: docName });
+  };
+
+  const confirmDelete = () => {
+    if (deletingDoc) {
+      deleteMutation.mutate(deletingDoc.id);
+      setDeletingDoc(null);
+    }
   };
 
   const getStatusIcon = (isValidated: boolean) => {
@@ -225,6 +261,49 @@ export const DocumentUpload = ({ quoteId, readonly = false }: DocumentUploadProp
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {doc.isValidated ? 'Validé' : 'En attente'}
                 </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleView(doc.id)}
+                  className="flex items-center gap-1"
+                >
+                  <Eye className="w-4 h-4" />
+                  Voir
+                </Button>
+                {!readonly && (
+                  <>
+                    <input
+                      id={`replace-${doc.id}`}
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => handleFileChange(e, doc.type)}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleReplace(doc.id)}
+                      disabled={uploading}
+                      className="flex items-center gap-1"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Remplacer
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(doc.id, doc.fileName)}
+                      disabled={deleteMutation.isPending}
+                      className="flex items-center gap-1 text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Supprimer
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -233,6 +312,73 @@ export const DocumentUpload = ({ quoteId, readonly = false }: DocumentUploadProp
         <div className="text-center py-8 text-gray-500 dark:text-gray-400">
           <File className="w-12 h-12 mx-auto mb-2 opacity-50" />
           <p className="text-sm">Aucun document téléchargé</p>
+        </div>
+      )}
+
+      {/* Document Viewer Modal */}
+      {viewingDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={() => setViewingDoc(null)}>
+          <div className="relative w-11/12 h-5/6 bg-white dark:bg-gray-800 rounded-lg shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Aperçu du document</h3>
+              <button
+                onClick={() => setViewingDoc(null)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="w-full h-full p-4">
+              <iframe
+                src={`${getApiBaseUrl()}/documents/${viewingDoc}/view?token=${localStorage.getItem('access_token')}`}
+                className="w-full h-full border-0 rounded"
+                title="Document viewer"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={() => setDeletingDoc(null)}>
+          <div className="relative w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Supprimer le document</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Cette action est irréversible</p>
+              </div>
+            </div>
+            <p className="text-gray-700 dark:text-gray-300 mb-6">
+              Êtes-vous sûr de vouloir supprimer <span className="font-semibold">{deletingDoc.name}</span> ?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDeletingDoc(null)}
+              >
+                Annuler
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={confirmDelete}
+                disabled={deleteMutation.isPending}
+                className="flex items-center gap-2"
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                Supprimer
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </Card>

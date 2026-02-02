@@ -1,11 +1,16 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Helper to get API base URL (works in both dev and prod)
+export const getApiBaseUrl = () => {
+  return api.defaults.baseURL;
+};
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
@@ -22,7 +27,7 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem('refresh_token');
       if (refreshToken) {
         try {
-          const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/auth/refresh`, {
+          const { data } = await axios.post(`${getApiBaseUrl()}/auth/refresh`, {
             refreshToken,
           });
           localStorage.setItem('access_token', data.accessToken);

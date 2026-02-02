@@ -81,17 +81,18 @@ async function main() {
   // Guarantees catalogue
   const guaranteesSeed = [
     { code: 'RC', nameFr: 'Responsabilité Civile', nameEn: 'Civil Liability', nameAr: 'المسؤولية المدنية', isOptional: false },
-    { code: 'CAS', nameFr: 'Corporel Assuré Seul', nameEn: 'Personal Injury', nameAr: 'الإصابات الجسدية', isOptional: true },
-    { code: 'VOL', nameFr: 'Vol', nameEn: 'Theft', nameAr: 'السرقة', isOptional: true },
-    { code: 'INCENDIE', nameFr: 'Incendie', nameEn: 'Fire', nameAr: 'الحريق', isOptional: true },
+    { code: 'CAS', nameFr: 'CAS / Défense et Recours', nameEn: 'Legal Defense', nameAr: 'الدفاع والطعن', isOptional: false },
+    { code: 'VOL', nameFr: 'Vol', nameEn: 'Theft', nameAr: 'السرقة', isOptional: false },
+    { code: 'INCENDIE', nameFr: 'Incendie', nameEn: 'Fire', nameAr: 'الحريق', isOptional: false },
+    { code: 'PERSONNES_TRANSPORTEES', nameFr: 'Personnes Transportées (PTA)', nameEn: 'Passengers', nameAr: 'الأشخاص المنقولون', isOptional: false },
+    { code: 'ASSISTANCE', nameFr: 'Assistance Remorquage', nameEn: 'Roadside Assistance', nameAr: 'المساعدة على الطريق', isOptional: false },
+    { code: 'BG', nameFr: 'Bris de Glaces', nameEn: 'Glass Breakage', nameAr: 'كسر الزجاج', isOptional: true },
     { code: 'INCENDIE_EMEUTES', nameFr: 'Incendie suite émeutes', nameEn: 'Fire following riots', nameAr: 'الحريق بعد الشغب', isOptional: true },
-    { code: 'CATASTROPHES_NATURELLES', nameFr: 'Extension Catastrophes Naturelles', nameEn: 'Natural Disasters Extension', nameAr: 'تمديد الكوارث الطبيعية', isOptional: true },
+    { code: 'ASSURANCE_CONDUCTEUR', nameFr: 'Assurance Conducteur', nameEn: 'Driver Insurance', nameAr: 'تأمين السائق', isOptional: true },
     { code: 'DOMMAGES_EMEUTES', nameFr: 'Dommages suite émeutes', nameEn: 'Damage following riots', nameAr: 'الأضرار بعد الشغب', isOptional: true },
-    { code: 'PERSONNES_TRANSPORTEES', nameFr: 'Personnes Transportées', nameEn: 'Passengers', nameAr: 'الأشخاص المنقولون', isOptional: true },
-    { code: 'ASSISTANCE', nameFr: 'Assistance Remorquage', nameEn: 'Roadside Assistance', nameAr: 'المساعدة على الطريق', isOptional: true },
+    { code: 'CATASTROPHES_NATURELLES', nameFr: 'Extension Catastrophes Naturelles', nameEn: 'Natural Disasters Extension', nameAr: 'تمديد الكوارث الطبيعية', isOptional: true },
     { code: 'TOUS_RISQUES_ZERO', nameFr: 'Tous Risques', nameEn: 'All Risks', nameAr: 'جميع المخاطر', isOptional: true },
     { code: 'DOMMAGES_COLLISIONS', nameFr: 'Dommages Collision', nameEn: 'Collision Damage', nameAr: 'أضرار التصادم', isOptional: true },
-    { code: 'BG', nameFr: 'Bris de Glaces', nameEn: 'Glass Breakage', nameAr: 'كسر الزجاج', isOptional: true },
     { code: 'DEFENSE_RECOURS', nameFr: 'Défense et Recours', nameEn: 'Legal Defense', nameAr: 'الدفاع والطعن', isOptional: true },
   ];
   const guarantees = {} as Record<string, { id: string }>;
@@ -138,7 +139,7 @@ async function main() {
   await prisma.pricingRule.create({ data: { companyId: lloyd.id, guaranteeId: guarantees['INCENDIE'].id, reductionRate: 1.0, isActive: true } });
   await prisma.pricingRule.create({ data: { companyId: amana.id, guaranteeId: guarantees['INCENDIE'].id, reductionRate: 1.0, isActive: true } });
 
-  // PTA per company (CDC: LLOYD 5k=25, 10k=42; AMANA 4k=32, 8k=64)
+  // PTA per company (CDC EXAMPLE: LLOYD 5k=25, 10k=42; AMANA 4k=32, 8k=64)
   await prisma.pricingRule.create({ data: { companyId: lloyd.id, guaranteeId: guarantees['PERSONNES_TRANSPORTEES'].id, minCapital: 5000, fixedPremium: 25.0, isActive: true } });
   await prisma.pricingRule.create({ data: { companyId: lloyd.id, guaranteeId: guarantees['PERSONNES_TRANSPORTEES'].id, minCapital: 10000, fixedPremium: 42.0, isActive: true } });
   await prisma.pricingRule.create({ data: { companyId: amana.id, guaranteeId: guarantees['PERSONNES_TRANSPORTEES'].id, minCapital: 4000, fixedPremium: 32.0, isActive: true } });
@@ -196,7 +197,7 @@ async function main() {
     { minVV: 8000, maxVV: 30000, primes: [77, 142.7, 205.3, 265.7, 322.7, 393, 449.5, 506, 560, 612.5, 894] },
     { minVV: 30000, maxVV: 60000, primes: [77, 144, 211, 278, 343.7, 408, 471, 534, 595.3, 656.7, 947, 1220, 1768] },
     { minVV: 60000, maxVV: 80000, primes: [77, 144, 211, 278, 345, 412, 479, 544, 607, 670, 983, 1275, 1827.5, 2354] },
-    { minVV: 80000, maxVV: 100000, primes: [77, 144, 211, 278, 345, 412, 479, 546, 613, 678, 993, 1303, 1878.5, 2418.5, 2940] },
+    { minVV: 80000, maxVV: 100000, primes: [77, 144, 211, 278, 345, 412, 479, 546, 613, 670, 993, 1303, 1878.5, 2418.5, 2940] },
     { minVV: 100000, maxVV: 150000, primes: [77, 144, 211, 278, 345, 412, 479, 546, 613, 680, 1007, 1322, 1932, 2504.8, 3051, 4405] },
     { minVV: 150000, maxVV: 200000, primes: [77, 144, 211, 278, 345, 412, 479, 546, 613, 680, 1015, 1342, 1972, 2582, 3160.8, 4528, 5870] },
     { minVV: 200000, maxVV: null, primes: [77, 144, 211, 278, 345, 412, 479, 546, 613, 680, 1015, 1350, 2020, 2670, 3300, 4837.5, 6285] },

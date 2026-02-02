@@ -25,7 +25,7 @@ export class PdfService {
       path: filepath,
       format: 'A4',
       printBackground: true,
-      margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
     });
     await browser.close();
 
@@ -68,6 +68,9 @@ export class PdfService {
       });
     };
 
+    const logoPath = path.join(process.cwd(), '..', 'frontend', 'public', 'Image1.png');
+    const logoBase64 = fs.existsSync(logoPath) ? fs.readFileSync(logoPath).toString('base64') : '';
+
     return `
 <!DOCTYPE html>
 <html>
@@ -75,31 +78,36 @@ export class PdfService {
   <meta charset="UTF-8">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Arial', sans-serif; color: #333; line-height: 1.6; }
-    .header { background: #003366; color: white; padding: 30px; text-align: center; }
-    .header h1 { font-size: 28px; margin-bottom: 10px; }
-    .header p { font-size: 14px; opacity: 0.9; }
-    .content { padding: 30px; }
-    .section { margin-bottom: 25px; }
-    .section-title { background: #f0f0f0; padding: 10px 15px; font-weight: bold; font-size: 16px; margin-bottom: 15px; border-left: 4px solid #003366; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-    .info-item { padding: 8px 0; }
-    .info-label { font-weight: bold; color: #666; font-size: 13px; }
-    .info-value { color: #333; font-size: 14px; margin-top: 3px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th { background: #003366; color: white; padding: 12px; text-align: left; font-size: 13px; }
-    td { padding: 10px 12px; border-bottom: 1px solid #ddd; font-size: 13px; }
-    tr:hover { background: #f9f9f9; }
-    .total-section { background: #f8f8f8; padding: 20px; margin-top: 20px; border-radius: 5px; }
-    .total-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
-    .total-row.final { font-size: 18px; font-weight: bold; color: #003366; border-top: 2px solid #003366; padding-top: 15px; margin-top: 10px; }
-    .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; border-top: 1px solid #ddd; margin-top: 30px; }
+    body { font-family: 'Arial', sans-serif; color: #333; line-height: 1.3; font-size: 11px; }
+    .header { background: #d52b36; color: white; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .header-logo { height: 40px; }
+    .header-text { flex: 1; text-align: center; }
+    .header h1 { font-size: 20px; margin-bottom: 3px; }
+    .header p { font-size: 11px; opacity: 0.9; }
+    .content { padding: 15px 20px; }
+    .section { margin-bottom: 12px; }
+    .section-title { background: #f0f0f0; padding: 6px 10px; font-weight: bold; font-size: 12px; margin-bottom: 8px; border-left: 3px solid #d52b36; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .info-item { padding: 4px 0; }
+    .info-label { font-weight: bold; color: #666; font-size: 10px; }
+    .info-value { color: #333; font-size: 11px; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th { background: #d52b36; color: white; padding: 6px 8px; text-align: left; font-size: 10px; }
+    td { padding: 5px 8px; border-bottom: 1px solid #ddd; font-size: 10px; }
+    .total-section { background: #f8f8f8; padding: 12px; margin-top: 12px; border-radius: 3px; }
+    .total-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 11px; }
+    .total-row.final { font-size: 14px; font-weight: bold; color: #d52b36; border-top: 2px solid #d52b36; padding-top: 8px; margin-top: 6px; }
+    .footer { text-align: center; padding: 10px; font-size: 9px; color: #666; border-top: 1px solid #ddd; margin-top: 15px; }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>ARS ASSURANCE</h1>
-    <p>Devis d'Assurance Automobile</p>
+    ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" class="header-logo" alt="Logo" />` : ''}
+    <div class="header-text">
+      <h1>ARS ASSURANCE</h1>
+      <p>Devis d'Assurance Automobile</p>
+    </div>
+    <div style="width: 40px;"></div>
   </div>
 
   <div class="content">
@@ -107,11 +115,11 @@ export class PdfService {
       <div class="section-title">Informations du Devis</div>
       <div class="info-grid">
         <div class="info-item">
-          <div class="info-label">Numéro de Devis</div>
+          <div class="info-label">N° Devis</div>
           <div class="info-value">${quote.quoteNumber}</div>
         </div>
         <div class="info-item">
-          <div class="info-label">Date d'émission</div>
+          <div class="info-label">Date</div>
           <div class="info-value">${formatDate(quote.createdAt)}</div>
         </div>
         <div class="info-item">
@@ -119,52 +127,30 @@ export class PdfService {
           <div class="info-value">${quote.company.name}</div>
         </div>
         <div class="info-item">
-          <div class="info-label">Statut</div>
-          <div class="info-value">${quote.status}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title">Informations Client</div>
-      <div class="info-grid">
-        <div class="info-item">
-          <div class="info-label">Nom</div>
+          <div class="info-label">Client</div>
           <div class="info-value">${quote.user.firstName} ${quote.user.lastName}</div>
         </div>
-        <div class="info-item">
-          <div class="info-label">Email</div>
-          <div class="info-value">${quote.user.email}</div>
-        </div>
       </div>
     </div>
 
     <div class="section">
-      <div class="section-title">Informations Véhicule</div>
+      <div class="section-title">Véhicule</div>
       <div class="info-grid">
         <div class="info-item">
           <div class="info-label">Immatriculation</div>
           <div class="info-value">${quote.simulation.vehicle.registration || 'N/A'}</div>
         </div>
         <div class="info-item">
-          <div class="info-label">Puissance Fiscale</div>
-          <div class="info-value">${quote.simulation.vehicle.fiscalHorsepower} CV</div>
+          <div class="info-label">CV / Places</div>
+          <div class="info-value">${quote.simulation.vehicle.fiscalHorsepower} CV / ${quote.simulation.vehicle.numberOfSeats} places</div>
         </div>
         <div class="info-item">
-          <div class="info-label">Nombre de Places</div>
-          <div class="info-value">${quote.simulation.vehicle.numberOfSeats}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Date 1ère Circulation</div>
+          <div class="info-label">1ère Circulation</div>
           <div class="info-value">${formatDate(quote.simulation.vehicle.firstCirculationDate)}</div>
         </div>
         <div class="info-item">
-          <div class="info-label">Valeur à Neuf</div>
-          <div class="info-value">${formatCurrency(quote.simulation.vehicle.newValue)}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Valeur Vénale</div>
-          <div class="info-value">${formatCurrency(quote.simulation.vehicle.marketValue)}</div>
+          <div class="info-label">Valeur Neuf / Vénale</div>
+          <div class="info-value">${formatCurrency(quote.simulation.vehicle.newValue)} / ${formatCurrency(quote.simulation.vehicle.marketValue)}</div>
         </div>
       </div>
     </div>
@@ -224,8 +210,7 @@ export class PdfService {
   </div>
 
   <div class="footer">
-    <p>Ce devis est valable 30 jours à compter de sa date d'émission.</p>
-    <p>ARS Assurance - Courtier en Assurances</p>
+    <p>Ce devis est valable 30 jours • ARS Assurance - Courtier en Assurances</p>
   </div>
 </body>
 </html>

@@ -98,41 +98,45 @@ export class PricingEngineService {
       console.log('❌ CAS NOT calculated - no pricing rule found');
     }
 
-    // 3. VOL (Optional - Formula: ((marketValue * 2.36) / 1000 + 30) * reductionRate)
-    if (simulation.selectedGuarantees.includes('VOL')) {
-      const volResult = await this.calculateVOL(companyId, vehicle, conventionId);
-      if (volResult) {
-        items.push(volResult);
-        primeNette = primeNette.add(volResult.prime);
-      }
+    // 3. VOL (MANDATORY - Always included)
+    const volResult = await this.calculateVOL(companyId, vehicle, conventionId);
+    if (volResult) {
+      console.log('✅ VOL calculated:', volResult.prime.toString());
+      items.push(volResult);
+      primeNette = primeNette.add(volResult.prime);
+    } else {
+      console.log('❌ VOL NOT calculated - no pricing rule found');
     }
 
-    // 4. INCENDIE (Optional - Formula: ((marketValue * 2.75) / 1000 + 30) * reductionRate)
-    if (simulation.selectedGuarantees.includes('INCENDIE')) {
-      const incendieResult = await this.calculateINCENDIE(companyId, vehicle, conventionId);
-      if (incendieResult) {
-        items.push(incendieResult);
-        primeNette = primeNette.add(incendieResult.prime);
-      }
+    // 4. INCENDIE (MANDATORY - Always included)
+    const incendieResult = await this.calculateINCENDIE(companyId, vehicle, conventionId);
+    if (incendieResult) {
+      console.log('✅ INCENDIE calculated:', incendieResult.prime.toString());
+      items.push(incendieResult);
+      primeNette = primeNette.add(incendieResult.prime);
+    } else {
+      console.log('❌ INCENDIE NOT calculated - no pricing rule found');
     }
 
-    // 5. PERSONNES_TRANSPORTEES (Optional - Fixed based on capital)
-    if (simulation.selectedGuarantees.includes('PERSONNES_TRANSPORTEES')) {
-      const selectedCapital = simulation.selectedCapitals?.['PERSONNES_TRANSPORTEES'];
-      const ptResult = await this.calculatePERSONNES_TRANSPORTEES(companyId, selectedCapital, conventionId);
-      if (ptResult) {
-        items.push(ptResult);
-        primeNette = primeNette.add(ptResult.prime);
-      }
+    // 5. PERSONNES_TRANSPORTEES (MANDATORY - Always included)
+    const selectedCapital = simulation.selectedCapitals?.['PERSONNES_TRANSPORTEES'];
+    const ptResult = await this.calculatePERSONNES_TRANSPORTEES(companyId, selectedCapital, conventionId);
+    if (ptResult) {
+      console.log('✅ PTA calculated:', ptResult.prime.toString());
+      items.push(ptResult);
+      primeNette = primeNette.add(ptResult.prime);
+    } else {
+      console.log('❌ PTA NOT calculated - no pricing rule found');
     }
 
-    // 6. ASSISTANCE (Optional - Fixed 121.000)
-    if (simulation.selectedGuarantees.includes('ASSISTANCE')) {
-      const assistanceResult = await this.calculateASSISTANCE(companyId, conventionId);
-      if (assistanceResult) {
-        items.push(assistanceResult);
-        primeNette = primeNette.add(assistanceResult.prime);
-      }
+    // 6. ASSISTANCE (MANDATORY - Always included)
+    const assistanceResult = await this.calculateASSISTANCE(companyId, conventionId);
+    if (assistanceResult) {
+      console.log('✅ ASSISTANCE calculated:', assistanceResult.prime.toString());
+      items.push(assistanceResult);
+      primeNette = primeNette.add(assistanceResult.prime);
+    } else {
+      console.log('❌ ASSISTANCE NOT calculated - no pricing rule found');
     }
 
     // 7. TOUS_RISQUES_0 (Only if formula is TOUS_RISQUES_0)
@@ -178,8 +182,11 @@ export class PricingEngineService {
     if (simulation.selectedGuarantees.includes('INCENDIE_EMEUTES')) {
       const incendieEmeutesResult = await this.calculateINCENDIE_EMEUTES(companyId, vehicle, conventionId);
       if (incendieEmeutesResult) {
+        console.log('✅ INCENDIE_EMEUTES calculated:', incendieEmeutesResult.prime.toString());
         items.push(incendieEmeutesResult);
         primeNette = primeNette.add(incendieEmeutesResult.prime);
+      } else {
+        console.log('❌ INCENDIE_EMEUTES NOT calculated - no pricing rule found');
       }
     }
 
@@ -187,8 +194,11 @@ export class PricingEngineService {
     if (simulation.selectedGuarantees.includes('CATASTROPHES_NATURELLES')) {
       const catnatResult = await this.calculateCATNAT(companyId, vehicle, simulation.formulaType, conventionId);
       if (catnatResult) {
+        console.log('✅ CATASTROPHES_NATURELLES calculated:', catnatResult.prime.toString());
         items.push(catnatResult);
         primeNette = primeNette.add(catnatResult.prime);
+      } else {
+        console.log('❌ CATASTROPHES_NATURELLES NOT calculated - no pricing rule found or not AMANA');
       }
     }
 
@@ -196,8 +206,11 @@ export class PricingEngineService {
     if (simulation.selectedGuarantees.includes('DOMMAGES_EMEUTES')) {
       const dommagesEmeutesResult = await this.calculateDOMMAGES_EMEUTES(companyId, vehicle, conventionId);
       if (dommagesEmeutesResult) {
+        console.log('✅ DOMMAGES_EMEUTES calculated:', dommagesEmeutesResult.prime.toString());
         items.push(dommagesEmeutesResult);
         primeNette = primeNette.add(dommagesEmeutesResult.prime);
+      } else {
+        console.log('❌ DOMMAGES_EMEUTES NOT calculated - no pricing rule found');
       }
     }
 
@@ -225,7 +238,7 @@ export class PricingEngineService {
     const fssr = new Decimal(company.fssr);
     const fg = new Decimal(company.fg);
     
-    const taxe12Percent = primeNette.mul(0.12);
+    const taxe12Percent = primeNette.add(frais).mul(0.12);
     const taxe2Percent = primeRC.add(frais).mul(0.02);
     const taxes = taxe12Percent.add(taxe2Percent);
 

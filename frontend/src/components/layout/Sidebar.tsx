@@ -18,6 +18,7 @@ import {
   ClipboardCheck,
   X,
   Upload,
+  BookOpen,
 } from 'lucide-react';
 
 interface NavItem {
@@ -42,6 +43,7 @@ const getNavItems = (t: (key: string) => string): NavItem[] => [
   { icon: ClipboardCheck, label: t('nav.validationTech'), path: '/admin/gestionnaire-validation', roles: [Role.GESTIONNAIRE_VALIDATION_ARS] },
   { icon: Users, label: t('nav.users'), path: '/admin/users', roles: [Role.ADMINISTRATEUR_ARS] },
   { icon: BarChart3, label: t('nav.reports'), path: '/admin/reports', roles: [Role.ADMINISTRATEUR_ARS] },
+  { icon: BookOpen, label: 'Guide Système', path: '/admin/system-guide', roles: [Role.ADMINISTRATEUR_ARS] },
   { icon: Settings, label: t('nav.settings'), path: '/settings' },
 ];
 

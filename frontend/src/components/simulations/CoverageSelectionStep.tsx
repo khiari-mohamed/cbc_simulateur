@@ -62,6 +62,7 @@ export const CoverageSelectionStep = ({
     },
   });
 
+  const mandatoryGuarantees = guarantees?.filter(g => !g.isOptional && g.isActive) || [];
   const optionalGuarantees = guarantees?.filter(g => g.isOptional && g.isActive) || [];
 
   const { data: companies } = useQuery({
@@ -82,6 +83,7 @@ export const CoverageSelectionStep = ({
   };
 
   const vehicleAge = calculateAge(firstCirculationDate);
+  console.log('🚗 Vehicle age calculation:', { firstCirculationDate, vehicleAge, canSelectTousRisques: vehicleAge < 2 });
   
   // DC capital step enforcement based on CDC
   const snapDcCapital = (value: number, marketValue?: number) => {
@@ -247,7 +249,7 @@ export const CoverageSelectionStep = ({
                 Dommages Collision
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Couverture des dommages en cas de collision
+                Couverture des dommages en cas de collision avec un autre véhicule terrestre
               </p>
               {!canSelectDommagesCollision && (
                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">
@@ -276,7 +278,7 @@ export const CoverageSelectionStep = ({
             />
             <div className="ml-3 flex-1">
               <div className="font-semibold text-gray-900 dark:text-white">
-                Tous Risques 0%
+                Tous Risques
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Couverture maximale sans franchise
@@ -345,6 +347,7 @@ export const CoverageSelectionStep = ({
               }}
               options={[
                 { value: '500', label: '500 DT' },
+                { value: '700', label: '700 DT' },
                 { value: '1000', label: '1 000 DT' },
                 { value: '1500', label: '1 500 DT' },
                 { value: '2000', label: '2 000 DT' },
@@ -404,6 +407,7 @@ export const CoverageSelectionStep = ({
             }}
             options={[
               { value: '500', label: '500 DT' },
+              { value: '700', label: '700 DT' },
               { value: '1000', label: '1 000 DT' },
               { value: '1500', label: '1 500 DT' },
               { value: '2000', label: '2 000 DT' },
@@ -432,6 +436,7 @@ export const CoverageSelectionStep = ({
           }}
           options={[
             { value: '500', label: '500 DT' },
+            { value: '700', label: '700 DT' },
             { value: '1000', label: '1 000 DT' },
             { value: '1500', label: '1 500 DT' },
             { value: '2000', label: '2 000 DT' },
@@ -459,7 +464,21 @@ export const CoverageSelectionStep = ({
                       const next = e.target.checked
                         ? [...selectedCompanies, c.id]
                         : selectedCompanies.filter(id => id !== c.id);
-                      if (next.length <= 2) setSelectedCompanies(next);
+                      if (next.length <= 2) {
+                        setSelectedCompanies(next);
+                        // Save to parent immediately
+                        if (localFormula) {
+                          onUpdate({
+                            formulaType: localFormula,
+                            selectedGuarantees: localGuarantees,
+                            conventionId: localConvention || undefined,
+                            franchiseRate: localFranchiseRate,
+                            bgLimit: localBgLimit,
+                            dcCapital: localDcCapital,
+                            companyIds: next,
+                          });
+                        }
+                      }
                     }}
                   />
                   <span className="text-sm text-gray-900 dark:text-white">{c.name}</span>
@@ -468,6 +487,40 @@ export const CoverageSelectionStep = ({
             })}
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Vous pouvez comparer jusqu'à 2 compagnies.</p>
+        </div>
+      )}
+
+      {mandatoryGuarantees.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Garanties incluses systématiquement
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            Ces garanties sont automatiquement incluses dans toutes les formules
+          </p>
+          <div className="space-y-2">
+            {mandatoryGuarantees.map((guarantee) => (
+              <div
+                key={guarantee.id}
+                className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+              >
+                <input
+                  type="checkbox"
+                  checked={true}
+                  disabled={true}
+                  className="mr-3"
+                />
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900 dark:text-white">
+                    {guarantee.nameFr}
+                  </div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Obligatoire
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

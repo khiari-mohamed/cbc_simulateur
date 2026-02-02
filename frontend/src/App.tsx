@@ -36,6 +36,7 @@ import { ContractDetailPage } from './pages/Contracts/ContractDetailPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { DocumentsPage } from './pages/DocumentsPage';
+import { SystemGuidePage } from './pages/admin/SystemGuidePage';
 import { Role } from './types/index';
 
 const queryClient = new QueryClient();
@@ -188,6 +189,14 @@ function App() {
                   element={
                     <ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}>
                       <ConventionReportsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/system-guide"
+                  element={
+                    <ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}>
+                      <SystemGuidePage />
                     </ProtectedRoute>
                   }
                 />

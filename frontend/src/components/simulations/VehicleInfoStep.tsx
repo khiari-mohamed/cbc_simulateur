@@ -1,7 +1,6 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useEffect } from 'react';
 import { Input } from '../ui/Input';
 import { Car } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -30,19 +29,11 @@ interface VehicleInfoStepProps {
 
 export const VehicleInfoStep = ({ data, onUpdate, onNext }: VehicleInfoStepProps) => {
   const { t } = useLanguage();
-  const { register, handleSubmit, formState: { errors, isValid }, watch } = useForm({
+  const { register, handleSubmit, formState: { errors }, watch } = useForm({
     resolver: zodResolver(vehicleSchema) as any,
     defaultValues: data,
     mode: 'onChange',
   });
-
-  const formData = watch();
-
-  useEffect(() => {
-    if (isValid && formData.fiscalHorsepower && formData.numberOfSeats && formData.newValue && formData.marketValue && formData.firstCirculationDate) {
-      onUpdate(formData as VehicleData);
-    }
-  }, [formData, isValid, onUpdate]);
 
   const onSubmit = (formData: any) => {
     onUpdate(formData as VehicleData);
@@ -137,6 +128,13 @@ export const VehicleInfoStep = ({ data, onUpdate, onNext }: VehicleInfoStepProps
           💡 {t('vehicle.tip')}
         </p>
       </div>
+
+      <button
+        type="submit"
+        className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        Continuer
+      </button>
     </form>
   );
 };

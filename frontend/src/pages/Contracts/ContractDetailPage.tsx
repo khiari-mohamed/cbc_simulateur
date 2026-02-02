@@ -55,12 +55,12 @@ export const ContractDetailPage = () => {
   });
 
   const handleDownloadPDF = async () => {
-    if (!contract?.pdfPath) {
+    if (!contract?.id) {
       toast.error('Le document PDF n\'est pas disponible');
       return;
     }
     try {
-      const response = await api.get(`/contracts/${contract.id}/pdf`, {
+      const response = await api.get(`/contracts/${contract.id}/download`, {
         responseType: 'blob',
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -77,11 +77,26 @@ export const ContractDetailPage = () => {
     }
   };
 
-  const handlePrint = () => {
-    if (contract?.pdfPath) {
-      window.open(contract.pdfPath, '_blank');
-    } else {
+  const handlePrint = async () => {
+    if (!contract?.id) {
       toast.error('Le document n\'est pas disponible à l\'impression');
+      return;
+    }
+    try {
+      const response = await api.get(`/contracts/${contract.id}/download`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const printWindow = window.open(url, '_blank');
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+      }
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error('Erreur lors de l\'impression');
     }
   };
 

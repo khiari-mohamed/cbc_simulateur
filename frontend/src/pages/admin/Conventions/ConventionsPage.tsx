@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, FileText, Edit, Trash2, Users, CheckCircle, XCircle, Shield } from 'lucide-react';
+import { Plus, FileText, Edit, Trash2, Users, CheckCircle, XCircle, Shield, ListChecks, DollarSign, Calendar } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { ConventionModal } from '../../../components/admin/ConventionModal';
 import { AssignUsersModal } from '../../../components/admin/AssignUsersModal';
+import { AssignGuaranteesModal } from '../../../components/admin/AssignGuaranteesModal';
 import api from '../../../lib/api/client';
 import toast from 'react-hot-toast';
 import type { Convention } from '../../../types';
@@ -11,6 +12,7 @@ import type { Convention } from '../../../types';
 export const ConventionsPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isGuaranteesModalOpen, setIsGuaranteesModalOpen] = useState(false);
   const [editingConvention, setEditingConvention] = useState<Convention | null>(null);
   const [selectedConvention, setSelectedConvention] = useState<Convention | null>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
@@ -43,6 +45,11 @@ export const ConventionsPage = () => {
     setIsAssignModalOpen(true);
   };
 
+  const handleAssignGuarantees = (convention: Convention) => {
+    setSelectedConvention(convention);
+    setIsGuaranteesModalOpen(true);
+  };
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingConvention(null);
@@ -50,6 +57,11 @@ export const ConventionsPage = () => {
 
   const handleCloseAssignModal = () => {
     setIsAssignModalOpen(false);
+    setSelectedConvention(null);
+  };
+
+  const handleCloseGuaranteesModal = () => {
+    setIsGuaranteesModalOpen(false);
     setSelectedConvention(null);
   };
 
@@ -110,6 +122,15 @@ export const ConventionsPage = () => {
                 <div>
                   <h3 className="font-semibold text-gray-900 dark:text-white">{convention.name}</h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400">{convention.company.name}</p>
+                  {convention.status && (
+                    <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded ${
+                      convention.status === 'ACTIVE' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                      convention.status === 'SUSPENDED' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                      'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                    }`}>
+                      {convention.status === 'ACTIVE' ? 'Active' : convention.status === 'SUSPENDED' ? 'Suspendue' : 'Expirée'}
+                    </span>
+                  )}
                 </div>
               </div>
               {convention.isActive ? (
@@ -119,6 +140,54 @@ export const ConventionsPage = () => {
               )}
             </div>
 
+            {(convention.reductionTousRisques || convention.reductionDommagesCollision || convention.reductionVol || convention.reductionIncendie) && (
+              <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-1 mb-1">
+                  <DollarSign className="w-3 h-3 text-blue-900 dark:text-blue-200" />
+                  <p className="text-xs font-semibold text-blue-900 dark:text-blue-200">Taux de réduction</p>
+                </div>
+                <div className="grid grid-cols-2 gap-1 text-xs">
+                  {convention.reductionTousRisques && convention.reductionTousRisques !== 1 && (
+                    <div className="text-gray-700 dark:text-gray-300">
+                      <span className="font-medium">TR:</span> {((1 - convention.reductionTousRisques) * 100).toFixed(0)}%
+                    </div>
+                  )}
+                  {convention.reductionDommagesCollision && convention.reductionDommagesCollision !== 1 && (
+                    <div className="text-gray-700 dark:text-gray-300">
+                      <span className="font-medium">DC:</span> {((1 - convention.reductionDommagesCollision) * 100).toFixed(0)}%
+                    </div>
+                  )}
+                  {convention.reductionVol && convention.reductionVol !== 1 && (
+                    <div className="text-gray-700 dark:text-gray-300">
+                      <span className="font-medium">Vol:</span> {((1 - convention.reductionVol) * 100).toFixed(0)}%
+                    </div>
+                  )}
+                  {convention.reductionIncendie && convention.reductionIncendie !== 1 && (
+                    <div className="text-gray-700 dark:text-gray-300">
+                      <span className="font-medium">Inc:</span> {((1 - convention.reductionIncendie) * 100).toFixed(0)}%
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {(convention.startDate || convention.endDate) && (
+              <div className="mb-3 text-xs text-gray-600 dark:text-gray-400">
+                {convention.startDate && (
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    <span>Début: {new Date(convention.startDate).toLocaleDateString('fr-FR')}</span>
+                  </div>
+                )}
+                {convention.endDate && (
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    <span>Fin: {new Date(convention.endDate).toLocaleDateString('fr-FR')}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-3 gap-2 mb-3 text-sm">
               <div className="bg-gray-50 dark:bg-gray-900 rounded p-2">
                 <p className="text-xs text-gray-500 dark:text-gray-400">Utilisateurs</p>
@@ -127,9 +196,9 @@ export const ConventionsPage = () => {
                 </p>
               </div>
               <div className="bg-gray-50 dark:bg-gray-900 rounded p-2">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Simulations</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Garanties</p>
                 <p className="font-semibold text-gray-900 dark:text-white">
-                  {convention._count?.simulations || 0}
+                  {convention._count?.guarantees || 0}
                 </p>
               </div>
               <div className="bg-gray-50 dark:bg-gray-900 rounded p-2">
@@ -149,6 +218,15 @@ export const ConventionsPage = () => {
               >
                 <Users className="w-3 h-3 mr-1" />
                 Utilisateurs
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleAssignGuarantees(convention)}
+                className="flex-1"
+              >
+                <ListChecks className="w-3 h-3 mr-1" />
+                Garanties
               </Button>
               <Button
                 size="sm"
@@ -197,6 +275,12 @@ export const ConventionsPage = () => {
       <AssignUsersModal
         isOpen={isAssignModalOpen}
         onClose={handleCloseAssignModal}
+        convention={selectedConvention}
+      />
+
+      <AssignGuaranteesModal
+        isOpen={isGuaranteesModalOpen}
+        onClose={handleCloseGuaranteesModal}
         convention={selectedConvention}
       />
     </div>

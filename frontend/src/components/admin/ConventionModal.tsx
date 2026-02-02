@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X } from 'lucide-react';
+import { X, DollarSign, Calendar } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
@@ -14,6 +14,21 @@ import type { Convention, Company } from '../../types';
 const conventionSchema = z.object({
   name: z.string().min(2, 'Nom minimum 2 caractères').max(100),
   companyId: z.string().min(1, 'Compagnie requise'),
+  reductionTousRisques: z.number().min(0, 'Minimum 0').max(1, 'Maximum 1').optional(),
+  reductionDommagesCollision: z.number().min(0, 'Minimum 0').max(1, 'Maximum 1').optional(),
+  reductionVol: z.number().min(0, 'Minimum 0').max(1, 'Maximum 1').optional(),
+  reductionIncendie: z.number().min(0, 'Minimum 0').max(1, 'Maximum 1').optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  status: z.string().optional(),
+}).refine((data) => {
+  if (data.startDate && data.endDate) {
+    return new Date(data.endDate) >= new Date(data.startDate);
+  }
+  return true;
+}, {
+  message: 'La date de fin doit être après la date de début',
+  path: ['endDate'],
 });
 
 type ConventionForm = z.infer<typeof conventionSchema>;
@@ -27,7 +42,7 @@ interface ConventionModalProps {
 export const ConventionModal = ({ isOpen, onClose, convention }: ConventionModalProps) => {
   const queryClient = useQueryClient();
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ConventionForm>({
-    resolver: zodResolver(conventionSchema),
+    resolver: zodResolver(conventionSchema) as any,
   });
 
   const { data: companies } = useQuery({
@@ -41,9 +56,29 @@ export const ConventionModal = ({ isOpen, onClose, convention }: ConventionModal
 
   useEffect(() => {
     if (convention) {
-      reset({ name: convention.name, companyId: convention.company.id });
+      reset({ 
+        name: convention.name, 
+        companyId: convention.company.id,
+        reductionTousRisques: convention.reductionTousRisques || 1.0,
+        reductionDommagesCollision: convention.reductionDommagesCollision || 1.0,
+        reductionVol: convention.reductionVol || 1.0,
+        reductionIncendie: convention.reductionIncendie || 1.0,
+        startDate: convention.startDate ? new Date(convention.startDate).toISOString().split('T')[0] : '',
+        endDate: convention.endDate ? new Date(convention.endDate).toISOString().split('T')[0] : '',
+        status: convention.status || 'ACTIVE',
+      });
     } else {
-      reset({ name: '', companyId: '' });
+      reset({ 
+        name: '', 
+        companyId: '',
+        reductionTousRisques: 1.0,
+        reductionDommagesCollision: 1.0,
+        reductionVol: 1.0,
+        reductionIncendie: 1.0,
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: '',
+        status: 'ACTIVE',
+      });
     }
   }, [convention, reset]);
 
@@ -61,7 +96,7 @@ export const ConventionModal = ({ isOpen, onClose, convention }: ConventionModal
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: ConventionForm) => api.patch(`/conventions/${convention?.id}`, { name: data.name }),
+    mutationFn: (data: ConventionForm) => api.put(`/conventions/${convention?.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conventions'] });
       toast.success('Convention modifiée avec succès');
@@ -122,6 +157,87 @@ export const ConventionModal = ({ isOpen, onClose, convention }: ConventionModal
               La compagnie ne peut pas être modifiée après création
             </p>
           )}
+
+          <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <DollarSign className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Taux de réduction par garantie</h3>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">1.0 = pas de réduction | 0.85 = 15% de réduction</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Tous Risques"
+                type="number"
+                step="0.01"
+                min="0"
+                max="1"
+                {...register('reductionTousRisques', { valueAsNumber: true })}
+                placeholder="1.0"
+                error={errors.reductionTousRisques?.message}
+              />
+              <Input
+                label="Dommages Collision"
+                type="number"
+                step="0.01"
+                min="0"
+                max="1"
+                {...register('reductionDommagesCollision', { valueAsNumber: true })}
+                placeholder="1.0"
+                error={errors.reductionDommagesCollision?.message}
+              />
+              <Input
+                label="Vol"
+                type="number"
+                step="0.01"
+                min="0"
+                max="1"
+                {...register('reductionVol', { valueAsNumber: true })}
+                placeholder="1.0"
+                error={errors.reductionVol?.message}
+              />
+              <Input
+                label="Incendie"
+                type="number"
+                step="0.01"
+                min="0"
+                max="1"
+                {...register('reductionIncendie', { valueAsNumber: true })}
+                placeholder="1.0"
+                error={errors.reductionIncendie?.message}
+              />
+            </div>
+          </div>
+
+          <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Calendar className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Période de validité</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Date de début"
+                type="date"
+                {...register('startDate')}
+                error={errors.startDate?.message}
+              />
+              <Input
+                label="Date de fin (optionnel)"
+                type="date"
+                {...register('endDate')}
+                error={errors.endDate?.message}
+              />
+            </div>
+          </div>
+
+          <Select
+            label="Statut"
+            {...register('status')}
+            options={[
+              { value: 'ACTIVE', label: 'Active' },
+              { value: 'SUSPENDED', label: 'Suspendue' },
+              { value: 'EXPIRED', label: 'Expirée' },
+            ]}
+          />
 
           <div className="flex gap-3 pt-4">
             <Button
