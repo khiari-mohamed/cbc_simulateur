@@ -3,8 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PricingEngineService } from '../pricing-engine/pricing-engine.service';
 import { PdfService } from '../pdf/pdf.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { InternalNotificationsService } from '../notifications/internal-notifications.service';
 import { QuoteStatus } from '@prisma/client';
+import { calculateEffectiveDate } from '../src/common/utils/effective-date.util';
 
 @Injectable()
 export class QuotesService {
@@ -13,7 +13,6 @@ export class QuotesService {
     private pricingEngine: PricingEngineService,
     private pdfService: PdfService,
     private notificationsService: NotificationsService,
-    private internalNotificationsService: InternalNotificationsService,
   ) {}
 
   async generate(simulationId: string, companyId: string) {
@@ -43,7 +42,20 @@ export class QuotesService {
       .map(sg => sg.guarantee.code);
     
     // Combine: ALL mandatory + selected optional
-    const allSelectedGuarantees = [...new Set([...mandatoryGuarantees, ...selectedOptionalGuarantees])];
+    let allSelectedGuarantees = [...new Set([...mandatoryGuarantees, ...selectedOptionalGuarantees])];
+
+    // Lloyd business rule: CAT NAT and Dommages Émeutes are bundled
+    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+    if (company?.code === 'LLOYD') {
+      const hasCatNat = allSelectedGuarantees.includes('CATASTROPHES_NATURELLES');
+      const hasDommagesEmeutes = allSelectedGuarantees.includes('DOMMAGES_EMEUTES');
+      
+      if (hasCatNat || hasDommagesEmeutes) {
+        // Ensure both are included for Lloyd
+        if (!hasCatNat) allSelectedGuarantees.push('CATASTROPHES_NATURELLES');
+        if (!hasDommagesEmeutes) allSelectedGuarantees.push('DOMMAGES_EMEUTES');
+      }
+    }
 
     const pricing = await this.pricingEngine.calculatePremium(
       companyId,
@@ -134,8 +146,13 @@ export class QuotesService {
       where: { status: QuoteStatus.SUBMITTED },
       include: {
         company: true,
-        simulation: { include: { vehicle: true } },
-        user: { select: { id: true, email: true, firstName: true, lastName: true } },
+        simulation: { 
+          include: { 
+            vehicle: true,
+            user: { select: { id: true, email: true, firstName: true, lastName: true, phone: true } }
+          } 
+        },
+        user: { select: { id: true, email: true, firstName: true, lastName: true, phone: true } },
         items: { include: { guarantee: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -143,13 +160,20 @@ export class QuotesService {
   }
 
   async update(id: string, data: any, updatedBy: string) {
+    const updateData: any = {
+      ...data,
+      validatedById: updatedBy,
+      validatedAt: new Date(),
+    };
+    
+    // Handle effectiveDate if provided
+    if (data.effectiveDate) {
+      updateData.effectiveDate = new Date(data.effectiveDate);
+    }
+    
     const quote = await this.prisma.quote.update({
       where: { id },
-      data: {
-        ...data,
-        validatedById: updatedBy,
-        validatedAt: new Date(),
-      },
+      data: updateData,
       include: { user: true },
     });
     return quote;
@@ -187,34 +211,28 @@ export class QuotesService {
         items: { include: { guarantee: true } },
         company: true,
         simulation: { include: { vehicle: true } },
-        user: { select: { id: true, email: true, firstName: true, lastName: true } },
+        user: { select: { id: true, email: true, firstName: true, lastName: true, phone: true } },
       },
     });
   }
 
-  async submit(id: string, userId: string) {
+  async submit(id: string, userId: string, effectiveDate?: Date) {
     const quote = await this.prisma.quote.findUnique({ 
       where: { id },
       include: { 
-        user: true
+        user: true,
+        simulation: { include: { vehicle: true } }
       },
     });
     if (!quote || quote.userId !== userId) {
       throw new Error('Quote not found or access denied');
     }
 
-    // CDC: Documents are mandatory before submission
+    // CDC: Documents are mandatory before submission - check user's documents (not quote-specific)
     const userDocs = await this.prisma.document.findMany({ where: { userId } });
-    const requiredDocs = ['CARTE_GRISE', 'CIN', 'VISITE_TECHNIQUE', 'VIGNETTE'];
+    const requiredDocs = ['CARTE_GRISE', 'CIN'];
     const uploadedDocTypes = userDocs.map(d => d.type);
     const missingDocs = requiredDocs.filter(type => !uploadedDocTypes.includes(type));
-    
-    // Check for RNE if user is a company (has company-related data)
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (user && user.role === 'CLIENT_ADHERENT') {
-      // For now, we assume all clients might need RNE - this can be refined based on business logic
-      // requiredDocs.push('RNE'); // Uncomment if RNE is mandatory for all
-    }
     
     if (missingDocs.length > 0) {
       throw new Error(`Documents manquants: ${missingDocs.join(', ')}. Veuillez télécharger tous les documents requis avant de soumettre.`);
@@ -222,7 +240,10 @@ export class QuotesService {
 
     const updated = await this.prisma.quote.update({
       where: { id },
-      data: { status: QuoteStatus.SUBMITTED },
+      data: { 
+        status: QuoteStatus.SUBMITTED,
+        effectiveDate: effectiveDate
+      },
       include: { user: true },
     });
 
@@ -231,13 +252,6 @@ export class QuotesService {
       updated.user,
       updated.quoteNumber,
     ).catch(err => console.error('Failed to notify client:', err.message));
-
-    // Internal notification to gestionnaires
-    this.internalNotificationsService.notifyQuoteSubmitted(
-      updated.id,
-      `${updated.user.firstName} ${updated.user.lastName}`,
-      updated.quoteNumber,
-    ).catch(err => console.error('Failed to send internal notification:', err.message));
 
     // Notify gestionnaires AND admins (non-blocking)
     this.prisma.user.findMany({
@@ -281,21 +295,6 @@ export class QuotesService {
       quote.quoteNumber,
     ).catch(err => console.error('Failed to send notification:', err.message));
 
-    // Internal notification to admin about validation
-    if (validator?.role === 'GESTIONNAIRE_VALIDATION_ARS') {
-      const admins = await this.prisma.user.findMany({
-        where: { role: 'ADMINISTRATEUR_ARS', isActive: true },
-      });
-      
-      for (const admin of admins) {
-        this.internalNotificationsService.notifyQuoteValidated(
-          admin.id,
-          quote.quoteNumber,
-          `${validator.firstName} ${validator.lastName}`,
-        ).catch(err => console.error('Failed to send internal notification:', err.message));
-      }
-    }
-
     return quote;
   }
 
@@ -318,29 +317,13 @@ export class QuotesService {
       reason,
     ).catch(err => console.error('Failed to send notification:', err.message));
 
-    // Internal notification to admin about rejection
-    if (rejector?.role === 'GESTIONNAIRE_VALIDATION_ARS') {
-      const admins = await this.prisma.user.findMany({
-        where: { role: 'ADMINISTRATEUR_ARS', isActive: true },
-      });
-      
-      for (const admin of admins) {
-        this.internalNotificationsService.notifyQuoteRejected(
-          admin.id,
-          quote.quoteNumber,
-          `${rejector.firstName} ${rejector.lastName}`,
-          reason || 'Aucune raison spécifiée',
-        ).catch(err => console.error('Failed to send internal notification:', err.message));
-      }
-    }
-
     return quote;
   }
 
   async updateWithNote(id: string, data: any, note: string, validatedBy: string) {
     const quote = await this.prisma.quote.findUnique({ 
       where: { id },
-      include: { user: true },
+      include: { user: true, simulation: { include: { vehicle: true } } },
     });
     
     if (!quote) {
@@ -360,11 +343,17 @@ export class QuotesService {
     });
 
     // Notify client about modification
-    this.notificationsService.notifyQuoteModified(
-      updated.user,
-      updated.quoteNumber,
-      note,
-    ).catch(err => console.error('Failed to send notification:', err.message));
+    try {
+      await this.notificationsService.notifyQuoteModified(
+        updated.user,
+        updated.quoteNumber,
+        note,
+      );
+      console.log('✅ Notification sent to client:', updated.user.email);
+    } catch (err) {
+      console.error('❌ Failed to send notification:', err.message);
+      console.error('Full error:', err);
+    }
 
     return updated;
   }

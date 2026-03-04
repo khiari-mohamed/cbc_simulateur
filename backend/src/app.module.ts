@@ -5,6 +5,8 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { CompaniesModule } from './companies/companies.module';
 import { ConventionsModule } from './conventions/conventions.module';
+import { ClientOrganizationsModule } from './client-organizations/client-organizations.module';
+import { ConventionReductionRulesModule } from './convention-reduction-rules/convention-reduction-rules.module';
 import { VehiclesModule } from './vehicles/vehicles.module';
 import { SimulationsModule } from './simulations/simulations.module';
 import { PricingEngineModule } from './pricing-engine/pricing-engine.module';
@@ -20,6 +22,7 @@ import { QuoteComparisonsModule } from './quote-comparisons/quote-comparisons.mo
 import { PdfModule } from './pdf/pdf.module';
 import { ReportingModule } from './reporting/reporting.module';
 import { PricingRulesModule } from './pricing-rules/pricing-rules.module';
+import { SystemModule } from './system/system.module';
 
 @Module({
   imports: [
@@ -29,6 +32,8 @@ import { PricingRulesModule } from './pricing-rules/pricing-rules.module';
     UsersModule,
     CompaniesModule,
     ConventionsModule,
+    ClientOrganizationsModule,
+    ConventionReductionRulesModule,
     VehiclesModule,
     SimulationsModule,
     PricingEngineModule,
@@ -44,6 +49,7 @@ import { PricingRulesModule } from './pricing-rules/pricing-rules.module';
     PdfModule,
     ReportingModule,
     PricingRulesModule,
+    SystemModule,
   ],
 })
 export class AppModule {}

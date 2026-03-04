@@ -34,12 +34,6 @@ export class ConventionsController {
     return this.conventionsService.findOne(id);
   }
 
-  @Get(':id/users')
-  @Roles(Role.ADMINISTRATEUR_ARS)
-  getUsers(@Param('id') id: string) {
-    return this.conventionsService.getUsers(id);
-  }
-
   @Put(':id')
   @Roles(Role.ADMINISTRATEUR_ARS)
   update(@Param('id') id: string, @Body() dto: UpdateConventionDto) {
@@ -50,23 +44,5 @@ export class ConventionsController {
   @Roles(Role.ADMINISTRATEUR_ARS)
   remove(@Param('id') id: string) {
     return this.conventionsService.remove(id);
-  }
-
-  @Post('assign')
-  @Roles(Role.ADMINISTRATEUR_ARS)
-  assign(@Body() dto: AssignConventionDto) {
-    return this.conventionsService.assignUser(dto.userId, dto.conventionId);
-  }
-
-  @Delete('assign/:userId/:conventionId')
-  @Roles(Role.ADMINISTRATEUR_ARS)
-  unassign(@Param('userId') userId: string, @Param('conventionId') conventionId: string) {
-    return this.conventionsService.unassignUser(userId, conventionId);
-  }
-
-  @Post(':id/guarantees')
-  @Roles(Role.ADMINISTRATEUR_ARS)
-  assignGuarantees(@Param('id') id: string, @Body() dto: { guaranteeIds: string[] }, @Request() req: any) {
-    return this.conventionsService.assignGuarantees(id, dto.guaranteeIds, req.user.id);
   }
 }

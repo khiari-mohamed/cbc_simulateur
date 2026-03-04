@@ -13,6 +13,7 @@ export class UsersService {
     lastName: string;
     phone?: string;
     role?: Role;
+    organizationId?: string;
     otpSecret?: string;
     otpEnabled?: boolean;
   }) {
@@ -24,7 +25,8 @@ export class UsersService {
       throw new ConflictException('Email already exists');
     }
 
-    return this.prisma.user.create({ data });
+    const { ...userData } = data;
+    return this.prisma.user.create({ data: userData });
   }
 
   async findByEmail(email: string) {
@@ -36,11 +38,9 @@ export class UsersService {
       where: { id },
       include: {
         driverProfile: true,
-        conventions: {
+        organization: {
           include: {
-            convention: {
-              include: { company: true },
-            },
+            conventions: true,
           },
         },
       },
@@ -64,10 +64,10 @@ export class UsersService {
         otpEnabled: true,
         createdAt: true,
         driverProfile: true,
-        conventions: {
+        organization: {
           include: {
-            convention: {
-              select: { id: true, name: true, company: { select: { name: true } } },
+            conventions: {
+              select: { id: true, name: true, status: true },
             },
           },
         },
@@ -125,28 +125,32 @@ export class UsersService {
   }
 
   async assignConvention(userId: string, conventionId: string) {
-    return this.prisma.userConvention.create({
-      data: { userId, conventionId },
+    const convention = await this.prisma.convention.findUnique({ where: { id: conventionId } });
+    if (!convention) throw new Error('Convention not found');
+    
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { organizationId: convention.organizationId },
     });
   }
 
   async removeConvention(userId: string, conventionId: string) {
-    return this.prisma.userConvention.delete({
-      where: {
-        userId_conventionId: { userId, conventionId },
-      },
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { organizationId: null },
     });
   }
 
   async getUserConventions(userId: string) {
-    return this.prisma.userConvention.findMany({
-      where: { userId },
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
       include: {
-        convention: {
-          include: { company: true },
+        organization: {
+          include: { conventions: true },
         },
       },
     });
+    return user?.organization?.conventions || [];
   }
 
   async toggle2FA(userId: string, enabled: boolean) {

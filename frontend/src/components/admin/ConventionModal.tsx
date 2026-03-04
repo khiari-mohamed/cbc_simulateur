@@ -3,26 +3,21 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, DollarSign, Calendar } from 'lucide-react';
+import { X, Calendar } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Select } from '../ui/Select';
 import api from '../../lib/api/client';
 import toast from 'react-hot-toast';
-import type { Convention, Company } from '../../types';
 
 const conventionSchema = z.object({
   name: z.string().min(2, 'Nom minimum 2 caractères').max(100),
-  companyId: z.string().min(1, 'Compagnie requise'),
-  reductionTousRisques: z.number().min(0, 'Minimum 0').max(1, 'Maximum 1').optional(),
-  reductionDommagesCollision: z.number().min(0, 'Minimum 0').max(1, 'Maximum 1').optional(),
-  reductionVol: z.number().min(0, 'Minimum 0').max(1, 'Maximum 1').optional(),
-  reductionIncendie: z.number().min(0, 'Minimum 0').max(1, 'Maximum 1').optional(),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-  status: z.string().optional(),
+  organizationId: z.string().min(1, 'Organisation requise'),
+  companyIds: z.array(z.string()).min(1, 'Au moins une compagnie requise'),
+  startDate: z.string().optional().or(z.literal('')),
+  endDate: z.string().optional().or(z.literal('')),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'EXPIRED']).optional(),
 }).refine((data) => {
-  if (data.startDate && data.endDate) {
+  if (data.startDate && data.endDate && data.startDate !== '' && data.endDate !== '') {
     return new Date(data.endDate) >= new Date(data.startDate);
   }
   return true;
@@ -36,33 +31,41 @@ type ConventionForm = z.infer<typeof conventionSchema>;
 interface ConventionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  convention: Convention | null;
+  convention: any | null;
 }
 
 export const ConventionModal = ({ isOpen, onClose, convention }: ConventionModalProps) => {
   const queryClient = useQueryClient();
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<ConventionForm>({
+  const { register, handleSubmit, formState: { errors }, reset, watch, setValue } = useForm<ConventionForm>({
     resolver: zodResolver(conventionSchema) as any,
+  });
+
+  const { data: organizations } = useQuery({
+    queryKey: ['client-organizations'],
+    queryFn: async () => {
+      const { data } = await api.get('/client-organizations');
+      return data;
+    },
+    enabled: isOpen,
   });
 
   const { data: companies } = useQuery({
     queryKey: ['companies'],
     queryFn: async () => {
       const { data } = await api.get('/companies');
-      return data as Company[];
+      return data;
     },
     enabled: isOpen,
   });
+
+  const selectedCompanyIds = watch('companyIds') || [];
 
   useEffect(() => {
     if (convention) {
       reset({ 
         name: convention.name, 
-        companyId: convention.company.id,
-        reductionTousRisques: convention.reductionTousRisques || 1.0,
-        reductionDommagesCollision: convention.reductionDommagesCollision || 1.0,
-        reductionVol: convention.reductionVol || 1.0,
-        reductionIncendie: convention.reductionIncendie || 1.0,
+        organizationId: convention.organizationId,
+        companyIds: convention.companies?.map((c: any) => c.companyId) || [],
         startDate: convention.startDate ? new Date(convention.startDate).toISOString().split('T')[0] : '',
         endDate: convention.endDate ? new Date(convention.endDate).toISOString().split('T')[0] : '',
         status: convention.status || 'ACTIVE',
@@ -70,11 +73,8 @@ export const ConventionModal = ({ isOpen, onClose, convention }: ConventionModal
     } else {
       reset({ 
         name: '', 
-        companyId: '',
-        reductionTousRisques: 1.0,
-        reductionDommagesCollision: 1.0,
-        reductionVol: 1.0,
-        reductionIncendie: 1.0,
+        organizationId: '',
+        companyIds: [],
         startDate: new Date().toISOString().split('T')[0],
         endDate: '',
         status: 'ACTIVE',
@@ -109,24 +109,33 @@ export const ConventionModal = ({ isOpen, onClose, convention }: ConventionModal
   });
 
   const onSubmit = (data: ConventionForm) => {
+    const payload = {
+      ...data,
+      startDate: data.startDate || undefined,
+      endDate: data.endDate || undefined,
+    };
     if (convention) {
-      updateMutation.mutate(data);
+      updateMutation.mutate(payload);
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(payload);
     }
   };
 
   if (!isOpen) return null;
 
-  const companyOptions = [
-    { value: '', label: 'Sélectionner une compagnie' },
-    ...(companies?.map((c: Company) => ({ value: c.id, label: c.name })) || []),
-  ];
+  const toggleCompany = (companyId: string) => {
+    const current = selectedCompanyIds;
+    if (current.includes(companyId)) {
+      setValue('companyIds', current.filter((id: string) => id !== companyId));
+    } else {
+      setValue('companyIds', [...current, companyId]);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
-        <div className="flex justify-between items-center mb-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">
             {convention ? 'Modifier la convention' : 'Nouvelle convention'}
           </h2>
@@ -135,77 +144,61 @@ export const ConventionModal = ({ isOpen, onClose, convention }: ConventionModal
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
           <Input
             label="Nom de la convention"
             {...register('name')}
             error={errors.name?.message}
-            placeholder="Ex: Convention Entreprise 2024"
+            placeholder="Ex: Convention ATB Bank 2024"
           />
 
-          <Select
-            label="Compagnie"
-            {...register('companyId')}
-            error={errors.companyId?.message}
-            options={companyOptions}
-            disabled={!!convention}
-            className={convention ? 'bg-gray-100 dark:bg-gray-900' : ''}
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Organisation cliente *
+            </label>
+            <select
+              {...register('organizationId')}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              disabled={!!convention}
+            >
+              <option value="">Sélectionner une organisation</option>
+              {organizations?.map((org: any) => (
+                <option key={org.id} value={org.id}>{org.name}</option>
+              ))}
+            </select>
+            {errors.organizationId && (
+              <p className="text-red-500 text-xs mt-1">{errors.organizationId.message}</p>
+            )}
+            {convention && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                L'organisation ne peut pas être modifiée après création
+              </p>
+            )}
+          </div>
 
-          {convention && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              La compagnie ne peut pas être modifiée après création
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Compagnies * (sélection multiple)
+            </label>
+            <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 max-h-48 overflow-y-auto">
+              {companies?.map((company: any) => (
+                <label key={company.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedCompanyIds.includes(company.id)}
+                    onChange={() => toggleCompany(company.id)}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span className="text-sm text-gray-900 dark:text-white">{company.name}</span>
+                </label>
+              ))}
+            </div>
+            {errors.companyIds && (
+              <p className="text-red-500 text-xs mt-1">{errors.companyIds.message}</p>
+            )}
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {selectedCompanyIds.length} compagnie(s) sélectionnée(s)
             </p>
-          )}
-
-          <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <DollarSign className="w-4 h-4 text-gray-700 dark:text-gray-300" />
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Taux de réduction par garantie</h3>
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">1.0 = pas de réduction | 0.85 = 15% de réduction</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="Tous Risques"
-                type="number"
-                step="0.01"
-                min="0"
-                max="1"
-                {...register('reductionTousRisques', { valueAsNumber: true })}
-                placeholder="1.0"
-                error={errors.reductionTousRisques?.message}
-              />
-              <Input
-                label="Dommages Collision"
-                type="number"
-                step="0.01"
-                min="0"
-                max="1"
-                {...register('reductionDommagesCollision', { valueAsNumber: true })}
-                placeholder="1.0"
-                error={errors.reductionDommagesCollision?.message}
-              />
-              <Input
-                label="Vol"
-                type="number"
-                step="0.01"
-                min="0"
-                max="1"
-                {...register('reductionVol', { valueAsNumber: true })}
-                placeholder="1.0"
-                error={errors.reductionVol?.message}
-              />
-              <Input
-                label="Incendie"
-                type="number"
-                step="0.01"
-                min="0"
-                max="1"
-                {...register('reductionIncendie', { valueAsNumber: true })}
-                placeholder="1.0"
-                error={errors.reductionIncendie?.message}
-              />
-            </div>
           </div>
 
           <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4">
@@ -229,15 +222,19 @@ export const ConventionModal = ({ isOpen, onClose, convention }: ConventionModal
             </div>
           </div>
 
-          <Select
-            label="Statut"
-            {...register('status')}
-            options={[
-              { value: 'ACTIVE', label: 'Active' },
-              { value: 'SUSPENDED', label: 'Suspendue' },
-              { value: 'EXPIRED', label: 'Expirée' },
-            ]}
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Statut
+            </label>
+            <select
+              {...register('status')}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+            >
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+              <option value="EXPIRED">Expirée</option>
+            </select>
+          </div>
 
           <div className="flex gap-3 pt-4">
             <Button

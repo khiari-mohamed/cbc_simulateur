@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Button } from '../../components/ui/Button';
-import { ArrowLeft, Download, Send, Trash2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Download, Send, Trash2 } from 'lucide-react';
 import api from '../../lib/api/client';
 import toast from 'react-hot-toast';
 import { SimulationStatus } from '../../types';
@@ -32,20 +32,6 @@ export const SimulationDetailPage = () => {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Erreur lors de la soumission');
-    },
-  });
-
-  const recalculateMutation = useMutation({
-    mutationFn: async () => {
-      const { data } = await api.post(`/simulations/${id}/recalculate`);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['simulations', id] });
-      toast.success('Simulation recalculée');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Erreur lors du recalcul');
     },
   });
 
@@ -101,6 +87,7 @@ export const SimulationDetailPage = () => {
   }
 
   const isDraft = simulation.status === SimulationStatus.DRAFT;
+  const hasGeneratedQuotes = simulation.quotes?.some((q: any) => q.status === 'GENERATED');
 
   return (
     <MainLayout>
@@ -208,9 +195,9 @@ export const SimulationDetailPage = () => {
             </div>
           )}
 
-          {isDraft && (
+          {isDraft && hasGeneratedQuotes && (
             <div className="flex gap-3">
-              <Button
+              {/* <Button
                 variant="outline"
                 onClick={() => recalculateMutation.mutate()}
                 loading={recalculateMutation.isPending}
@@ -218,7 +205,7 @@ export const SimulationDetailPage = () => {
               >
                 <RefreshCw className="w-4 h-4" />
                 Recalculer
-              </Button>
+              </Button> */}
               <Button
                 onClick={() => submitMutation.mutate()}
                 loading={submitMutation.isPending}
@@ -261,7 +248,7 @@ export const SimulationDetailPage = () => {
                         {quote.company.name}
                       </h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Devis N° {quote.quoteNumber}
+                        Devis N° {quote.displayNumber ? `DEVIS-${String(quote.displayNumber).padStart(5, '0')}` : quote.quoteNumber}
                       </p>
                       {quote.status === 'REJECTED' && quote.rejectionReason && (
                         <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">

@@ -8,7 +8,7 @@
 
 const axios = require('axios');
 
-const BASE_URL = 'http://localhost:5000';
+const BASE_URL = process.env.API_URL || 'http://localhost:5000';
 
 // Login as client
 async function login() {

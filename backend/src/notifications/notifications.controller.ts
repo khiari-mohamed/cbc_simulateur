@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, UseGuards, Request, Query } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, UseGuards, Request, Query } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { NotificationsService } from './notifications.service';
 
@@ -35,5 +35,16 @@ export class NotificationsController {
   @Post('mark-all-read')
   async markAllAsRead(@Request() req: any) {
     return this.notificationsService.markAllAsRead(req.user.id);
+  }
+
+  @Delete(':id')
+  async deleteNotification(@Param('id') id: string, @Request() req: any) {
+    return this.notificationsService.deleteNotification(id, req.user.id);
+  }
+
+  @Post('bulk-delete')
+  async bulkDeleteNotifications(@Request() req: any) {
+    const { ids } = req.body;
+    return this.notificationsService.bulkDeleteNotifications(ids, req.user.id);
   }
 }

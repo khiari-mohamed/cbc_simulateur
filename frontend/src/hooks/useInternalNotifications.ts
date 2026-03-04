@@ -56,3 +56,62 @@ export const useCreateSystemAlert = () => {
     },
   });
 };
+
+export const useMarkInternalAsRead = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (notificationId: string) =>
+      api.post(`/internal-notifications/${notificationId}/mark-read`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['internal-notifications'] });
+    },
+  });
+};
+
+export const useMarkAllInternalAsRead = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: () => api.post('/internal-notifications/mark-all-read'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['internal-notifications'] });
+    },
+  });
+};
+
+export const useDeleteInternalNotification = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (notificationId: string) =>
+      api.delete(`/internal-notifications/${notificationId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['internal-notifications'] });
+    },
+  });
+};
+
+export const useBulkDeleteInternalNotifications = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (ids: string[]) =>
+      api.post('/internal-notifications/bulk-delete', { ids }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['internal-notifications'] });
+    },
+  });
+};
+
+export const useBulkMarkInternalAsRead = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (ids: string[]) =>
+      Promise.all(ids.map(id => api.post(`/internal-notifications/${id}/mark-read`))),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['internal-notifications'] });
+    },
+  });
+};

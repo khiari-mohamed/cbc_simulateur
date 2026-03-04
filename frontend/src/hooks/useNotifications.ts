@@ -55,3 +55,39 @@ export const useMarkAllAsRead = () => {
     },
   });
 };
+
+export const useDeleteNotification = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (notificationId: string) =>
+      api.delete(`/notifications/${notificationId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+export const useBulkDeleteNotifications = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (ids: string[]) =>
+      api.post('/notifications/bulk-delete', { ids }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};
+
+export const useBulkMarkAsRead = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (ids: string[]) =>
+      Promise.all(ids.map(id => api.post(`/notifications/${id}/mark-read`))),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+};

@@ -16,9 +16,11 @@ async function purgeAll() {
   await prisma.vehicle.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.auditLog.deleteMany();
-  await prisma.userConvention.deleteMany();
   await prisma.pricingRule.deleteMany();
+  await prisma.conventionReductionRule.deleteMany();
+  await prisma.conventionCompany.deleteMany();
   await prisma.convention.deleteMany();
+  await prisma.clientOrganization.deleteMany();
   await prisma.guarantee.deleteMany();
   await prisma.company.deleteMany();
   await prisma.driverProfile.deleteMany();
@@ -133,14 +135,14 @@ async function main() {
   await prisma.pricingRule.create({ data: { companyId: lloyd.id, guaranteeId: guarantees['CAS'].id, fixedPremium: 45.0, isActive: true } });
   await prisma.pricingRule.create({ data: { companyId: amana.id, guaranteeId: guarantees['CAS'].id, fixedPremium: 20.0, isActive: true } });
 
-  // VOL & INCENDIE reduction rate (admin-adjustable; default 1.0)
-  await prisma.pricingRule.create({ data: { companyId: lloyd.id, guaranteeId: guarantees['VOL'].id, reductionRate: 1.0, isActive: true } });
-  await prisma.pricingRule.create({ data: { companyId: amana.id, guaranteeId: guarantees['VOL'].id, reductionRate: 1.0, isActive: true } });
-  await prisma.pricingRule.create({ data: { companyId: lloyd.id, guaranteeId: guarantees['INCENDIE'].id, reductionRate: 1.0, isActive: true } });
-  await prisma.pricingRule.create({ data: { companyId: amana.id, guaranteeId: guarantees['INCENDIE'].id, reductionRate: 1.0, isActive: true } });
+  // VOL & INCENDIE with ratePercentage + fixedPremium (parameterized)
+  await prisma.pricingRule.create({ data: { companyId: lloyd.id, guaranteeId: guarantees['VOL'].id, ratePercentage: 0.00236, fixedPremium: 30, reductionRate: 0, isActive: true } });
+  await prisma.pricingRule.create({ data: { companyId: amana.id, guaranteeId: guarantees['VOL'].id, ratePercentage: 0.00236, fixedPremium: 30, reductionRate: 0, isActive: true } });
+  await prisma.pricingRule.create({ data: { companyId: lloyd.id, guaranteeId: guarantees['INCENDIE'].id, ratePercentage: 0.00275, fixedPremium: 30, reductionRate: 0, isActive: true } });
+  await prisma.pricingRule.create({ data: { companyId: amana.id, guaranteeId: guarantees['INCENDIE'].id, ratePercentage: 0.00275, fixedPremium: 30, reductionRate: 0, isActive: true } });
 
-  // PTA per company (CDC EXAMPLE: LLOYD 5k=25, 10k=42; AMANA 4k=32, 8k=64)
-  await prisma.pricingRule.create({ data: { companyId: lloyd.id, guaranteeId: guarantees['PERSONNES_TRANSPORTEES'].id, minCapital: 5000, fixedPremium: 25.0, isActive: true } });
+  // PTA per company (CDC EXACT: LLOYD 5k=21, 10k=42; AMANA 4k=32, 8k=64)
+  await prisma.pricingRule.create({ data: { companyId: lloyd.id, guaranteeId: guarantees['PERSONNES_TRANSPORTEES'].id, minCapital: 5000, fixedPremium: 21.0, isActive: true } });
   await prisma.pricingRule.create({ data: { companyId: lloyd.id, guaranteeId: guarantees['PERSONNES_TRANSPORTEES'].id, minCapital: 10000, fixedPremium: 42.0, isActive: true } });
   await prisma.pricingRule.create({ data: { companyId: amana.id, guaranteeId: guarantees['PERSONNES_TRANSPORTEES'].id, minCapital: 4000, fixedPremium: 32.0, isActive: true } });
   await prisma.pricingRule.create({ data: { companyId: amana.id, guaranteeId: guarantees['PERSONNES_TRANSPORTEES'].id, minCapital: 8000, fixedPremium: 64.0, isActive: true } });
@@ -165,7 +167,7 @@ async function main() {
           franchiseRate: tr.franchise,
           ratePercentage: tr.rate,
           fixedPremium: tr.fixed,
-          reductionRate: 1.0,
+          reductionRate: 0,
           isActive: true,
         },
       });
@@ -173,8 +175,8 @@ async function main() {
   }
 
   // BG percentage per company
-  await prisma.pricingRule.create({ data: { companyId: lloyd.id, guaranteeId: guarantees['BG'].id, ratePercentage: 0.08, isActive: true } });
-  await prisma.pricingRule.create({ data: { companyId: amana.id, guaranteeId: guarantees['BG'].id, ratePercentage: 0.07, isActive: true } });
+  await prisma.pricingRule.create({ data: { companyId: lloyd.id, guaranteeId: guarantees['BG'].id, ratePercentage: 0.065, reductionRate: 0, isActive: true } });
+  await prisma.pricingRule.create({ data: { companyId: amana.id, guaranteeId: guarantees['BG'].id, ratePercentage: 0.07, reductionRate: 0, isActive: true } });
 
   // Dommages Collisions
   // PRIVATE_BUSINESS (Promenade et Affaire): base + 5 tier rates
@@ -186,21 +188,21 @@ async function main() {
     { tier: 5, rate: 0.05 },
   ];
   for (const company of [lloyd, amana]) {
-    await prisma.pricingRule.create({ data: { companyId: company.id, guaranteeId: guarantees['DOMMAGES_COLLISIONS'].id, basePremium: 10.0, reductionRate: 1.0, usageType: 'PRIVATE_BUSINESS', isActive: true } });
+    await prisma.pricingRule.create({ data: { companyId: company.id, guaranteeId: guarantees['DOMMAGES_COLLISIONS'].id, basePremium: 10.0, reductionRate: 0, usageType: 'PRIVATE_BUSINESS', isActive: true } });
     for (const tier of dcTiers) {
       await prisma.pricingRule.create({ data: { companyId: company.id, guaranteeId: guarantees['DOMMAGES_COLLISIONS'].id, tierLevel: tier.tier, tierRate: tier.rate, usageType: 'PRIVATE_BUSINESS', isActive: true } });
     }
   }
 
-  // COMMERCIAL (Affaire) matrix for DC
+  // COMMERCIAL (Affaire) matrix for DC - CORRECTED per client spec
   const dcMatrix = [
     { minVV: 8000, maxVV: 30000, primes: [77, 142.7, 205.3, 265.7, 322.7, 393, 449.5, 506, 560, 612.5, 894] },
-    { minVV: 30000, maxVV: 60000, primes: [77, 144, 211, 278, 343.7, 408, 471, 534, 595.3, 656.7, 947, 1220, 1768] },
-    { minVV: 60000, maxVV: 80000, primes: [77, 144, 211, 278, 345, 412, 479, 544, 607, 670, 983, 1275, 1827.5, 2354] },
-    { minVV: 80000, maxVV: 100000, primes: [77, 144, 211, 278, 345, 412, 479, 546, 613, 670, 993, 1303, 1878.5, 2418.5, 2940] },
-    { minVV: 100000, maxVV: 150000, primes: [77, 144, 211, 278, 345, 412, 479, 546, 613, 680, 1007, 1322, 1932, 2504.8, 3051, 4405] },
-    { minVV: 150000, maxVV: 200000, primes: [77, 144, 211, 278, 345, 412, 479, 546, 613, 680, 1015, 1342, 1972, 2582, 3160.8, 4528, 5870] },
-    { minVV: 200000, maxVV: null, primes: [77, 144, 211, 278, 345, 412, 479, 546, 613, 680, 1015, 1350, 2020, 2670, 3300, 4837.5, 6285] },
+    { minVV: 30000.01, maxVV: 60000, primes: [77, 144, 211, 278, 343.7, 408, 471, 534, 595.3, 656.7, 947, 1220, 1768] },
+    { minVV: 60000.01, maxVV: 80000, primes: [77, 144, 211, 278, 345, 412, 479, 544, 607, 670, 983, 1275, 1827.5, 2354] },
+    { minVV: 80000.01, maxVV: 100000, primes: [77, 144, 211, 278, 345, 412, 479, 546, 613, 678, 993, 1303, 1878.5, 2418.5, 2940] },
+    { minVV: 100000.01, maxVV: 150000, primes: [77, 144, 211, 278, 345, 412, 479, 546, 613, 680, 1007, 1322, 1932, 2504.8, 3051, 4405] },
+    { minVV: 150000.01, maxVV: 200000, primes: [77, 144, 211, 278, 345, 412, 479, 546, 613, 680, 1015, 1342, 1972, 2582, 3160.8, 4528, 5870] },
+    { minVV: 200000.01, maxVV: null, primes: [77, 144, 211, 278, 345, 412, 479, 546, 613, 680, 1015, 1350, 2020, 2670, 3300, 4837.5, 6285] },
   ];
   const capitals = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 15000, 20000, 30000, 40000, 50000, 75000, 100000];
   for (const company of [lloyd, amana]) {
@@ -219,7 +221,7 @@ async function main() {
               minCapital: capital,
               maxCapital: capital,
               fixedPremium: prime,
-              reductionRate: 1.0,
+              reductionRate: 0,
               isActive: true,
             },
           });
@@ -234,7 +236,7 @@ async function main() {
   // Dommages suite émeutes: both 30
   await prisma.pricingRule.create({ data: { companyId: lloyd.id, guaranteeId: guarantees['DOMMAGES_EMEUTES'].id, fixedPremium: 30.0, isActive: true } });
   await prisma.pricingRule.create({ data: { companyId: amana.id, guaranteeId: guarantees['DOMMAGES_EMEUTES'].id, fixedPremium: 30.0, isActive: true } });
-  // CAT NAT: AMANA only, Tous Risques
+  // CAT NAT: AMANA only, Tous Risques only (franchise 0)
   await prisma.pricingRule.create({ data: { companyId: amana.id, guaranteeId: guarantees['CATASTROPHES_NATURELLES'].id, formulaType: FormulaType.TOUS_RISQUES_0, fixedPremium: 40.0, isActive: true } });
   
   // Défense et Recours: FREE for AMANA with TR 0%, otherwise paid
@@ -263,12 +265,12 @@ async function main() {
 
   const bgLloyd = await prisma.pricingRule.findFirst({ where: { guaranteeId: guarantees['BG'].id, companyId: lloyd.id } });
   const bgAmana = await prisma.pricingRule.findFirst({ where: { guaranteeId: guarantees['BG'].id, companyId: amana.id } });
-  if (!bgLloyd || Number(bgLloyd.ratePercentage) !== 0.08) console.warn('⚠️ BG LLOYD rate mismatch'); else console.log('✅ BG LLOYD 8%');
+  if (!bgLloyd || Number(bgLloyd.ratePercentage) !== 0.065) console.warn('⚠️ BG LLOYD rate mismatch'); else console.log('✅ BG LLOYD 6.5%');
   if (!bgAmana || Number(bgAmana.ratePercentage) !== 0.07) console.warn('⚠️ BG AMANA rate mismatch'); else console.log('✅ BG AMANA 7%');
 
   const ptaLloyd5 = await prisma.pricingRule.findFirst({ where: { guaranteeId: guarantees['PERSONNES_TRANSPORTEES'].id, companyId: lloyd.id, minCapital: 5000 } });
   const ptaAmana8 = await prisma.pricingRule.findFirst({ where: { guaranteeId: guarantees['PERSONNES_TRANSPORTEES'].id, companyId: amana.id, minCapital: 8000 } });
-  if (!ptaLloyd5 || Number(ptaLloyd5.fixedPremium) !== 25) console.warn('⚠️ PTA LLOYD 5k mismatch'); else console.log('✅ PTA LLOYD 5k=25');
+  if (!ptaLloyd5 || Number(ptaLloyd5.fixedPremium) !== 21) console.warn('⚠️ PTA LLOYD 5k mismatch'); else console.log('✅ PTA LLOYD 5k=21');
   if (!ptaAmana8 || Number(ptaAmana8.fixedPremium) !== 64) console.warn('⚠️ PTA AMANA 8k mismatch'); else console.log('✅ PTA AMANA 8k=64');
 
   const casLloyd = await prisma.pricingRule.findFirst({ where: { guaranteeId: guarantees['CAS'].id, companyId: lloyd.id } });

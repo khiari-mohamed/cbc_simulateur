@@ -140,17 +140,8 @@ export class GuaranteesService {
   }
 
   async findByConvention(conventionId: string, includeInactive = false) {
-    const conventionGuarantees = await this.prisma.conventionGuarantee.findMany({
-      where: { conventionId },
-      include: {
-        guarantee: true,
-      },
-    });
-    
-    const filtered = conventionGuarantees
-      .map(cg => cg.guarantee)
-      .filter(g => includeInactive || g.isActive);
-    
-    return filtered;
+    // Since conventions are now organization-level, return all guarantees
+    // Convention-specific guarantee filtering should be done at the reduction rule level
+    return this.findAll(includeInactive);
   }
 }

@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, UseGuards, Request, Param, Res } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Request, Param, Res, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { ContractsService } from './contracts.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -21,12 +22,21 @@ export class ContractsController {
   @Post('manual/:quoteId')
   @UseGuards(RolesGuard)
   @Roles(Role.GESTIONNAIRE_VALIDATION_ARS, Role.ADMINISTRATEUR_ARS)
+  @UseInterceptors(FilesInterceptor('contractDocuments', 3))
   createManually(
     @Param('quoteId') quoteId: string,
-    @Body() data: { deliveryType?: DeliveryType },
+    @Body() data: { deliveryType?: DeliveryType; contractNumber: string; quittanceNumber: string },
+    @UploadedFiles() files: Express.Multer.File[],
     @Request() req: any,
   ) {
-    return this.contractsService.createManualContract(quoteId, req.user.id, data.deliveryType);
+    return this.contractsService.createManualContract(
+      quoteId,
+      req.user.id,
+      data.deliveryType,
+      data.contractNumber,
+      data.quittanceNumber,
+      files,
+    );
   }
 
   @Get()

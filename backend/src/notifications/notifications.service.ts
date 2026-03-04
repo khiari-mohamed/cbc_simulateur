@@ -383,7 +383,7 @@ export class NotificationsService {
         subject,
         content,
         channel: 'EMAIL' as const,
-        status: 'SENT' as const,
+        status: 'PENDING' as const,
       },
     });
   }
@@ -440,6 +440,20 @@ export class NotificationsService {
     return { success: true };
   }
 
+  async deleteNotification(notificationId: string, userId: string) {
+    await this.prisma.notification.delete({
+      where: { id: notificationId, userId },
+    });
+    return { success: true };
+  }
+
+  async bulkDeleteNotifications(notificationIds: string[], userId: string) {
+    await this.prisma.notification.deleteMany({
+      where: { id: { in: notificationIds }, userId },
+    });
+    return { success: true };
+  }
+
   // Enhanced notification methods that create both email and in-app notifications
   async notifyQuoteCreated(user: any, quoteNumber: string) {
     // Send email
@@ -481,16 +495,20 @@ export class NotificationsService {
   }
 
   async notifyQuoteModified(user: any, quoteNumber: string, note: string) {
-    // Send email with modification note
-    await this.sendQuoteModified(user.email, quoteNumber, `${user.firstName} ${user.lastName}`, note);
-    
-    // Create in-app notification
+    // Create in-app notification FIRST (most important)
     await this.createNotification(
       user.id,
       NotificationType.QUOTE_VALIDATED,
       'Devis modifié et validé',
       `Votre devis ${quoteNumber} a été modifié et validé. Consultez la note pour plus de détails.`,
     );
+    
+    // Try to send email (non-blocking)
+    try {
+      await this.sendQuoteModified(user.email, quoteNumber, `${user.firstName} ${user.lastName}`, note);
+    } catch (err) {
+      console.error('Failed to send email notification:', err.message);
+    }
   }
 
   async notifyContractCreated(user: any, contractNumber: string) {

@@ -11,6 +11,9 @@ import { GoogleCallback } from './pages/auth/GoogleCallback';
 import { CompaniesPage } from './pages/admin/companies/CompaniesPage';
 import { ConventionsPage } from './pages/admin/Conventions/ConventionsPage';
 import { GuaranteesPage } from './pages/admin/Guarantees/GuaranteesPage';
+import { OrganizationsPage } from './pages/admin/organizations/OrganizationsPage';
+import { ConventionReductionRulesPage } from './pages/admin/ConventionReductionRulesPage';
+import { FormulaConfigPage } from './pages/admin/FormulaConfigPage';
 
 import { UsersManagementPage } from './pages/admin/users/UsersManagementPage';
 import { ReportsPage } from './pages/admin/reports/ReportsPage';
@@ -75,133 +78,40 @@ function App() {
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/auth/google/callback" element={<GoogleCallback />} />
-              <Route
-                element={
-                  <ProtectedRoute>
-                    <MainLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/simulations" element={<SimulationsPage />} />
-                <Route path="/simulations/new" element={<NewSimulationPage />} />
-                <Route path="/simulations/:id" element={<SimulationDetailPage />} />
-                <Route path="/quotes" element={<QuotesPage />} />
-                <Route path="/quotes/compare" element={<QuoteComparisonPage />} />
-                <Route path="/quotes/:quoteId/checkout" element={<PaymentCheckoutPage />} />
-                <Route path="/payment/success" element={<PaymentSuccessPage />} />
-                <Route path="/payment/cancel" element={<PaymentCancelPage />} />
-                <Route path="/contracts" element={<ContractsPage />} />
-                <Route path="/contracts/:contractNumber" element={<ContractDetailPage />} />
-                <Route path="/notifications" element={<NotificationsPage />} />
-                <Route path="/documents" element={<DocumentsPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route
-                  path="/admin/companies"
-                  element={
-                    <ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}>
-                      <CompaniesPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/conventions"
-                  element={
-                    <ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}>
-                      <ConventionsPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/guarantees"
-                  element={
-                    <ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}>
-                      <GuaranteesPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/users"
-                  element={
-                    <ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}>
-                      <UsersManagementPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/reports"
-                  element={
-                    <ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}>
-                      <ReportsPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/pricing-rules"
-                  element={
-                    <ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}>
-                      <PricingRulesPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/validation"
-                  element={
-                    <ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}>
-                      <ValidationPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/gestionnaire-validation"
-                  element={
-                    <ProtectedRoute allowedRoles={[Role.GESTIONNAIRE_VALIDATION_ARS]}>
-                      <GestionnaireValidationPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/quotes/:id/edit"
-                  element={
-                    <ProtectedRoute allowedRoles={[Role.GESTIONNAIRE_VALIDATION_ARS]}>
-                      <GestionnaireQuoteEditPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/notification-analytics"
-                  element={
-                    <ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}>
-                      <NotificationAnalyticsPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/settings"
-                  element={
-                    <ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}>
-                      <AdminSettingsPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/convention-reports"
-                  element={
-                    <ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}>
-                      <ConventionReportsPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/system-guide"
-                  element={
-                    <ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}>
-                      <SystemGuidePage />
-                    </ProtectedRoute>
-                  }
-                />
+              <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="simulations" element={<SimulationsPage />} />
+                <Route path="simulations/new" element={<NewSimulationPage />} />
+                <Route path="simulations/:id" element={<SimulationDetailPage />} />
+                <Route path="quotes" element={<QuotesPage />} />
+                <Route path="quotes/compare" element={<QuoteComparisonPage />} />
+                <Route path="quotes/:quoteId/checkout" element={<PaymentCheckoutPage />} />
+                <Route path="payment/success" element={<PaymentSuccessPage />} />
+                <Route path="payment/cancel" element={<PaymentCancelPage />} />
+                <Route path="contracts" element={<ContractsPage />} />
+                <Route path="contracts/:contractNumber" element={<ContractDetailPage />} />
+                <Route path="notifications" element={<NotificationsPage />} />
+                <Route path="documents" element={<DocumentsPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="admin/companies" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><CompaniesPage /></ProtectedRoute>} />
+                <Route path="admin/organizations" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><OrganizationsPage /></ProtectedRoute>} />
+                <Route path="admin/conventions/:conventionId/reduction-rules" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><ConventionReductionRulesPage /></ProtectedRoute>} />
+                <Route path="admin/conventions" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><ConventionsPage /></ProtectedRoute>} />
+                <Route path="admin/guarantees" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><GuaranteesPage /></ProtectedRoute>} />
+                <Route path="admin/users" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><UsersManagementPage /></ProtectedRoute>} />
+                <Route path="admin/reports" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><ReportsPage /></ProtectedRoute>} />
+                <Route path="admin/pricing-rules" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><PricingRulesPage /></ProtectedRoute>} />
+                <Route path="admin/formulas" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><FormulaConfigPage /></ProtectedRoute>} />
+                <Route path="admin/validation" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><ValidationPage /></ProtectedRoute>} />
+                <Route path="admin/gestionnaire-validation" element={<ProtectedRoute allowedRoles={[Role.GESTIONNAIRE_VALIDATION_ARS]}><GestionnaireValidationPage /></ProtectedRoute>} />
+                <Route path="admin/quotes/:id/edit" element={<ProtectedRoute allowedRoles={[Role.GESTIONNAIRE_VALIDATION_ARS]}><GestionnaireQuoteEditPage /></ProtectedRoute>} />
+                <Route path="admin/notification-analytics" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><NotificationAnalyticsPage /></ProtectedRoute>} />
+                <Route path="admin/settings" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><AdminSettingsPage /></ProtectedRoute>} />
+                <Route path="admin/convention-reports" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><ConventionReportsPage /></ProtectedRoute>} />
+                <Route path="admin/system-guide" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><SystemGuidePage /></ProtectedRoute>} />
               </Route>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
             <Toaster position="top-right" />
             </AuthProvider>

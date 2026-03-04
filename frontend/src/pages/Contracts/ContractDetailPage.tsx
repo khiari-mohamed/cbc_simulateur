@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, Download, Printer, Check, Clock, AlertCircle, Home, MapPin } from 'lucide-react';
+import { FileText, Download, Printer, Check, Clock, AlertCircle, Home, MapPin, Eye, X, Car } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import api from '../../lib/api/client';
@@ -16,8 +17,11 @@ interface Contract {
   deliveryFee: number;
   pdfPath?: string;
   createdAt: string;
+  quittanceNumber?: string;
   quote: {
+    id: string;
     quoteNumber: string;
+    displayNumber?: number;
     totalAPayer: number;
     company: { name: string };
     items: Array<{
@@ -27,6 +31,8 @@ interface Contract {
     }>;
     simulation: {
       vehicle: {
+        registration?: string;
+        fiscalHorsepower: number;
         newValue: number;
         marketValue: number;
         firstCirculationDate: string;
@@ -44,6 +50,8 @@ interface Contract {
 export const ContractDetailPage = () => {
   const { contractNumber } = useParams();
   const navigate = useNavigate();
+  const [viewingDocument, setViewingDocument] = useState<any>(null);
+  const [documentUrl, setDocumentUrl] = useState<string>('');
 
   const { data: contract, isLoading } = useQuery({
     queryKey: ['contract', contractNumber],
@@ -53,6 +61,47 @@ export const ContractDetailPage = () => {
     },
     enabled: !!contractNumber,
   });
+
+  const { data: documents } = useQuery({
+    queryKey: ['contract-documents', contract?.quote?.id],
+    queryFn: async () => {
+      if (!contract?.quote?.id) return [];
+      const { data } = await api.get(`/documents/quote/${contract.quote.id}`);
+      return data.filter((doc: any) => doc.type === 'CONTRACT_DOCUMENT');
+    },
+    enabled: !!contract?.quote?.id,
+  });
+
+  const openDocument = async (doc: any) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await api.get(`/documents/${doc.id}/view?token=${token}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(response.data);
+      setDocumentUrl(url);
+      setViewingDocument(doc);
+    } catch (error) {
+      toast.error('Erreur lors de l\'ouverture du document');
+    }
+  };
+
+  const downloadDocument = async (docId: string, fileName: string) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const { data } = await api.get(`/documents/${docId}/view?token=${token}`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Document téléchargé');
+    } catch (error) {
+      toast.error('Erreur lors du téléchargement');
+    }
+  };
 
   const handleDownloadPDF = async () => {
     if (!contract?.id) {
@@ -139,13 +188,56 @@ export const ContractDetailPage = () => {
             {contract.contractNumber}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Devis: {contract.quote.quoteNumber} | {contract.quote.company.name}
+            Devis: {contract.quote.displayNumber ? `DEVIS-${String(contract.quote.displayNumber).padStart(5, '0')}` : contract.quote.quoteNumber} | {contract.quote.company.name}
+            {contract.quittanceNumber && ` | Quittance: ${contract.quittanceNumber}`}
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Vehicle Info Card */}
+            <Card className="p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center gap-3 mb-3">
+                <Car className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <h3 className="font-semibold text-blue-900 dark:text-blue-200">Informations véhicule</h3>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                <div>
+                  <p className="text-blue-700 dark:text-blue-300">Date circulation</p>
+                  <p className="font-semibold text-blue-900 dark:text-blue-100">
+                    {new Date(contract.quote.simulation.vehicle.firstCirculationDate).toLocaleDateString('fr-FR')}
+                  </p>
+                </div>
+                {contract.quote.simulation.vehicle.registration && (
+                  <div>
+                    <p className="text-blue-700 dark:text-blue-300">Immat</p>
+                    <p className="font-semibold text-blue-900 dark:text-blue-100">
+                      {contract.quote.simulation.vehicle.registration}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-blue-700 dark:text-blue-300">VN</p>
+                  <p className="font-semibold text-blue-900 dark:text-blue-100">
+                    {Number(contract.quote.simulation.vehicle.newValue).toLocaleString()} DT
+                  </p>
+                </div>
+                <div>
+                  <p className="text-blue-700 dark:text-blue-300">VV</p>
+                  <p className="font-semibold text-blue-900 dark:text-blue-100">
+                    {Number(contract.quote.simulation.vehicle.marketValue).toLocaleString()} DT
+                  </p>
+                </div>
+                <div>
+                  <p className="text-blue-700 dark:text-blue-300">CV</p>
+                  <p className="font-semibold text-blue-900 dark:text-blue-100">
+                    {contract.quote.simulation.vehicle.fiscalHorsepower}
+                  </p>
+                </div>
+              </div>
+            </Card>
+
             {/* Status Card */}
             <Card className={`p-6 ${
               isActive
@@ -290,6 +382,46 @@ export const ContractDetailPage = () => {
                 ))}
               </div>
             </Card>
+
+            {/* Contract Documents */}
+            {documents && documents.length > 0 && (
+              <Card className="p-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                  Documents du contrat ({documents.length})
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {documents.map((doc: any) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <FileText className="w-4 h-4 text-green-600 flex-shrink-0" />
+                        <span className="text-sm text-gray-900 dark:text-white truncate">
+                          {doc.fileName}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 ml-2">
+                        <button
+                          onClick={() => openDocument(doc)}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900 rounded"
+                          title="Voir"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => downloadDocument(doc.id, doc.fileName)}
+                          className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900 rounded"
+                          title="Télécharger"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -365,6 +497,56 @@ export const ContractDetailPage = () => {
             )}
           </div>
         </div>
+
+        {/* Document Viewer Modal */}
+        {viewingDocument && documentUrl && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[60] p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-5xl w-full max-h-[95vh] overflow-hidden flex flex-col">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                  {viewingDocument.fileName}
+                </h2>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadDocument(viewingDocument.id, viewingDocument.fileName)}
+                    className="flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Télécharger
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      window.URL.revokeObjectURL(documentUrl);
+                      setDocumentUrl('');
+                      setViewingDocument(null);
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto p-4 bg-gray-100 dark:bg-gray-900">
+                {viewingDocument.fileName.toLowerCase().endsWith('.pdf') ? (
+                  <iframe
+                    src={documentUrl}
+                    className="w-full h-full min-h-[600px] border-0"
+                    title={viewingDocument.fileName}
+                  />
+                ) : (
+                  <img
+                    src={documentUrl}
+                    alt={viewingDocument.fileName}
+                    className="max-w-full h-auto mx-auto"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

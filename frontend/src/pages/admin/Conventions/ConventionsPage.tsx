@@ -1,20 +1,16 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, FileText, Edit, Trash2, Users, CheckCircle, XCircle, Shield, ListChecks, DollarSign, Calendar } from 'lucide-react';
+import { Plus, FileText, Edit, Trash2, CheckCircle, XCircle, Shield, Calendar, Building2, Sliders } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { ConventionModal } from '../../../components/admin/ConventionModal';
-import { AssignUsersModal } from '../../../components/admin/AssignUsersModal';
-import { AssignGuaranteesModal } from '../../../components/admin/AssignGuaranteesModal';
+import { useNavigate } from 'react-router-dom';
 import api from '../../../lib/api/client';
 import toast from 'react-hot-toast';
-import type { Convention } from '../../../types';
 
 export const ConventionsPage = () => {
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [isGuaranteesModalOpen, setIsGuaranteesModalOpen] = useState(false);
-  const [editingConvention, setEditingConvention] = useState<Convention | null>(null);
-  const [selectedConvention, setSelectedConvention] = useState<Convention | null>(null);
+  const [editingConvention, setEditingConvention] = useState<any | null>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
   const queryClient = useQueryClient();
 
@@ -22,7 +18,7 @@ export const ConventionsPage = () => {
     queryKey: ['conventions', includeInactive],
     queryFn: async () => {
       const { data } = await api.get(`/conventions?includeInactive=${includeInactive}`);
-      return data as Convention[];
+      return data;
     },
   });
 
@@ -35,34 +31,14 @@ export const ConventionsPage = () => {
     onError: () => toast.error('Erreur lors de la désactivation'),
   });
 
-  const handleEdit = (convention: Convention) => {
+  const handleEdit = (convention: any) => {
     setEditingConvention(convention);
     setIsModalOpen(true);
-  };
-
-  const handleAssignUsers = (convention: Convention) => {
-    setSelectedConvention(convention);
-    setIsAssignModalOpen(true);
-  };
-
-  const handleAssignGuarantees = (convention: Convention) => {
-    setSelectedConvention(convention);
-    setIsGuaranteesModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingConvention(null);
-  };
-
-  const handleCloseAssignModal = () => {
-    setIsAssignModalOpen(false);
-    setSelectedConvention(null);
-  };
-
-  const handleCloseGuaranteesModal = () => {
-    setIsGuaranteesModalOpen(false);
-    setSelectedConvention(null);
   };
 
   if (isLoading) {
@@ -85,7 +61,7 @@ export const ConventionsPage = () => {
             </span>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Gérez les conventions spécifiques par compagnie
+            Conventions exclusives par organisation cliente
           </p>
         </div>
         <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2">
@@ -107,7 +83,7 @@ export const ConventionsPage = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {conventions?.map((convention) => (
+        {conventions?.map((convention: any) => (
           <div
             key={convention.id}
             className={`bg-white dark:bg-gray-800 rounded-lg border-2 p-4 ${
@@ -121,14 +97,14 @@ export const ConventionsPage = () => {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 dark:text-white">{convention.name}</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{convention.company.name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{convention.organization?.name}</p>
                   {convention.status && (
                     <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded ${
                       convention.status === 'ACTIVE' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                      convention.status === 'SUSPENDED' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                      convention.status === 'INACTIVE' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' :
                       'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                     }`}>
-                      {convention.status === 'ACTIVE' ? 'Active' : convention.status === 'SUSPENDED' ? 'Suspendue' : 'Expirée'}
+                      {convention.status === 'ACTIVE' ? 'Active' : convention.status === 'INACTIVE' ? 'Inactive' : 'Expirée'}
                     </span>
                   )}
                 </div>
@@ -140,33 +116,18 @@ export const ConventionsPage = () => {
               )}
             </div>
 
-            {(convention.reductionTousRisques || convention.reductionDommagesCollision || convention.reductionVol || convention.reductionIncendie) && (
+            {convention.companies && convention.companies.length > 0 && (
               <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
                 <div className="flex items-center gap-1 mb-1">
-                  <DollarSign className="w-3 h-3 text-blue-900 dark:text-blue-200" />
-                  <p className="text-xs font-semibold text-blue-900 dark:text-blue-200">Taux de réduction</p>
+                  <Building2 className="w-3 h-3 text-blue-900 dark:text-blue-200" />
+                  <p className="text-xs font-semibold text-blue-900 dark:text-blue-200">Compagnies</p>
                 </div>
-                <div className="grid grid-cols-2 gap-1 text-xs">
-                  {convention.reductionTousRisques && convention.reductionTousRisques !== 1 && (
-                    <div className="text-gray-700 dark:text-gray-300">
-                      <span className="font-medium">TR:</span> {((1 - convention.reductionTousRisques) * 100).toFixed(0)}%
-                    </div>
-                  )}
-                  {convention.reductionDommagesCollision && convention.reductionDommagesCollision !== 1 && (
-                    <div className="text-gray-700 dark:text-gray-300">
-                      <span className="font-medium">DC:</span> {((1 - convention.reductionDommagesCollision) * 100).toFixed(0)}%
-                    </div>
-                  )}
-                  {convention.reductionVol && convention.reductionVol !== 1 && (
-                    <div className="text-gray-700 dark:text-gray-300">
-                      <span className="font-medium">Vol:</span> {((1 - convention.reductionVol) * 100).toFixed(0)}%
-                    </div>
-                  )}
-                  {convention.reductionIncendie && convention.reductionIncendie !== 1 && (
-                    <div className="text-gray-700 dark:text-gray-300">
-                      <span className="font-medium">Inc:</span> {((1 - convention.reductionIncendie) * 100).toFixed(0)}%
-                    </div>
-                  )}
+                <div className="flex flex-wrap gap-1">
+                  {convention.companies.map((cc: any) => (
+                    <span key={cc.companyId} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded text-xs">
+                      {cc.company.name}
+                    </span>
+                  ))}
                 </div>
               </div>
             )}
@@ -188,23 +149,17 @@ export const ConventionsPage = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-2 mb-3 text-sm">
+            <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
               <div className="bg-gray-50 dark:bg-gray-900 rounded p-2">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Utilisateurs</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Compagnies</p>
                 <p className="font-semibold text-gray-900 dark:text-white">
-                  {convention._count?.users || 0}
+                  {convention._count?.companies || 0}
                 </p>
               </div>
               <div className="bg-gray-50 dark:bg-gray-900 rounded p-2">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Garanties</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Règles réduction</p>
                 <p className="font-semibold text-gray-900 dark:text-white">
-                  {convention._count?.guarantees || 0}
-                </p>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-900 rounded p-2">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Règles</p>
-                <p className="font-semibold text-gray-900 dark:text-white">
-                  {convention._count?.pricingRules || 0}
+                  {convention._count?.reductionRules || 0}
                 </p>
               </div>
             </div>
@@ -213,20 +168,11 @@ export const ConventionsPage = () => {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleAssignUsers(convention)}
+                onClick={() => navigate(`/admin/conventions/${convention.id}/reduction-rules`)}
                 className="flex-1"
               >
-                <Users className="w-3 h-3 mr-1" />
-                Utilisateurs
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleAssignGuarantees(convention)}
-                className="flex-1"
-              >
-                <ListChecks className="w-3 h-3 mr-1" />
-                Garanties
+                <Sliders className="w-3 h-3 mr-1" />
+                Paliers
               </Button>
               <Button
                 size="sm"
@@ -257,7 +203,7 @@ export const ConventionsPage = () => {
             Aucune convention
           </h3>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Créez une convention pour associer des utilisateurs à des compagnies
+            Créez une convention pour une organisation cliente
           </p>
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
@@ -270,18 +216,6 @@ export const ConventionsPage = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         convention={editingConvention}
-      />
-
-      <AssignUsersModal
-        isOpen={isAssignModalOpen}
-        onClose={handleCloseAssignModal}
-        convention={selectedConvention}
-      />
-
-      <AssignGuaranteesModal
-        isOpen={isGuaranteesModalOpen}
-        onClose={handleCloseGuaranteesModal}
-        convention={selectedConvention}
       />
     </div>
   );

@@ -4,22 +4,27 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { Role } from '../../types/index';
 import {
   LayoutDashboard,
-  FileText,
-  List,
+  FilePlus2,
+  ListChecks,
   FileCheck,
+  FileSignature,
   Building2,
-  Settings,
+  Network,
+  ShieldCheck,
+  ShieldHalf,
+  DollarSign,
+  Calculator,
+  Scale,
+  ClipboardCheck,
   Users,
   BarChart3,
-  Shield,
+  Settings,
   LogOut,
-  FileSignature,
-  DollarSign,
-  ClipboardCheck,
-  X,
   Upload,
-  BookOpen,
+  BookOpenCheck,
+  X,
 } from 'lucide-react';
+
 
 interface NavItem {
   icon: any;
@@ -30,22 +35,42 @@ interface NavItem {
 
 const getNavItems = (t: (key: string) => string): NavItem[] => [
   { icon: LayoutDashboard, label: t('nav.dashboard'), path: '/dashboard' },
-  { icon: FileText, label: t('nav.newSimulation'), path: '/simulations/new', roles: [Role.CLIENT_ADHERENT] },
-  { icon: List, label: t('nav.simulations'), path: '/simulations', roles: [Role.CLIENT_ADHERENT] },
+
+  { icon: FilePlus2, label: t('nav.newSimulation'), path: '/simulations/new', roles: [Role.CLIENT_ADHERENT] },
+
+  { icon: ListChecks, label: t('nav.simulations'), path: '/simulations', roles: [Role.CLIENT_ADHERENT] },
+
   { icon: FileCheck, label: t('nav.quotes'), path: '/quotes', roles: [Role.CLIENT_ADHERENT] },
+
   { icon: FileSignature, label: t('nav.contracts'), path: '/contracts', roles: [Role.CLIENT_ADHERENT] },
+
   { icon: Upload, label: 'Mes Documents', path: '/documents', roles: [Role.CLIENT_ADHERENT] },
+
   { icon: Building2, label: t('nav.companies'), path: '/admin/companies', roles: [Role.ADMINISTRATEUR_ARS] },
-  { icon: Shield, label: t('nav.conventions'), path: '/admin/conventions', roles: [Role.ADMINISTRATEUR_ARS] },
-  { icon: Shield, label: t('nav.guarantees'), path: '/admin/guarantees', roles: [Role.ADMINISTRATEUR_ARS] },
+
+  { icon: Network, label: 'Organisations', path: '/admin/organizations', roles: [Role.ADMINISTRATEUR_ARS] },
+
+  { icon: ShieldCheck, label: t('nav.conventions'), path: '/admin/conventions', roles: [Role.ADMINISTRATEUR_ARS] },
+
+  { icon: ShieldHalf, label: t('nav.guarantees'), path: '/admin/guarantees', roles: [Role.ADMINISTRATEUR_ARS] },
+
   { icon: DollarSign, label: t('nav.pricing'), path: '/admin/pricing-rules', roles: [Role.ADMINISTRATEUR_ARS] },
-  { icon: ClipboardCheck, label: t('nav.validation'), path: '/admin/validation', roles: [Role.ADMINISTRATEUR_ARS] },
+
+  { icon: Calculator, label: 'Configuration Formules', path: '/admin/formulas', roles: [Role.ADMINISTRATEUR_ARS] },
+
+  { icon: Scale, label: t('nav.validation'), path: '/admin/validation', roles: [Role.ADMINISTRATEUR_ARS] },
+
   { icon: ClipboardCheck, label: t('nav.validationTech'), path: '/admin/gestionnaire-validation', roles: [Role.GESTIONNAIRE_VALIDATION_ARS] },
+
   { icon: Users, label: t('nav.users'), path: '/admin/users', roles: [Role.ADMINISTRATEUR_ARS] },
+
   { icon: BarChart3, label: t('nav.reports'), path: '/admin/reports', roles: [Role.ADMINISTRATEUR_ARS] },
-  { icon: BookOpen, label: 'Guide Système', path: '/admin/system-guide', roles: [Role.ADMINISTRATEUR_ARS] },
+
+  { icon: BookOpenCheck, label: 'Guide Système', path: '/admin/system-guide', roles: [Role.ADMINISTRATEUR_ARS] },
+
   { icon: Settings, label: t('nav.settings'), path: '/settings' },
 ];
+
 
 interface SidebarProps {
   isOpen: boolean;

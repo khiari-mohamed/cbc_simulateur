@@ -1,152 +1,93 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
+import { FormulaType, UsageType, ReductionMetric } from '@prisma/client';
 
-/**
- * Service to handle reduction rate logic
- * Ensures consistent application of reduction rates across all guarantees
- */
 @Injectable()
 export class ReductionRatesService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Get reduction rate for a specific guarantee and convention
-   * Reduction rates apply to: VOL, INCENDIE, TOUS_RISQUES_0, DOMMAGES_COLLISIONS
-   * Priority: Convention-level rates > Pricing rule rates > 1.0 (no reduction)
+   * Get reduction rate using ConventionReductionRule with paliers
+   * Returns discount percent (35 means 35% discount, apply as: prime * (1 - 35/100))
    */
-  async getReductionRate(
+  async getReductionPercent(
     companyId: string,
     guaranteeCode: string,
-    conventionId?: string,
-  ): Promise<Decimal> {
-    // Guarantees that DO NOT use reduction rates
-    const noReductionGuarantees = [
-      'RC',
-      'CAS',
-      'PERSONNES_TRANSPORTEES',
-      'ASSISTANCE',
-      'BG',
-      'INCENDIE_EMEUTES',
-      'CATASTROPHES_NATURELLES',
-      'DOMMAGES_EMEUTES',
-      'DEFENSE_RECOURS',
-    ];
+    conventionId: string | undefined,
+    metricValue: Decimal,
+    metric: ReductionMetric,
+    formulaType?: FormulaType,
+    usageType?: UsageType,
+  ): Promise<number> {
+    if (!conventionId) return 0; // No convention = no reduction
 
-    // If guarantee doesn't use reduction rates, return 1 (no reduction)
-    if (noReductionGuarantees.includes(guaranteeCode)) {
-      return new Decimal(1);
-    }
+    const guarantee = await this.prisma.guarantee.findUnique({ where: { code: guaranteeCode } });
+    if (!guarantee) return 0;
 
-    // Priority 1: Check convention-level reduction rates
-    if (conventionId) {
-      const convention = await this.prisma.convention.findUnique({
-        where: { id: conventionId },
-      });
+    // Find matching rules ordered by priority desc, then created desc
+    const rules = await this.prisma.conventionReductionRule.findMany({
+      where: {
+        conventionId,
+        OR: [
+          { companyId },
+          { companyId: null }
+        ],
+        guaranteeId: guarantee.id,
+        metric,
+        isActive: true,
+        validFrom: { lte: new Date() },
+        AND: [
+          {
+            OR: [
+              { formulaType },
+              { formulaType: null }
+            ]
+          },
+          {
+            OR: [
+              { usageType },
+              { usageType: null }
+            ]
+          },
+          {
+            OR: [
+              { validTo: null },
+              { validTo: { gte: new Date() } }
+            ]
+          }
+        ]
+      },
+      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+    });
 
-      if (convention) {
-        // Map guarantee codes to convention fields
-        const conventionRateMap: Record<string, Decimal | null> = {
-          'TOUS_RISQUES_ZERO': convention.reductionTousRisques,
-          'DOMMAGES_COLLISIONS': convention.reductionDommagesCollision,
-          'VOL': convention.reductionVol,
-          'INCENDIE': convention.reductionIncendie,
-        };
+    // Find first matching rule by range
+    for (const rule of rules) {
+      const value = metricValue.toNumber();
+      const min = rule.minValue?.toNumber();
+      const max = rule.maxValue?.toNumber();
 
-        const conventionRate = conventionRateMap[guaranteeCode];
-        if (conventionRate && !conventionRate.eq(1)) {
-          return conventionRate;
-        }
+      const minCheck = min === null || min === undefined || 
+        (rule.minInclusive ? value >= min : value > min);
+      const maxCheck = max === null || max === undefined || 
+        (rule.maxInclusive ? value <= max : value < max);
+
+      if (minCheck && maxCheck) {
+        return rule.discountPercent.toNumber();
       }
     }
 
-    // Priority 2: Check pricing rule reduction rate
-    const rule = await this.prisma.pricingRule.findFirst({
-      where: {
-        company: { id: companyId },
-        guarantee: { code: guaranteeCode },
-        isActive: true,
-        conventionId: conventionId || null,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    // Return reduction rate if exists, otherwise 1 (100% = no reduction)
-    if (rule && rule.reductionRate) {
-      return new Decimal(rule.reductionRate);
-    }
-
-    return new Decimal(1);
+    return 0; // No matching rule
   }
 
   /**
-   * Apply reduction rate to a premium
+   * Apply discount percent to premium
+   * discountPercent: 35 means 35% discount
+   * Formula: prime * (1 - discountPercent / 100)
    */
-  applyReductionRate(premium: Decimal, reductionRate: Decimal): Decimal {
-    if (!reductionRate || reductionRate.eq(0)) {
-      return premium;
-    }
-    return premium.mul(reductionRate);
-  }
-
-  /**
-   * Get all reduction rates for a company (for admin display)
-   */
-  async getCompanyReductionRates(companyId: string) {
-    const reducibleGuarantees = ['VOL', 'INCENDIE', 'TOUS_RISQUES_ZERO', 'DOMMAGES_COLLISIONS'];
-
-    const rates = await Promise.all(
-      reducibleGuarantees.map(async (code) => ({
-        guaranteeCode: code,
-        rate: await this.getReductionRate(companyId, code),
-      })),
-    );
-
-    return rates;
-  }
-
-  /**
-   * Update reduction rate for a guarantee
-   */
-  async updateReductionRate(
-    companyId: string,
-    guaranteeCode: string,
-    rate: number,
-    conventionId?: string,
-  ) {
-    const guarantee = await this.prisma.guarantee.findUnique({
-      where: { code: guaranteeCode },
-    });
-
-    if (!guarantee) {
-      throw new Error(`Guarantee not found: ${guaranteeCode}`);
-    }
-
-    const rule = await this.prisma.pricingRule.findFirst({
-      where: {
-        companyId,
-        guaranteeId: guarantee.id,
-        ...(conventionId && { conventionId }),
-      },
-    });
-
-    if (!rule) {
-      // Create new rule with reduction rate
-      return this.prisma.pricingRule.create({
-        data: {
-          companyId,
-          guaranteeId: guarantee.id,
-          reductionRate: new Decimal(rate),
-          isActive: true,
-          ...(conventionId && { conventionId }),
-        },
-      });
-    }
-
-    // Update existing rule
-    return this.prisma.pricingRule.update({
-      where: { id: rule.id },
-      data: { reductionRate: new Decimal(rate) },
-    });
+  applyDiscount(premium: Decimal, discountPercent: number): Decimal {
+    if (discountPercent <= 0) return premium;
+    const multiplier = new Decimal(1).sub(new Decimal(discountPercent).div(100));
+    return premium.mul(multiplier);
   }
 }

@@ -36,16 +36,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const { data } = await api.post('/auth/login', { email, password });
-    
-    if (data.requiresOtp) {
-      return { requiresOtp: true, userId: data.userId };
-    }
+    try {
+      console.log('🔍 AUTH CONTEXT - Login called with:', email);
+      const { data } = await api.post('/auth/login', { email, password });
+      console.log('🔍 AUTH CONTEXT - Response:', data);
+      
+      if (data.requiresOtp) {
+        return { requiresOtp: true, userId: data.userId };
+      }
 
-    localStorage.setItem('access_token', data.accessToken);
-    localStorage.setItem('refresh_token', data.refreshToken);
-    setUser(data.user);
-    return {};
+      localStorage.setItem('access_token', data.accessToken);
+      localStorage.setItem('refresh_token', data.refreshToken);
+      setUser(data.user);
+      return {};
+    } catch (error) {
+      console.error('🔍 AUTH CONTEXT - Login error:', error);
+      throw error;
+    }
   };
 
   const verifyOtp = async (userId: string, otp: string) => {

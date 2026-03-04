@@ -79,9 +79,9 @@ export class PdfService {
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Arial', sans-serif; color: #333; line-height: 1.3; font-size: 11px; }
-    .header { background: #d52b36; color: white; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; }
-    .header-logo { height: 40px; }
-    .header-text { flex: 1; text-align: center; }
+    .header { background: #d52b36; color: white; padding: 20px; text-align: center; }
+    .logo-box { display: inline-block; background: #ffffff; padding: 8px 14px; border-radius: 6px; margin: 0 auto 8px auto; }
+    .logo-box img { height: 42px; max-width: 160px; object-fit: contain; display: block; }
     .header h1 { font-size: 20px; margin-bottom: 3px; }
     .header p { font-size: 11px; opacity: 0.9; }
     .content { padding: 15px 20px; }
@@ -102,12 +102,13 @@ export class PdfService {
 </head>
 <body>
   <div class="header">
-    ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" class="header-logo" alt="Logo" />` : ''}
-    <div class="header-text">
-      <h1>ARS ASSURANCE</h1>
-      <p>Devis d'Assurance Automobile</p>
-    </div>
-    <div style="width: 40px;"></div>
+    ${logoBase64 ? `
+      <div class="logo-box">
+        <img src="data:image/png;base64,${logoBase64}" alt="Logo" />
+      </div>
+    ` : ''}
+    <h1>ARS ASSURANCE</h1>
+    <p>Devis d'Assurance Automobile</p>
   </div>
 
   <div class="content">
@@ -116,7 +117,7 @@ export class PdfService {
       <div class="info-grid">
         <div class="info-item">
           <div class="info-label">N° Devis</div>
-          <div class="info-value">${quote.quoteNumber}</div>
+          <div class="info-value">${quote.displayNumber ? `DEVIS-${String(quote.displayNumber).padStart(5, '0')}` : quote.quoteNumber}</div>
         </div>
         <div class="info-item">
           <div class="info-label">Date</div>
@@ -166,13 +167,49 @@ export class PdfService {
           </tr>
         </thead>
         <tbody>
-          ${quote.items.map((item: any) => `
-            <tr>
-              <td>${item.guarantee.nameFr}</td>
-              <td>${item.capital == 0 ? 'ILLIMITÉ' : formatCurrency(item.capital)}</td>
-              <td>${formatCurrency(item.prime)}</td>
-            </tr>
-          `).join('')}
+          ${(() => {
+            const isLloyd = quote.company.code === 'LLOYD';
+            const hasCatNat = quote.items.some((i: any) => i.guarantee.code === 'CATASTROPHES_NATURELLES');
+            const hasDommagesEmeutes = quote.items.some((i: any) => i.guarantee.code === 'DOMMAGES_EMEUTES');
+            const shouldCombine = isLloyd && hasCatNat && hasDommagesEmeutes;
+            
+            let rows = '';
+            let combinedAdded = false;
+            
+            quote.items.forEach((item: any) => {
+              // Skip individual CAT NAT and Dommages Émeutes for Lloyd if both present
+              if (shouldCombine && (item.guarantee.code === 'CATASTROPHES_NATURELLES' || item.guarantee.code === 'DOMMAGES_EMEUTES')) {
+                if (!combinedAdded) {
+                  // Add combined row once
+                  const catNatItem = quote.items.find((i: any) => i.guarantee.code === 'CATASTROPHES_NATURELLES');
+                  const dommagesItem = quote.items.find((i: any) => i.guarantee.code === 'DOMMAGES_EMEUTES');
+                  const combinedPrime = Number(catNatItem.prime) + Number(dommagesItem.prime);
+                  const combinedCapital = Math.max(Number(catNatItem.capital), Number(dommagesItem.capital));
+                  
+                  rows += `
+                    <tr style="background: #e3f2fd;">
+                      <td><strong>Extension Catastrophes Naturelles</strong><br/><span style="font-size: 9px; color: #666;">(CAT NAT + Dommages émeutes)</span></td>
+                      <td>${combinedCapital == 0 ? 'ILLIMITÉ' : formatCurrency(combinedCapital)}</td>
+                      <td><strong>${formatCurrency(combinedPrime)}</strong></td>
+                    </tr>
+                  `;
+                  combinedAdded = true;
+                }
+                return;
+              }
+              
+              // Regular item
+              rows += `
+                <tr>
+                  <td>${item.guarantee.nameFr}</td>
+                  <td>${item.capital == 0 ? 'ILLIMITÉ' : formatCurrency(item.capital)}</td>
+                  <td>${formatCurrency(item.prime)}</td>
+                </tr>
+              `;
+            });
+            
+            return rows;
+          })()}
         </tbody>
       </table>
     </div>
@@ -245,9 +282,9 @@ export class PdfService {
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Arial', sans-serif; color: #333; line-height: 1.3; font-size: 11px; }
-    .header { background: #d52b36; color: white; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; }
-    .header-logo { height: 40px; }
-    .header-text { flex: 1; text-align: center; }
+    .header { background: #d52b36; color: white; padding: 20px; text-align: center; }
+    .logo-box { display: inline-block; background: #ffffff; padding: 8px 14px; border-radius: 6px; margin: 0 auto 8px auto; }
+    .logo-box img { height: 42px; max-width: 160px; object-fit: contain; display: block; }
     .header h1 { font-size: 20px; margin-bottom: 3px; }
     .header p { font-size: 11px; opacity: 0.9; }
     .content { padding: 15px 20px; }
@@ -270,12 +307,13 @@ export class PdfService {
 </head>
 <body>
   <div class="header">
-    ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" class="header-logo" alt="Logo" />` : ''}
-    <div class="header-text">
-      <h1>ARS ASSURANCE</h1>
-      <p>Contrat d'Assurance Automobile</p>
-    </div>
-    <div style="width: 40px;"></div>
+    ${logoBase64 ? `
+      <div class="logo-box">
+        <img src="data:image/png;base64,${logoBase64}" alt="Logo" />
+      </div>
+    ` : ''}
+    <h1>ARS ASSURANCE</h1>
+    <p>Contrat d'Assurance Automobile</p>
   </div>
 
   <div class="content">
@@ -356,13 +394,49 @@ export class PdfService {
           </tr>
         </thead>
         <tbody>
-          ${contract.quote.items.map((item: any) => `
-            <tr>
-              <td>${item.guarantee.nameFr}</td>
-              <td>${item.capital == 0 ? 'ILLIMITÉ' : formatCurrency(item.capital)}</td>
-              <td>${formatCurrency(item.prime)}</td>
-            </tr>
-          `).join('')}
+          ${(() => {
+            const isLloyd = contract.quote.company.code === 'LLOYD';
+            const hasCatNat = contract.quote.items.some((i: any) => i.guarantee.code === 'CATASTROPHES_NATURELLES');
+            const hasDommagesEmeutes = contract.quote.items.some((i: any) => i.guarantee.code === 'DOMMAGES_EMEUTES');
+            const shouldCombine = isLloyd && hasCatNat && hasDommagesEmeutes;
+            
+            let rows = '';
+            let combinedAdded = false;
+            
+            contract.quote.items.forEach((item: any) => {
+              // Skip individual CAT NAT and Dommages Émeutes for Lloyd if both present
+              if (shouldCombine && (item.guarantee.code === 'CATASTROPHES_NATURELLES' || item.guarantee.code === 'DOMMAGES_EMEUTES')) {
+                if (!combinedAdded) {
+                  // Add combined row once
+                  const catNatItem = contract.quote.items.find((i: any) => i.guarantee.code === 'CATASTROPHES_NATURELLES');
+                  const dommagesItem = contract.quote.items.find((i: any) => i.guarantee.code === 'DOMMAGES_EMEUTES');
+                  const combinedPrime = Number(catNatItem.prime) + Number(dommagesItem.prime);
+                  const combinedCapital = Math.max(Number(catNatItem.capital), Number(dommagesItem.capital));
+                  
+                  rows += `
+                    <tr style="background: #e3f2fd;">
+                      <td><strong>Extension Catastrophes Naturelles</strong><br/><span style="font-size: 9px; color: #666;">(CAT NAT + Dommages émeutes)</span></td>
+                      <td>${combinedCapital == 0 ? 'ILLIMITÉ' : formatCurrency(combinedCapital)}</td>
+                      <td><strong>${formatCurrency(combinedPrime)}</strong></td>
+                    </tr>
+                  `;
+                  combinedAdded = true;
+                }
+                return;
+              }
+              
+              // Regular item
+              rows += `
+                <tr>
+                  <td>${item.guarantee.nameFr}</td>
+                  <td>${item.capital == 0 ? 'ILLIMITÉ' : formatCurrency(item.capital)}</td>
+                  <td>${formatCurrency(item.prime)}</td>
+                </tr>
+              `;
+            });
+            
+            return rows;
+          })()}
         </tbody>
       </table>
     </div>

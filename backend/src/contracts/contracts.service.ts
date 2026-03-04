@@ -15,7 +15,7 @@ export class ContractsService {
   async createFromQuote(quoteId: string, createdBy: string, deliveryType?: DeliveryType) {
     const quote = await this.prisma.quote.findUnique({ 
       where: { id: quoteId },
-      include: { user: true, contract: true },
+      include: { user: true, contract: true, simulation: true },
     });
     
     if (!quote) {
@@ -65,6 +65,21 @@ export class ContractsService {
       data: { status: QuoteStatus.TRANSFORMED_TO_CONTRACT },
     });
 
+    // Reject all other quotes from the same simulation
+    if (quote.simulationId) {
+      await this.prisma.quote.updateMany({
+        where: {
+          simulationId: quote.simulationId,
+          id: { not: quoteId },
+          status: { in: [QuoteStatus.GENERATED, QuoteStatus.SUBMITTED, QuoteStatus.VALIDATED] },
+        },
+        data: {
+          status: QuoteStatus.REJECTED,
+          rejectionReason: 'Un autre devis de cette simulation a été transformé en contrat.',
+        },
+      });
+    }
+
     const pdfPath = await this.pdfService.generateContractPdf(contract);
     await this.prisma.contract.update({
       where: { id: contract.id },
@@ -80,10 +95,17 @@ export class ContractsService {
     return { ...contract, pdfPath };
   }
 
-  async createManualContract(quoteId: string, createdBy: string, deliveryType?: DeliveryType) {
+  async createManualContract(
+    quoteId: string,
+    createdBy: string,
+    deliveryType?: DeliveryType,
+    contractNumber?: string,
+    quittanceNumber?: string,
+    files?: Express.Multer.File[],
+  ) {
     const quote = await this.prisma.quote.findUnique({ 
       where: { id: quoteId },
-      include: { user: true, contract: true },
+      include: { user: true, contract: true, simulation: true },
     });
     
     if (!quote) {
@@ -98,14 +120,14 @@ export class ContractsService {
       throw new Error('Quote must be validated before creating contract');
     }
 
-    const contractNumber = await this.generateContractNumber();
+    const finalContractNumber = contractNumber || await this.generateContractNumber();
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setFullYear(endDate.getFullYear() + 1);
 
     const contract = await this.prisma.contract.create({
       data: {
-        contractNumber,
+        contractNumber: finalContractNumber,
         quoteId,
         userId: quote.userId,
         startDate,
@@ -113,6 +135,7 @@ export class ContractsService {
         createdById: createdBy,
         deliveryType: deliveryType || DeliveryType.AGENCY_PICKUP,
         deliveryFee: 0,
+        quittanceNumber: quittanceNumber || null,
       },
       include: {
         quote: {
@@ -129,6 +152,37 @@ export class ContractsService {
       where: { id: quoteId },
       data: { status: QuoteStatus.TRANSFORMED_TO_CONTRACT },
     });
+
+    // Reject all other quotes from the same simulation
+    if (quote.simulationId) {
+      await this.prisma.quote.updateMany({
+        where: {
+          simulationId: quote.simulationId,
+          id: { not: quoteId },
+          status: { in: [QuoteStatus.GENERATED, QuoteStatus.SUBMITTED, QuoteStatus.VALIDATED] },
+        },
+        data: {
+          status: QuoteStatus.REJECTED,
+          rejectionReason: 'Un autre devis de cette simulation a été transformé en contrat.',
+        },
+      });
+    }
+
+    // Store uploaded contract documents
+    if (files && files.length > 0) {
+      for (const file of files) {
+        await this.prisma.document.create({
+          data: {
+            quoteId,
+            userId: quote.userId,
+            type: 'CONTRACT_DOCUMENT',
+            fileName: file.originalname,
+            filePath: file.path,
+            isValidated: true,
+          },
+        });
+      }
+    }
 
     const pdfPath = await this.pdfService.generateContractPdf(contract);
     await this.prisma.contract.update({

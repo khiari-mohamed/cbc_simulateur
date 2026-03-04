@@ -49,6 +49,22 @@ export class CreatePricingRuleDto {
   reductionRate?: number;
 
   @IsOptional()
+  @IsNumber()
+  ratePercentage?: number;
+
+  @IsOptional()
+  @IsNumber()
+  franchiseRate?: number;
+
+  @IsOptional()
+  @IsNumber()
+  minCapital?: number;
+
+  @IsOptional()
+  @IsNumber()
+  maxCapital?: number;
+
+  @IsOptional()
   @IsEnum(UsageType)
   usageType?: UsageType;
 

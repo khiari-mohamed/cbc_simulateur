@@ -1,431 +1,591 @@
-generator client {
-  provider = "prisma-client-js"
-}
+  generator client {
+    provider = "prisma-client-js"
+  }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+  datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+  }
 
-enum Role {
-  CLIENT_ADHERENT
-  ADMINISTRATEUR_ARS
-  GESTIONNAIRE_VALIDATION_ARS
-}
+  enum Role {
+    CLIENT_ADHERENT
+    ADMINISTRATEUR_ARS
+    GESTIONNAIRE_VALIDATION_ARS
+  }
 
-enum SimulationStatus {
-  DRAFT
-  SUBMITTED
-  APPROVED
-  REJECTED
-}
+  enum SimulationStatus {
+    DRAFT
+    SUBMITTED
+    APPROVED
+    REJECTED
+  }
 
-enum QuoteStatus {
-  GENERATED
-  SUBMITTED
-  VALIDATED
-  REJECTED
-  TRANSFORMED_TO_CONTRACT
-}
+  enum QuoteStatus {
+    GENERATED
+    SUBMITTED
+    VALIDATED
+    REJECTED
+    TRANSFORMED_TO_CONTRACT
+  }
 
-enum ContractStatus {
-  ACTIVE
-  SUSPENDED
-  CANCELLED
-  EXPIRED
-}
+  enum ContractStatus {
+    ACTIVE
+    SUSPENDED
+    CANCELLED
+    EXPIRED
+  }
 
-enum FormulaType {
-  STANDARD
-  DOMMAGES_COLLISIONS
-  TOUS_RISQUES_0
-}
+  enum FormulaType {
+    STANDARD
+    DOMMAGES_COLLISIONS
+    TOUS_RISQUES_0
+  }
 
-enum DeliveryType {
-  HOME_DELIVERY
-  AGENCY_PICKUP
-}
+  enum ConventionStatus {
+    ACTIVE
+    INACTIVE
+    EXPIRED
+  }
 
-enum NotificationChannel {
-  EMAIL
-  SMS
-}
+  enum DeliveryType {
+    HOME_DELIVERY
+    AGENCY_PICKUP
+  }
 
-enum NotificationStatus {
-  PENDING
-  SENT
-  FAILED
-}
+  enum NotificationChannel {
+    EMAIL
+    SMS
+  }
 
-enum PaymentStatus {
-  PENDING
-  PAID
-  FAILED
-  REFUNDED
-}
+  enum NotificationStatus {
+    PENDING
+    SENT
+    FAILED
+  }
 
-enum UsageType {
-  PRIVATE_BUSINESS
-  COMMERCIAL
-  TAXI
-  RENTAL
-}
+  enum PaymentStatus {
+    PENDING
+    PAID
+    FAILED
+    REFUNDED
+  }
 
-model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  password      String
-  firstName     String
-  lastName      String
-  phone         String?
-  role          Role     @default(CLIENT_ADHERENT)
-  otpEnabled    Boolean  @default(false)
-  otpSecret     String?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  enum UsageType {
+    PRIVATE_BUSINESS
+    COMMERCIAL
+    TAXI
+    RENTAL
+  }
 
-  driverProfile       DriverProfile?
-  simulations         Simulation[]
-  quotes              Quote[]
-  contracts           Contract[]
-  auditLogs           AuditLog[]
-  conventions         UserConvention[]
-  validatedQuotes     Quote[]           @relation("QuoteValidator")
-  createdContracts    Contract[]        @relation("ContractCreator")
-  notifications       Notification[]
-  quoteComparisons    QuoteComparison[]
-  documents           Document[]
+  enum ReductionMetric {
+    NEW_VALUE
+    MARKET_VALUE
+    DC_CAPITAL
+    CAPITAL_OVER_VV_PERCENT
+  }
 
-  @@map("users")
-}
+  model User {
+    id             String   @id @default(uuid())
+    email          String   @unique
+    password       String
+    firstName      String
+    lastName       String
+    phone          String?
+    role           Role     @default(CLIENT_ADHERENT)
+    otpEnabled     Boolean  @default(false)
+    otpSecret      String?
+    isActive       Boolean  @default(true)
+    organizationId String?
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
 
-model Company {
-  id           String   @id @default(uuid())
-  name         String   @unique
-  code         String   @unique
-  contractFees Decimal? @db.Decimal(12, 2)
-  fpac         Decimal  @default(0.5) @db.Decimal(12, 2)
-  fssr         Decimal  @default(0.3) @db.Decimal(12, 2)
-  fg           Decimal  @default(3.0) @db.Decimal(12, 2)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+    organization     ClientOrganization? @relation(fields: [organizationId], references: [id])
+    driverProfile    DriverProfile?
+    simulations      Simulation[]
+    quotes           Quote[]
+    contracts        Contract[]
+    auditLogs        AuditLog[]
+    validatedQuotes  Quote[]             @relation("QuoteValidator")
+    createdContracts Contract[]          @relation("ContractCreator")
+    notifications    Notification[]
+    quoteComparisons QuoteComparison[]
+    documents        Document[]
 
-  pricingRules PricingRule[]
-  quotes       Quote[]
-  conventions  Convention[]
+    @@map("users")
+  }
 
-  @@map("companies")
-}
+  model Company {
+    id           String   @id @default(uuid())
+    name         String   @unique
+    code         String   @unique
+    contractFees Decimal? @db.Decimal(12, 2)
+    fpac         Decimal  @default(0.5) @db.Decimal(12, 2)
+    fssr         Decimal  @default(0.3) @db.Decimal(12, 2)
+    fg           Decimal  @default(3.0) @db.Decimal(12, 2)
+    isActive     Boolean  @default(true)
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
 
-model Convention {
-  id                      String   @id @default(uuid())
-  name                    String
-  companyId               String
-  company                 Company  @relation(fields: [companyId], references: [id])
-  reductionTousRisques    Decimal? @default(1.0) @db.Decimal(5, 2)
-  reductionDommagesCollision Decimal? @default(1.0) @db.Decimal(5, 2)
-  reductionVol            Decimal? @default(1.0) @db.Decimal(5, 2)
-  reductionIncendie       Decimal? @default(1.0) @db.Decimal(5, 2)
-  startDate               DateTime @default(now())
-  endDate                 DateTime?
-  status                  String   @default("ACTIVE")
-  isActive                Boolean  @default(true)
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+    pricingRules             PricingRule[]
+    quotes                   Quote[]
+    conventionCompanies      ConventionCompany[]
+    conventionReductionRules ConventionReductionRule[]
+    dcCapitalTiers           DcCapitalTier[]
+    dcProgressiveTiers       DcProgressiveTier[]
+    dcMatrixVvRanges         DcMatrixVvRange[]
+    dcMatrixCapitals         DcMatrixCapital[]
+    dcMatrixPrices           DcMatrixPrice[]
+    dcConfigs                DcConfig[]
 
-  users        UserConvention[]
-  simulations  Simulation[]
-  pricingRules PricingRule[]
-  guarantees   ConventionGuarantee[]
+    @@map("companies")
+  }
 
-  @@map("conventions")
-}
+  model Convention {
+    id             String             @id @default(uuid())
+    name           String
+    organizationId String
+    organization   ClientOrganization @relation(fields: [organizationId], references: [id])
+    startDate      DateTime           @default(now())
+    endDate        DateTime?
+    status         ConventionStatus   @default(ACTIVE)
+    isActive       Boolean            @default(true)
+    createdAt      DateTime           @default(now())
+    updatedAt      DateTime           @updatedAt
 
-model UserConvention {
-  userId       String
-  conventionId String
-  user         User       @relation(fields: [userId], references: [id])
-  convention   Convention @relation(fields: [conventionId], references: [id])
-  assignedAt   DateTime   @default(now())
+    companies      ConventionCompany[]
+    reductionRules ConventionReductionRule[]
+    simulations    Simulation[]
+    pricingRules   PricingRule[]
 
-  @@id([userId, conventionId])
-  @@map("user_conventions")
-}
+    @@map("conventions")
+  }
 
-model Vehicle {
-  id                    String   @id @default(uuid())
-  registration          String?
-  fiscalHorsepower      Int
-  numberOfSeats         Int
-  newValue              Decimal  @db.Decimal(12, 2)
-  marketValue           Decimal  @db.Decimal(12, 2)
-  firstCirculationDate  DateTime
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  model ClientOrganization {
+    id          String   @id @default(uuid())
+    name        String   @unique
+    code        String   @unique
+    joinKey     String
+    isActive    Boolean  @default(true)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
 
-  simulations Simulation[]
+    users       User[]
+    conventions Convention[]
 
-  @@map("vehicles")
-}
+    @@map("client_organizations")
+  }
 
-model DriverProfile {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id])
-  birthDate       DateTime
-  licenseDate     DateTime
-  experienceYears Int
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  model ConventionCompany {
+    conventionId String
+    companyId    String
+    convention   Convention @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+    company      Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    assignedAt   DateTime   @default(now())
 
-  @@map("driver_profiles")
-}
+    @@id([conventionId, companyId])
+    @@map("convention_companies")
+  }
 
-model Simulation {
-  id              String            @id @default(uuid())
-  userId          String
-  user            User              @relation(fields: [userId], references: [id])
-  vehicleId       String
-  vehicle         Vehicle           @relation(fields: [vehicleId], references: [id])
-  conventionId    String?
-  convention      Convention?       @relation(fields: [conventionId], references: [id])
-  bonusMalus      Decimal           @db.Decimal(5, 2)
-  usage           UsageType
-  formulaType     FormulaType
-  franchiseRate   Decimal?          @db.Decimal(5, 2)
-  bgLimit         Int?
-  dcCapital       Decimal?          @db.Decimal(12, 2)
-  status          SimulationStatus  @default(DRAFT)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  model ConventionReductionRule {
+    id              String          @id @default(uuid())
+    conventionId    String
+    convention      Convention      @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+    companyId       String?
+    company         Company?        @relation(fields: [companyId], references: [id])
+    guaranteeId     String
+    guarantee       Guarantee       @relation(fields: [guaranteeId], references: [id])
+    formulaType     FormulaType?
+    usageType       UsageType?
+    metric          ReductionMetric
+    minValue        Decimal?        @db.Decimal(12, 2)
+    maxValue        Decimal?        @db.Decimal(12, 2)
+    minInclusive    Boolean         @default(true)
+    maxInclusive    Boolean         @default(false)
+    discountPercent Decimal         @db.Decimal(5, 2)
+    priority        Int             @default(0)
+    validFrom       DateTime        @default(now())
+    validTo         DateTime?
+    isActive        Boolean         @default(true)
+    createdAt       DateTime        @default(now())
+    updatedAt       DateTime        @updatedAt
 
-  quotes             Quote[]
-  guarantees         SimulationGuarantee[]
-  comparisonGroupId  String?
-  comparisonGroup    QuoteComparison? @relation(fields: [comparisonGroupId], references: [id])
+    @@index([conventionId, companyId, guaranteeId, formulaType, usageType, metric, isActive, validFrom, validTo])
+    @@index([conventionId, priority, createdAt])
+    @@map("convention_reduction_rules")
+  }
 
-  @@map("simulations")
-}
+  model Vehicle {
+    id                   String   @id @default(uuid())
+    registration         String?
+    fiscalHorsepower     Int
+    numberOfSeats        Int
+    newValue             Decimal  @db.Decimal(12, 2)
+    marketValue          Decimal  @db.Decimal(12, 2)
+    firstCirculationDate DateTime
+    createdAt            DateTime @default(now())
+    updatedAt            DateTime @updatedAt
 
-model SimulationGuarantee {
-  id            String     @id @default(uuid())
-  simulationId  String
-  simulation    Simulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
-  guaranteeId   String
-  guarantee     Guarantee  @relation(fields: [guaranteeId], references: [id])
-  isSelected    Boolean    @default(false)
-  customValue   Decimal?   @db.Decimal(12, 2)
+    simulations Simulation[]
 
-  @@map("simulation_guarantees")
-}
+    @@map("vehicles")
+  }
 
-model Quote {
-  id                 String           @id @default(uuid())
-  quoteNumber        String           @unique
-  simulationId       String
-  simulation         Simulation       @relation(fields: [simulationId], references: [id])
-  userId             String
-  user               User             @relation(fields: [userId], references: [id])
-  companyId          String
-  company            Company          @relation(fields: [companyId], references: [id])
-  status             QuoteStatus      @default(GENERATED)
-  primeNette         Decimal          @db.Decimal(12, 2)
-  frais              Decimal          @db.Decimal(12, 2)
-  taxes              Decimal          @db.Decimal(12, 2)
-  fpac               Decimal          @db.Decimal(12, 2)
-  fssr               Decimal          @db.Decimal(12, 2)
-  fg                 Decimal          @db.Decimal(12, 2)
-  totalAPayer        Decimal          @db.Decimal(12, 2)
-  pricingSnapshot    Json?
-  pdfPath            String?
-  validatedById      String?
-  validatedBy        User?            @relation("QuoteValidator", fields: [validatedById], references: [id])
-  validationRole     Role?
-  validatedAt        DateTime?
-  rejectionReason    String?          @db.Text
-  modificationNote   String?          @db.Text
-  comparisonGroupId  String?
-  comparisonGroup    QuoteComparison? @relation(fields: [comparisonGroupId], references: [id])
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  model DriverProfile {
+    id              String   @id @default(uuid())
+    userId          String   @unique
+    user            User     @relation(fields: [userId], references: [id])
+    birthDate       DateTime
+    licenseDate     DateTime
+    experienceYears Int
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
 
-  items           QuoteItem[]
-  contract        Contract?
-  documents       Document[]
+    @@map("driver_profiles")
+  }
 
-  @@map("quotes")
-}
+  model Simulation {
+    id            String           @id @default(uuid())
+    userId        String
+    user          User             @relation(fields: [userId], references: [id])
+    vehicleId     String
+    vehicle       Vehicle          @relation(fields: [vehicleId], references: [id])
+    conventionId  String?
+    convention    Convention?      @relation(fields: [conventionId], references: [id])
+    bonusMalus    Decimal          @db.Decimal(5, 2)
+    usage         UsageType
+    formulaType   FormulaType
+    franchiseRate Int?
+    bgLimit       Int?
+    dcCapital     Decimal?         @db.Decimal(12, 2)
+    status        SimulationStatus @default(DRAFT)
+    createdAt     DateTime         @default(now())
+    updatedAt     DateTime         @updatedAt
 
-model QuoteItem {
-  id          String    @id @default(uuid())
-  quoteId     String
-  quote       Quote     @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-  guaranteeId String
-  guarantee   Guarantee @relation(fields: [guaranteeId], references: [id])
-  capital     Decimal   @db.Decimal(12, 2)
-  prime       Decimal   @db.Decimal(12, 2)
+    quotes            Quote[]
+    guarantees        SimulationGuarantee[]
+    comparisonGroupId String?
+    comparisonGroup   QuoteComparison?      @relation(fields: [comparisonGroupId], references: [id])
 
-  @@map("quote_items")
-}
+    @@map("simulations")
+  }
 
-model Contract {
-  id              String         @id @default(uuid())
-  contractNumber  String         @unique
-  quoteId         String         @unique
-  quote           Quote          @relation(fields: [quoteId], references: [id])
-  userId          String
-  user            User           @relation(fields: [userId], references: [id])
-  status          ContractStatus @default(ACTIVE)
-  startDate       DateTime
-  endDate         DateTime
-  pdfPath         String?
-  deliveryType    DeliveryType   @default(AGENCY_PICKUP)
-  deliveryFee     Decimal        @default(0) @db.Decimal(12, 2)
-  createdById     String
-  createdBy       User           @relation("ContractCreator", fields: [createdById], references: [id])
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  model SimulationGuarantee {
+    id           String     @id @default(uuid())
+    simulationId String
+    simulation   Simulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
+    guaranteeId  String
+    guarantee    Guarantee  @relation(fields: [guaranteeId], references: [id])
+    isSelected   Boolean    @default(false)
+    customValue  Decimal?   @db.Decimal(12, 2)
 
-  @@map("contracts")
-}
+    @@map("simulation_guarantees")
+  }
 
-model Guarantee {
-  id          String   @id @default(uuid())
-  code        String   @unique
-  nameFr      String
-  nameAr      String?
-  nameEn      String?
-  isOptional  Boolean  @default(false)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  model Quote {
+    id                String           @id @default(uuid())
+    quoteNumber       String           @unique
+    displayNumber     Int              @default(autoincrement())
+    simulationId      String
+    simulation        Simulation       @relation(fields: [simulationId], references: [id])
+    userId            String
+    user              User             @relation(fields: [userId], references: [id])
+    companyId         String
+    company           Company          @relation(fields: [companyId], references: [id])
+    status            QuoteStatus      @default(GENERATED)
+    primeNette        Decimal          @db.Decimal(12, 2)
+    frais             Decimal          @db.Decimal(12, 2)
+    taxes             Decimal          @db.Decimal(12, 2)
+    fpac              Decimal          @db.Decimal(12, 2)
+    fssr              Decimal          @db.Decimal(12, 2)
+    fg                Decimal          @db.Decimal(12, 2)
+    totalAPayer       Decimal          @db.Decimal(12, 2)
+    pricingSnapshot   Json?
+    pdfPath           String?
+    validatedById     String?
+    validatedBy       User?            @relation("QuoteValidator", fields: [validatedById], references: [id])
+    validationRole    Role?
+    validatedAt       DateTime?
+    rejectionReason   String?          @db.Text
+    modificationNote  String?          @db.Text
+    effectiveDate     DateTime?
+    comparisonGroupId String?
+    comparisonGroup   QuoteComparison? @relation(fields: [comparisonGroupId], references: [id])
+    createdAt         DateTime         @default(now())
+    updatedAt         DateTime         @updatedAt
 
-  pricingRules         PricingRule[]
-  simulationGuarantees SimulationGuarantee[]
-  quoteItems           QuoteItem[]
-  conventions          ConventionGuarantee[]
+    items     QuoteItem[]
+    contract  Contract?
+    documents Document[]
 
-  @@map("guarantees")
-}
+    @@map("quotes")
+  }
 
-model PricingRule {
-  id              String       @id @default(uuid())
-  companyId       String
-  company         Company      @relation(fields: [companyId], references: [id])
-  guaranteeId     String
-  guarantee       Guarantee    @relation(fields: [guaranteeId], references: [id])
-  conventionId    String?
-  convention      Convention?  @relation(fields: [conventionId], references: [id])
-  formulaType     FormulaType?
-  minPower        Int?
-  maxPower        Int?
-  bonusMalusClass Int?
-  minAge          Int?
-  maxAge          Int?
-  minCapital      Decimal?     @db.Decimal(12, 2)
-  maxCapital      Decimal?     @db.Decimal(12, 2)
-  minMarketValue  Decimal?     @db.Decimal(12, 2)
-  maxMarketValue  Decimal?     @db.Decimal(12, 2)
-  franchiseRate   Int?
-  ratePercentage  Decimal?     @db.Decimal(12, 6)
-  baseRate        Decimal?     @db.Decimal(12, 4)
-  fixedPremium    Decimal?     @db.Decimal(12, 2)
-  multiplier      Decimal?     @db.Decimal(12, 4)
-  reductionRate   Decimal?     @db.Decimal(5, 2)
-  tierLevel       Int?
-  tierRate        Decimal?     @db.Decimal(12, 6)
-  basePremium     Decimal?     @db.Decimal(12, 2)
-  usageType       UsageType?
-  validFrom       DateTime     @default(now())
-  validTo         DateTime?
-  isActive        Boolean      @default(true)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  model QuoteItem {
+    id          String    @id @default(uuid())
+    quoteId     String
+    quote       Quote     @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+    guaranteeId String
+    guarantee   Guarantee @relation(fields: [guaranteeId], references: [id])
+    capital     Decimal   @db.Decimal(12, 2)
+    prime       Decimal   @db.Decimal(12, 2)
 
-  @@map("pricing_rules")
-}
+    @@map("quote_items")
+  }
 
-model Document {
-  id          String   @id @default(uuid())
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id])
-  quoteId     String?
-  quote       Quote?   @relation(fields: [quoteId], references: [id])
-  type        String
-  fileName    String
-  filePath    String
-  isValidated Boolean  @default(false)
-  uploadedAt  DateTime @default(now())
+  model Contract {
+    id              String         @id @default(uuid())
+    contractNumber  String         @unique
+    quoteId         String         @unique
+    quote           Quote          @relation(fields: [quoteId], references: [id])
+    userId          String
+    user            User           @relation(fields: [userId], references: [id])
+    status          ContractStatus @default(ACTIVE)
+    startDate       DateTime
+    endDate         DateTime
+    pdfPath         String?
+    deliveryType    DeliveryType   @default(AGENCY_PICKUP)
+    deliveryFee     Decimal        @default(0) @db.Decimal(12, 2)
+    quittanceNumber String?
+    createdById     String
+    createdBy       User           @relation("ContractCreator", fields: [createdById], references: [id])
+    createdAt       DateTime       @default(now())
+    updatedAt       DateTime       @updatedAt
 
-  @@map("documents")
-}
+    @@map("contracts")
+  }
 
-model Payment {
-  id          String        @id @default(uuid())
-  quoteId     String
-  orderId     String        @unique
-  amount      Decimal       @db.Decimal(12, 2)
-  method      String
-  status      PaymentStatus @default(PENDING)
-  reference   String?
-  paidAt      DateTime?
-  createdAt   DateTime      @default(now())
+  model Guarantee {
+    id         String   @id @default(uuid())
+    code       String   @unique
+    nameFr     String
+    nameAr     String?
+    nameEn     String?
+    isOptional Boolean  @default(false)
+    isActive   Boolean  @default(true)
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
 
-  @@map("payments")
-}
+    pricingRules             PricingRule[]
+    simulationGuarantees     SimulationGuarantee[]
+    quoteItems               QuoteItem[]
+    conventionReductionRules ConventionReductionRule[]
 
-model AuditLog {
-  id          String   @id @default(uuid())
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id])
-  action      String
-  entity      String
-  entityId    String
-  oldValue    String?  @db.Text
-  newValue    String?  @db.Text
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
+    @@map("guarantees")
+  }
 
-  @@map("audit_logs")
-}
+  model PricingRule {
+    id              String       @id @default(uuid())
+    companyId       String
+    company         Company      @relation(fields: [companyId], references: [id])
+    guaranteeId     String
+    guarantee       Guarantee    @relation(fields: [guaranteeId], references: [id])
+    conventionId    String?
+    convention      Convention?  @relation(fields: [conventionId], references: [id])
+    formulaType     FormulaType?
+    minPower        Int?
+    maxPower        Int?
+    bonusMalusClass Int?
+    minAge          Int?
+    maxAge          Int?
+    minCapital      Decimal?     @db.Decimal(12, 2)
+    maxCapital      Decimal?     @db.Decimal(12, 2)
+    minMarketValue  Decimal?     @db.Decimal(12, 2)
+    maxMarketValue  Decimal?     @db.Decimal(12, 2)
+    franchiseRate   Int?
+    ratePercentage  Decimal?     @db.Decimal(12, 6)
+    baseRate        Decimal?     @db.Decimal(12, 4)
+    fixedPremium    Decimal?     @db.Decimal(12, 2)
+    multiplier      Decimal?     @db.Decimal(12, 4)
+    reductionRate   Decimal?     @db.Decimal(5, 2)
+    tierLevel       Int?
+    tierRate        Decimal?     @db.Decimal(12, 6)
+    basePremium     Decimal?     @db.Decimal(12, 2)
+    usageType       UsageType?
+    validFrom       DateTime     @default(now())
+    validTo         DateTime?
+    isActive        Boolean      @default(true)
+    createdAt       DateTime     @default(now())
+    updatedAt       DateTime     @updatedAt
 
-model QuoteComparison {
-  id          String       @id @default(uuid())
-  userId      String
-  user        User         @relation(fields: [userId], references: [id])
-  createdAt   DateTime     @default(now())
-  simulations Simulation[]
-  quotes      Quote[]
+    @@map("pricing_rules")
+  }
 
-  @@map("quote_comparisons")
-}
+  model DcCapitalTier {
+    id         String    @id @default(uuid())
+    companyId  String
+    company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    usageType  UsageType
+    minAmount  Decimal   @db.Decimal(12, 2)
+    maxAmount  Decimal?  @db.Decimal(12, 2)
+    step       Decimal   @db.Decimal(12, 2)
+    isActive   Boolean   @default(true)
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @updatedAt
 
-model Notification {
-  id        String              @id @default(uuid())
-  userId    String
-  user      User                @relation(fields: [userId], references: [id])
-  type      String
-  channel   NotificationChannel
-  status    NotificationStatus  @default(PENDING)
-  subject   String?
-  content   String              @db.Text
-  sentAt    DateTime?
-  error     String?             @db.Text
-  createdAt DateTime            @default(now())
+    @@unique([companyId, usageType, minAmount])
+    @@index([companyId, usageType, isActive, minAmount])
+    @@map("dc_capital_tiers")
+  }
 
-  @@map("notifications")
-}
+  model DcProgressiveTier {
+    id         String    @id @default(uuid())
+    companyId  String
+    company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    usageType  UsageType
+    tierNumber Int
+    tierRate   Decimal   @db.Decimal(12, 6)
+    isActive   Boolean   @default(true)
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @updatedAt
 
-model ConventionGuarantee {
-  conventionId String
-  guaranteeId  String
-  convention   Convention @relation(fields: [conventionId], references: [id], onDelete: Cascade)
-  guarantee    Guarantee  @relation(fields: [guaranteeId], references: [id], onDelete: Cascade)
-  assignedAt   DateTime   @default(now())
+    @@unique([companyId, usageType, tierNumber])
+    @@index([companyId, usageType, isActive, tierNumber])
+    @@map("dc_progressive_tiers")
+  }
 
-  @@id([conventionId, guaranteeId])
-  @@map("convention_guarantees")
-}
+  model DcMatrixVvRange {
+    id         String    @id @default(uuid())
+    companyId  String
+    company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    usageType  UsageType
+    minVv      Decimal   @db.Decimal(12, 2)
+    maxVv      Decimal?  @db.Decimal(12, 2)
+    isActive   Boolean   @default(true)
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @updatedAt
+
+    matrixPrices DcMatrixPrice[]
+
+    @@unique([companyId, usageType, minVv])
+    @@index([companyId, usageType, isActive, minVv, maxVv])
+    @@map("dc_matrix_vv_ranges")
+  }
+
+  model DcMatrixCapital {
+    id         String    @id @default(uuid())
+    companyId  String
+    company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    usageType  UsageType
+    amount     Decimal   @db.Decimal(12, 2)
+    order      Int
+    isActive   Boolean   @default(true)
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @updatedAt
+
+    matrixPrices DcMatrixPrice[]
+
+    @@unique([companyId, usageType, amount])
+    @@index([companyId, usageType, isActive, order])
+    @@map("dc_matrix_capitals")
+  }
+
+  model DcMatrixPrice {
+    id         String          @id @default(uuid())
+    companyId  String
+    company    Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    usageType  UsageType
+    vvRangeId  String
+    vvRange    DcMatrixVvRange @relation(fields: [vvRangeId], references: [id], onDelete: Cascade)
+    capitalId  String
+    capital    DcMatrixCapital @relation(fields: [capitalId], references: [id], onDelete: Cascade)
+    prime      Decimal         @db.Decimal(12, 2)
+    createdAt  DateTime        @default(now())
+    updatedAt  DateTime        @updatedAt
+
+    @@unique([vvRangeId, capitalId])
+    @@index([companyId, usageType, vvRangeId, capitalId])
+    @@map("dc_matrix_prices")
+  }
+
+  model DcConfig {
+    id                String    @id @default(uuid())
+    companyId         String
+    company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    usageType         UsageType
+    useMatrix         Boolean   @default(false)
+    franchise         Decimal   @default(0) @db.Decimal(5, 2)
+    minCapital        Decimal   @default(1000) @db.Decimal(12, 2)
+    maxCapitalPercent Decimal   @default(50) @db.Decimal(5, 2)
+    maxCapitalAbsolute Decimal  @default(100000) @db.Decimal(12, 2)
+    basePremium       Decimal   @default(10) @db.Decimal(12, 2)
+    discountPercent   Decimal   @default(0) @db.Decimal(5, 2)
+    isActive          Boolean   @default(true)
+    createdAt         DateTime  @default(now())
+    updatedAt         DateTime  @updatedAt
+
+    @@unique([companyId, usageType])
+    @@index([companyId, usageType, isActive])
+    @@map("dc_configs")
+  }
+
+  model Document {
+    id          String   @id @default(uuid())
+    userId      String?
+    user        User?    @relation(fields: [userId], references: [id])
+    quoteId     String?
+    quote       Quote?   @relation(fields: [quoteId], references: [id])
+    type        String
+    fileName    String
+    filePath    String
+    isValidated Boolean  @default(false)
+    uploadedAt  DateTime @default(now())
+
+    @@map("documents")
+  }
+
+  model Payment {
+    id        String        @id @default(uuid())
+    quoteId   String
+    orderId   String        @unique
+    amount    Decimal       @db.Decimal(12, 2)
+    method    String
+    status    PaymentStatus @default(PENDING)
+    reference String?
+    paidAt    DateTime?
+    createdAt DateTime      @default(now())
+
+    @@map("payments")
+  }
+
+  model AuditLog {
+    id        String   @id @default(uuid())
+    userId    String?
+    user      User?    @relation(fields: [userId], references: [id])
+    action    String
+    entity    String
+    entityId  String
+    oldValue  String?  @db.Text
+    newValue  String?  @db.Text
+    ipAddress String?
+    userAgent String?
+    createdAt DateTime @default(now())
+
+    @@map("audit_logs")
+  }
+
+  model QuoteComparison {
+    id          String       @id @default(uuid())
+    userId      String
+    user        User         @relation(fields: [userId], references: [id])
+    createdAt   DateTime     @default(now())
+    simulations Simulation[]
+    quotes      Quote[]
+
+    @@map("quote_comparisons")
+  }
+
+  model Notification {
+    id        String              @id @default(uuid())
+    userId    String
+    user      User                @relation(fields: [userId], references: [id])
+    type      String
+    channel   NotificationChannel
+    status    NotificationStatus  @default(PENDING)
+    subject   String?
+    content   String              @db.Text
+    sentAt    DateTime?
+    error     String?             @db.Text
+    createdAt DateTime            @default(now())
+
+    @@map("notifications")
+  }

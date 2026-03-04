@@ -103,26 +103,32 @@ export const QuoteComparisonPage = () => {
         {quotes[0]?.simulation?.vehicle && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
             <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Informations du véhicule</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
+            <div className="flex flex-wrap gap-6 text-sm">
+              <div className="whitespace-nowrap min-w-[200px]">
+                <span className="text-gray-600 dark:text-gray-400">Immatriculation:</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                  {quotes[0].simulation.vehicle.registration || 'N/A'}
+                </span>
+              </div>
+              <div className="whitespace-nowrap">
                 <span className="text-gray-600 dark:text-gray-400">Valeur à neuf:</span>
                 <span className="ml-2 font-medium text-gray-900 dark:text-white">
                   {quotes[0].simulation.vehicle.newValue.toLocaleString()} DT
                 </span>
               </div>
-              <div>
+              <div className="whitespace-nowrap">
                 <span className="text-gray-600 dark:text-gray-400">Valeur vénale:</span>
                 <span className="ml-2 font-medium text-gray-900 dark:text-white">
                   {quotes[0].simulation.vehicle.marketValue.toLocaleString()} DT
                 </span>
               </div>
-              <div>
+              <div className="whitespace-nowrap">
                 <span className="text-gray-600 dark:text-gray-400">Puissance:</span>
                 <span className="ml-2 font-medium text-gray-900 dark:text-white">
                   {quotes[0].simulation.vehicle.fiscalHorsepower} CV
                 </span>
               </div>
-              <div>
+              <div className="whitespace-nowrap">
                 <span className="text-gray-600 dark:text-gray-400">Places:</span>
                 <span className="ml-2 font-medium text-gray-900 dark:text-white">
                   {quotes[0].simulation.vehicle.numberOfSeats}

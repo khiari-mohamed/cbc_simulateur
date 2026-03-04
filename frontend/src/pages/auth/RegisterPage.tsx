@@ -20,10 +20,19 @@ const registerSchema = z.object({
   firstName: z.string().min(2, 'Prénom minimum 2 caractères'),
   lastName: z.string().min(2, 'Nom minimum 2 caractères'),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Format de téléphone invalide').optional().or(z.literal('')),
+  organizationCode: z.string().optional().or(z.literal('')),
+  organizationJoinKey: z.string().optional().or(z.literal('')),
   role: z.enum(['CLIENT_ADHERENT', 'ADMINISTRATEUR_ARS', 'GESTIONNAIRE_VALIDATION_ARS']).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Les mots de passe ne correspondent pas',
   path: ['confirmPassword'],
+}).refine((data) => {
+  if (data.organizationCode && !data.organizationJoinKey) return false;
+  if (!data.organizationCode && data.organizationJoinKey) return false;
+  return true;
+}, {
+  message: 'Code et clé d\'accès organisation requis ensemble',
+  path: ['organizationJoinKey'],
 });
 
 const roleOptions = [
@@ -41,9 +50,11 @@ export const RegisterPage = () => {
   const [otp, setOtp] = useState('');
   const [verifying, setVerifying] = useState(false);
   const navigate = useNavigate();
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<RegisterForm>({
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
   });
+
+  const selectedRole = watch('role');
 
   const onSubmit = async (data: RegisterForm) => {
     try {
@@ -179,6 +190,32 @@ export const RegisterPage = () => {
             error={errors.role?.message}
             options={roleOptions}
           />
+
+          {selectedRole === 'CLIENT_ADHERENT' && (
+            <div className="border border-blue-200 dark:border-blue-800 rounded-lg p-3 bg-blue-50 dark:bg-blue-900/20">
+              <p className="text-xs font-semibold text-blue-900 dark:text-blue-200 mb-2">
+                🔐 Accès Organisation (optionnel)
+              </p>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+                Si vous appartenez à une organisation (ATB Bank, etc.), entrez le code et la clé d'accès fournis par votre organisation.
+              </p>
+              <Input
+                label="Code Organisation"
+                type="text"
+                {...register('organizationCode')}
+                error={errors.organizationCode?.message}
+                placeholder="Ex: ATB"
+              />
+              <Input
+                label="Clé d'accès Organisation"
+                type="password"
+                autoComplete="new-password"
+                {...register('organizationJoinKey')}
+                error={errors.organizationJoinKey?.message}
+                placeholder="Ex: Alpha-Bravo-12345678"
+              />
+            </div>
+          )}
 
           <Input
             label="Mot de passe"

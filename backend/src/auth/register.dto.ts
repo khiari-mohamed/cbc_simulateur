@@ -26,6 +26,18 @@ export class RegisterDto {
   phone?: string;
 
   @IsOptional()
+  @IsString()
+  organizationCode?: string;
+
+  @IsOptional()
+  @IsString()
+  organizationJoinKey?: string;
+
+  @IsOptional()
+  @IsString()
+  organizationId?: string;
+
+  @IsOptional()
   @IsEnum(Role, { message: 'Invalid role' })
   role?: Role;
 }

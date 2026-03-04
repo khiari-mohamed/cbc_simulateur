@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { InternalNotificationsService } from '../notifications/internal-notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class DocumentsService {
   constructor(
     private prisma: PrismaService,
-    private internalNotificationsService: InternalNotificationsService,
+    private notificationsService: NotificationsService,
     private jwtService: JwtService,
   ) {}
 
@@ -19,11 +19,14 @@ export class DocumentsService {
     console.log(`  QuoteId: ${quoteId || 'N/A'}`);
     console.log(`  UserId: ${userId || 'N/A'}`);
 
-    // Allow same file for different document types, but replace if same type
-    // Check if document of this type already exists for this quote/user
+    if (!userId) {
+      throw new Error('userId is required for document upload');
+    }
+
+    // Documents are linked to USER, not quote - this allows sharing across all user's quotes
     const existingDoc = await this.prisma.document.findFirst({
       where: {
-        ...(quoteId ? { quoteId } : { userId }),
+        userId,
         type,
       },
     });
@@ -41,9 +44,9 @@ export class DocumentsService {
       console.log(`  ✅ Document REPLACED: ID=${document.id}`);
     } else {
       console.log(`  ✅ No existing document for type ${type} - CREATING NEW`);
-      // Create new document
+      // Create new document linked to USER (not quote)
       document = await this.prisma.document.create({
-        data: { quoteId, userId, type, fileName, filePath },
+        data: { userId, type, fileName, filePath },
       });
       console.log(`  ✅ Document CREATED: ID=${document.id}`);
     }
@@ -55,6 +58,7 @@ export class DocumentsService {
     console.log(`     FilePath: ${document.filePath}`);
     console.log('');
 
+    // Notify staff about document upload
     if (quoteId) {
       const quote = await this.prisma.quote.findUnique({
         where: { id: quoteId },
@@ -62,11 +66,14 @@ export class DocumentsService {
       });
       
       if (quote) {
-        this.internalNotificationsService.notifyDocumentUploaded(
-          quote.quoteNumber,
+        const staffUsers = await this.prisma.user.findMany({
+          where: { role: { in: ['ADMINISTRATEUR_ARS', 'GESTIONNAIRE_VALIDATION_ARS'] } },
+        });
+        this.notificationsService.notifyDocumentUploaded(
+          staffUsers,
           `${quote.user.firstName} ${quote.user.lastName}`,
-          type,
-        ).catch(err => console.error('Failed to send internal notification:', err.message));
+          quote.quoteNumber,
+        ).catch(err => console.error('Failed to send notification:', err.message));
       }
     }
 
@@ -74,7 +81,18 @@ export class DocumentsService {
   }
 
   async findByQuote(quoteId: string) {
-    return this.prisma.document.findMany({ where: { quoteId } });
+    // Get the quote to find the userId
+    const quote = await this.prisma.quote.findUnique({ 
+      where: { id: quoteId },
+      select: { userId: true }
+    });
+    
+    if (!quote) {
+      return [];
+    }
+    
+    // Return all documents for this user (shared across all their quotes)
+    return this.prisma.document.findMany({ where: { userId: quote.userId } });
   }
 
   async findByUser(userId: string) {
@@ -119,10 +137,7 @@ export class DocumentsService {
     if (!document) throw new Error('Document not found');
     
     // Verify user owns this document
-    if (document.quoteId) {
-      const quote = await this.prisma.quote.findUnique({ where: { id: document.quoteId } });
-      if (!quote || quote.userId !== userId) throw new Error('Unauthorized');
-    } else if (document.userId && document.userId !== userId) {
+    if (document.userId !== userId) {
       throw new Error('Unauthorized');
     }
     
@@ -134,28 +149,12 @@ export class DocumentsService {
     const document = await this.prisma.document.findUnique({
       where: { id },
       include: {
-        quote: {
-          include: { user: true },
-        },
+        user: true,
       },
     });
 
     if (!document) throw new Error('Document not found');
-    if (!document.quote) throw new Error('Quote not found for document');
-
-    // Internal notification to admin about document rejection
-    const admins = await this.prisma.user.findMany({
-      where: { role: 'ADMINISTRATEUR_ARS', isActive: true },
-    });
-    
-    for (const admin of admins) {
-      this.internalNotificationsService.notifyDocumentRejected(
-        admin.id,
-        document.quote.quoteNumber,
-        document.type,
-        reason,
-      ).catch(err => console.error('Failed to send internal notification:', err.message));
-    }
+    if (!document.user) throw new Error('User not found for document');
 
     return { success: true };
   }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Download, Calendar, Building2, GitCompare, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, Download, Calendar, Building2, GitCompare, ChevronLeft, ChevronRight, History } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useLanguage } from '../../contexts/LanguageContext';
 import api from '../../lib/api/client';
@@ -16,18 +16,36 @@ export const QuotesPage = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedCV, setSelectedCV] = useState<string>('');
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const itemsPerPage = 20;
 
   const { data: quotes, isLoading } = useQuery({
     queryKey: ['quotes'],
     queryFn: async () => {
       const { data } = await api.get('/quotes');
-      return data;
+      // Group quotes by simulationId to detect if any quote from same simulation is already transformed
+      const quotesWithSimulationStatus = data.map((quote: any) => {
+        const hasSiblingContract = data.some(
+          (q: any) => 
+            q.simulationId === quote.simulationId && 
+            q.id !== quote.id && 
+            q.status === QuoteStatus.TRANSFORMED_TO_CONTRACT
+        );
+        return { ...quote, hasSiblingContract };
+      });
+      return quotesWithSimulationStatus;
     },
   });
 
-  // Filter quotes by date range and CV
+  const transformedQuotes = quotes?.filter((q: any) => q.status === QuoteStatus.TRANSFORMED_TO_CONTRACT) || [];
+
+  // Filter quotes by date range and CV and exclude TRANSFORMED_TO_CONTRACT
   const filteredQuotes = quotes?.filter((quote: any) => {
+    // Exclude quotes that have been transformed to contracts
+    if (quote.status === QuoteStatus.TRANSFORMED_TO_CONTRACT) {
+      return false;
+    }
+    
     // Date filter
     let dateMatch = true;
     if (startDate || endDate) {
@@ -147,12 +165,24 @@ export const QuotesPage = () => {
               {t('quotes.subtitle')}
             </p>
           </div>
-          {selectedQuotes.length > 0 && (
-            <Button onClick={handleCompare} className="flex items-center gap-2 w-full sm:w-auto">
-              <GitCompare className="w-5 h-5" />
-              {t('quotes.compare')} ({selectedQuotes.length})
-            </Button>
-          )}
+          <div className="flex gap-2">
+            {transformedQuotes.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setShowHistoryModal(true)}
+                className="flex items-center gap-2"
+              >
+                <History className="w-5 h-5" />
+                Historique ({transformedQuotes.length})
+              </Button>
+            )}
+            {selectedQuotes.length > 0 && (
+              <Button onClick={handleCompare} className="flex items-center gap-2 w-full sm:w-auto">
+                <GitCompare className="w-5 h-5" />
+                {t('quotes.compare')} ({selectedQuotes.length})
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Filters */}
@@ -251,7 +281,7 @@ export const QuotesPage = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                            Devis N° {quote.quoteNumber}
+                            Devis N° {quote.displayNumber ? `DEVIS-${String(quote.displayNumber).padStart(5, '0')}` : quote.quoteNumber}
                           </h3>
                           {getStatusBadge(quote.status)}
                         </div>
@@ -267,6 +297,9 @@ export const QuotesPage = () => {
                         </div>
                         {quote.simulation?.vehicle && (
                           <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mt-2">
+                            {quote.simulation.vehicle.registration && (
+                              <span className="font-semibold text-blue-600 dark:text-blue-400">Immat: {quote.simulation.vehicle.registration}</span>
+                            )}
                             <span>VN: {quote.simulation.vehicle.newValue.toLocaleString()} DT</span>
                             <span>VV: {quote.simulation.vehicle.marketValue.toLocaleString()} DT</span>
                             <span>CV: {quote.simulation.vehicle.fiscalHorsepower}</span>
@@ -367,17 +400,39 @@ export const QuotesPage = () => {
                       </div>
                     )}
 
+                    {quote.effectiveDate && (quote.status === QuoteStatus.VALIDATED || quote.status === QuoteStatus.SUBMITTED) && (
+                      <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                        <p className="text-xs font-medium text-green-900 dark:text-green-100 mb-1">
+                          📅 Date d'effet du contrat :
+                        </p>
+                        <p className="text-sm font-semibold text-green-800 dark:text-green-200">
+                          {new Date(quote.effectiveDate).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
+                        <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                          {quote.status === QuoteStatus.SUBMITTED ? 'En attente de validation gestionnaire' : 'Date validée par le gestionnaire'}
+                        </p>
+                      </div>
+                    )}
+
                     {quote.status === QuoteStatus.VALIDATED && (
                       <div className="mt-4">
-                        <Button
-                          onClick={() => navigate(`/quotes/${quote.id}/checkout`)}
-                          className="w-full bg-green-600 hover:bg-green-700 flex items-center justify-center gap-2"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                          </svg>
-                          Acheter ce devis
-                        </Button>
+                        {quote.hasSiblingContract ? (
+                          <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                            <p className="text-sm text-orange-800 dark:text-orange-200">
+                              ⚠️ Un autre devis de cette simulation a déjà été transformé en contrat. Vous ne pouvez pas acheter ce devis.
+                            </p>
+                          </div>
+                        ) : (
+                          <Button
+                            onClick={() => navigate(`/quotes/${quote.id}/checkout`)}
+                            className="w-full bg-green-600 hover:bg-green-700 flex items-center justify-center gap-2"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                            </svg>
+                            Acheter ce devis
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -429,6 +484,78 @@ export const QuotesPage = () => {
             <Button onClick={() => navigate('/simulations/new')} className="mx-auto">
               {t('simulations.create')}
             </Button>
+          </div>
+        )}
+
+        {/* History Modal */}
+        {showHistoryModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <History className="w-6 h-6" />
+                  Historique - Devis transformés en contrats
+                </h2>
+                <button
+                  onClick={() => setShowHistoryModal(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="space-y-4">
+                  {transformedQuotes.map((quote: any) => (
+                    <div
+                      key={quote.id}
+                      className="bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 p-4"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                              Devis N° {quote.displayNumber ? `DEVIS-${String(quote.displayNumber).padStart(5, '0')}` : quote.quoteNumber}
+                            </h3>
+                            {getStatusBadge(quote.status)}
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                            <span className="flex items-center gap-1">
+                              <Building2 className="w-4 h-4" />
+                              {quote.company.name}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              {new Date(quote.createdAt).toLocaleDateString('fr-FR')}
+                            </span>
+                          </div>
+                          {quote.simulation?.vehicle && (
+                            <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mt-2">
+                              {quote.simulation.vehicle.registration && (
+                                <span className="font-semibold">Immat: {quote.simulation.vehicle.registration}</span>
+                              )}
+                              <span>VN: {quote.simulation.vehicle.newValue.toLocaleString()} DT</span>
+                              <span>VV: {quote.simulation.vehicle.marketValue.toLocaleString()} DT</span>
+                              <span>CV: {quote.simulation.vehicle.fiscalHorsepower}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total TTC</p>
+                          <p className="text-xl font-bold text-gray-600 dark:text-gray-400">
+                            {quote.totalAPayer.toLocaleString()} DT
+                          </p>
+                        </div>
+                      </div>
+                      <div className="pt-3 border-t border-gray-300 dark:border-gray-600">
+                        <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                          ✓ Ce devis a été transformé en contrat
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
     </div>

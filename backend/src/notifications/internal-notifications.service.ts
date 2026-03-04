@@ -206,4 +206,35 @@ export class InternalNotificationsService {
 
     return { count };
   }
+
+  async markAsRead(notificationId: string, userId: string) {
+    await this.prisma.notification.update({
+      where: { id: notificationId, userId },
+      data: { status: 'SENT' as const },
+    });
+    return { success: true };
+  }
+
+  async markAllAsRead(userId: string) {
+    const internalTypes = Object.values(InternalNotificationType);
+    await this.prisma.notification.updateMany({
+      where: { userId, type: { in: internalTypes }, status: 'PENDING' as const },
+      data: { status: 'SENT' as const },
+    });
+    return { success: true };
+  }
+
+  async deleteNotification(notificationId: string, userId: string) {
+    await this.prisma.notification.delete({
+      where: { id: notificationId, userId },
+    });
+    return { success: true };
+  }
+
+  async bulkDeleteNotifications(notificationIds: string[], userId: string) {
+    await this.prisma.notification.deleteMany({
+      where: { id: { in: notificationIds }, userId },
+    });
+    return { success: true };
+  }
 }

@@ -125,12 +125,8 @@ export class DocumentsController {
     
     const document = await this.documentsService.findById(id);
     
-    if (document.quoteId) {
-      const quote = await this.documentsService.findQuoteById(document.quoteId);
-      if (quote.userId !== userId && userRole !== 'ADMINISTRATEUR_ARS' && userRole !== 'GESTIONNAIRE_VALIDATION_ARS') {
-        throw new BadRequestException('Unauthorized access to document');
-      }
-    } else if (document.userId && document.userId !== userId && userRole !== 'ADMINISTRATEUR_ARS') {
+    // Check if user owns this document or is staff
+    if (document.userId !== userId && userRole !== 'ADMINISTRATEUR_ARS' && userRole !== 'GESTIONNAIRE_VALIDATION_ARS') {
       throw new BadRequestException('Unauthorized access to document');
     }
     

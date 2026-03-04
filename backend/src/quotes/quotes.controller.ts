@@ -60,8 +60,9 @@ export class QuotesController {
   }
 
   @Post(':id/submit')
-  submit(@Param('id') id: string, @Request() req: any) {
-    return this.quotesService.submit(id, req.user.id);
+  submit(@Param('id') id: string, @Body() body: { effectiveDate?: string }, @Request() req: any) {
+    const effectiveDate = body.effectiveDate ? new Date(body.effectiveDate) : undefined;
+    return this.quotesService.submit(id, req.user.id, effectiveDate);
   }
 
   @Post(':id/validate')

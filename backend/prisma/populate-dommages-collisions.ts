@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function populateDommagesCollisions() {
-  console.log('🔧 Populating DOMMAGES_COLLISIONS Tiered Rates\n');
+  console.log('🔧 Populating DOMMAGES_COLLISIONS Tiered Rates (PRIVATE_BUSINESS)\n');
 
   const dcGuarantee = await prisma.guarantee.findUnique({ where: { code: 'DOMMAGES_COLLISIONS' } });
   const companies = await prisma.company.findMany();
@@ -13,7 +13,15 @@ async function populateDommagesCollisions() {
     return;
   }
 
-  // Client spec: Tiered rates for DOMMAGES_COLLISIONS
+  // Delete existing PRIVATE_BUSINESS rules
+  await prisma.pricingRule.deleteMany({
+    where: {
+      guaranteeId: dcGuarantee.id,
+      usageType: 'PRIVATE_BUSINESS'
+    }
+  });
+
+  // Client spec: Tiered rates for DOMMAGES_COLLISIONS (Promenade et Affaire)
   // Tier 1 (0-10%): 6.7%
   // Tier 2 (10-20%): 6.3%
   // Tier 3 (20-30%): 5.8%
@@ -35,6 +43,7 @@ async function populateDommagesCollisions() {
       data: {
         companyId: company.id,
         guaranteeId: dcGuarantee.id,
+        usageType: 'PRIVATE_BUSINESS',
         basePremium: 10,
         isActive: true
       }
@@ -47,6 +56,7 @@ async function populateDommagesCollisions() {
         data: {
           companyId: company.id,
           guaranteeId: dcGuarantee.id,
+          usageType: 'PRIVATE_BUSINESS',
           tierLevel: tier.level,
           tierRate: tier.rate,
           isActive: true
@@ -56,7 +66,7 @@ async function populateDommagesCollisions() {
     console.log(`   ✅ ${company.name}: 5 tiered rates added`);
   }
 
-  console.log('\n✅ DOMMAGES_COLLISIONS fully configured!');
+  console.log('\n✅ DOMMAGES_COLLISIONS PRIVATE_BUSINESS fully configured!');
   await prisma.$disconnect();
 }
 

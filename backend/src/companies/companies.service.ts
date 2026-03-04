@@ -13,10 +13,6 @@ export class CompaniesService {
     return this.prisma.company.findMany({
       where: includeInactive ? {} : { isActive: true },
       include: {
-        conventions: {
-          where: { isActive: true },
-          select: { id: true, name: true },
-        },
         _count: {
           select: {
             pricingRules: true,
@@ -32,7 +28,6 @@ export class CompaniesService {
     const company = await this.prisma.company.findUnique({
       where: { id },
       include: {
-        conventions: { where: { isActive: true } },
         pricingRules: {
           where: { isActive: true },
           include: { guarantee: true },
@@ -154,11 +149,12 @@ export class CompaniesService {
   async findByConvention(conventionId: string, includeInactive = false) {
     const convention = await this.prisma.convention.findUnique({
       where: { id: conventionId },
-      include: { company: true },
+      include: { organization: true },
     });
     if (!convention) {
       throw new NotFoundException('Convention not found');
     }
-    return [convention.company];
+    // Return all active companies since conventions are now organization-level
+    return this.findAll(includeInactive);
   }
 }

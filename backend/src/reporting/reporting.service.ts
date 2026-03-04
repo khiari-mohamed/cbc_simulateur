@@ -181,7 +181,7 @@ export class ReportingService {
       },
       include: {
         convention: {
-          include: { company: true },
+          include: { organization: true },
         },
         quotes: {
           where: { status: QuoteStatus.TRANSFORMED_TO_CONTRACT },
@@ -197,7 +197,7 @@ export class ReportingService {
         acc[key] = {
           conventionId: sim.conventionId,
           conventionName: sim.convention.name,
-          companyName: sim.convention.company.name,
+          organizationName: sim.convention.organization.name,
           totalSimulations: 0,
           totalContracts: 0,
           totalPremium: 0,
@@ -207,8 +207,8 @@ export class ReportingService {
 
       acc[key].totalSimulations++;
       acc[key].totalContracts += sim.quotes.length;
-      acc[key].totalPremium += sim.quotes.reduce((sum, q) => sum + Number(q.primeNette), 0);
-      acc[key].quotes.push(...sim.quotes.map(q => ({
+      acc[key].totalPremium += sim.quotes.reduce((sum: number, q: any) => sum + Number(q.primeNette), 0);
+      acc[key].quotes.push(...sim.quotes.map((q: any) => ({
         quoteNumber: q.quoteNumber,
         primeNette: Number(q.primeNette),
         totalAPayer: Number(q.totalAPayer),

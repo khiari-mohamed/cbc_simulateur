@@ -143,15 +143,19 @@ export const SimulationsPage = () => {
                 {simulation.quotes && simulation.quotes.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                      Meilleur devis
+                      Devis générés
                     </p>
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {simulation.quotes[0].company.name}
-                      </span>
-                      <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                        {simulation.quotes[0].totalAPayer.toLocaleString()} DT
-                      </span>
+                    <div className="space-y-2">
+                      {simulation.quotes.map((quote: any) => (
+                        <div key={quote.id} className="flex justify-between items-center">
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {quote.company.name}
+                          </span>
+                          <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                            {quote.totalAPayer.toLocaleString()} DT
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

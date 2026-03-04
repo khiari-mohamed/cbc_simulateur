@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { PrismaService } from '../prisma/prisma.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { FormulaType, UsageType, SimulationStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -11,6 +12,7 @@ export class SimulationsService {
     private prisma: PrismaService,
     private vehiclesService: VehiclesService,
     private auditService: AuditService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async create(userId: string, data: {
@@ -43,7 +45,7 @@ export class SimulationsService {
         bonusMalus: new Decimal(data.bonusMalus),
         usage: data.usage,
         formulaType: data.formulaType,
-        franchiseRate: data.franchiseRate ? new Decimal(data.franchiseRate) : null,
+        franchiseRate: data.franchiseRate ?? null,
         bgLimit: data.bgLimit,
         dcCapital: data.dcCapital ? new Decimal(data.dcCapital) : null,
       },
@@ -72,10 +74,11 @@ export class SimulationsService {
       where: { userId },
       include: {
         vehicle: true,
-        convention: { include: { company: true } },
+        convention: { include: { organization: true } },
         guarantees: { include: { guarantee: true } },
         quotes: {
           select: { id: true, quoteNumber: true, status: true, totalAPayer: true, company: { select: { name: true } } },
+          orderBy: { totalAPayer: 'asc' },
         },
         _count: { select: { quotes: true } },
       },
@@ -89,7 +92,7 @@ export class SimulationsService {
       include: {
         vehicle: true,
         user: { select: { id: true, email: true, firstName: true, lastName: true } },
-        convention: { include: { company: true } },
+        convention: { include: { organization: true } },
         guarantees: { include: { guarantee: true } },
         quotes: {
           include: { company: true },
@@ -126,7 +129,7 @@ export class SimulationsService {
     }
 
     // Validate formula change with vehicle age
-    if (data.formulaType) {
+    if (data.formulaType && simulation.vehicle) {
       const vehicleAge = this.vehiclesService.calculateVehicleAge(simulation.vehicle.firstCirculationDate);
       if (data.formulaType === FormulaType.TOUS_RISQUES_0 && vehicleAge >= 2) {
         throw new BadRequestException('Tous Risques 0% is only available for vehicles less than 2 years old');
@@ -136,17 +139,18 @@ export class SimulationsService {
       }
     }
 
+    const updateData: any = {};
+    if (data.bonusMalus !== undefined) updateData.bonusMalus = new Decimal(data.bonusMalus);
+    if (data.usage !== undefined) updateData.usage = data.usage;
+    if (data.formulaType !== undefined) updateData.formulaType = data.formulaType;
+    if (data.conventionId !== undefined) updateData.conventionId = data.conventionId;
+    if (data.franchiseRate !== undefined) updateData.franchiseRate = data.franchiseRate ?? null;
+    if (data.bgLimit !== undefined) updateData.bgLimit = data.bgLimit;
+    if (data.dcCapital !== undefined) updateData.dcCapital = data.dcCapital ? new Decimal(data.dcCapital) : null;
+
     const updated = await this.prisma.simulation.update({
       where: { id },
-      data: {
-        ...(data.bonusMalus && { bonusMalus: new Decimal(data.bonusMalus) }),
-        ...(data.usage && { usage: data.usage }),
-        ...(data.formulaType && { formulaType: data.formulaType }),
-        ...(data.conventionId !== undefined && { conventionId: data.conventionId }),
-        ...(data.franchiseRate !== undefined && { franchiseRate: data.franchiseRate ? new Decimal(data.franchiseRate) : null }),
-        ...(data.bgLimit !== undefined && { bgLimit: data.bgLimit }),
-        ...(data.dcCapital !== undefined && { dcCapital: data.dcCapital ? new Decimal(data.dcCapital) : null }),
-      },
+      data: updateData,
     });
 
     if (data.selectedGuarantees) {
@@ -192,6 +196,9 @@ export class SimulationsService {
       throw new BadRequestException('Cannot recalculate submitted simulation');
     }
 
+    if (!simulation.vehicle) {
+      throw new BadRequestException('Vehicle data not found');
+    }
     const vehicleAge = this.vehiclesService.calculateVehicleAge(simulation.vehicle.firstCirculationDate);
     
     // Validate age restrictions
@@ -230,6 +237,54 @@ export class SimulationsService {
       data: { status: SimulationStatus.SUBMITTED },
     });
 
+    // Submit all quotes associated with this simulation and send notifications
+    if (simulation.quotes && simulation.quotes.length > 0) {
+      await this.prisma.quote.updateMany({
+        where: { 
+          simulationId: id,
+          status: 'GENERATED'
+        },
+        data: { status: 'SUBMITTED' },
+      });
+
+      // Send notifications for each quote
+      for (const quote of simulation.quotes) {
+        // Notify client (non-blocking)
+        this.notificationsService.notifyQuoteSubmitted(
+          simulation.user,
+          quote.quoteNumber,
+        ).catch(err => console.error('Failed to notify client:', err.message));
+      }
+
+      // Notify gestionnaires AND admins (non-blocking)
+      this.prisma.user.findMany({
+        where: { 
+          role: { 
+            in: ['ADMINISTRATEUR_ARS', 'GESTIONNAIRE_VALIDATION_ARS'] 
+          } 
+        },
+      }).then(staffUsers => {
+        if (simulation.quotes) {
+          for (const quote of simulation.quotes) {
+            this.notificationsService.notifyAdminNewQuote(
+              staffUsers,
+              `${simulation.user.firstName} ${simulation.user.lastName}`,
+              quote.quoteNumber,
+            ).catch(err => console.error('Failed to notify staff:', err.message));
+          }
+        }
+      });
+
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@ars.com';
+      for (const quote of simulation.quotes) {
+        this.notificationsService.sendQuoteSubmitted(
+          adminEmail,
+          quote.quoteNumber,
+          `${simulation.user.firstName} ${simulation.user.lastName}`,
+        ).catch(err => console.error('Failed to send email:', err.message));
+      }
+    }
+
     await this.auditService.log(
       userId,
       'SIMULATION_SUBMITTED',
@@ -249,7 +304,7 @@ export class SimulationsService {
       throw new ForbiddenException('You can only delete your own simulations');
     }
 
-    if (simulation.quotes.length > 0) {
+    if (simulation.quotes && simulation.quotes.length > 0) {
       throw new BadRequestException('Cannot delete simulation with generated quotes');
     }
 

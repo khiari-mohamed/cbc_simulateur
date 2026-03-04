@@ -43,9 +43,12 @@ export const ConfirmationStep = ({ simulationId, onBack }: ConfirmationStepProps
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      if (!simulation?.quotes?.[0]?.id) throw new Error('No quote found');
-      const { data } = await api.post(`/quotes/${simulation.quotes[0].id}/submit`);
-      return data;
+      if (!simulation?.quotes || simulation.quotes.length === 0) throw new Error('No quotes found');
+      // Submit all quotes
+      const promises = simulation.quotes.map((quote: any) => 
+        api.post(`/quotes/${quote.id}/submit`)
+      );
+      await Promise.all(promises);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
@@ -122,19 +125,6 @@ export const ConfirmationStep = ({ simulationId, onBack }: ConfirmationStepProps
         </div>
       </div>
 
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-        <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-          📋 Prochaines étapes
-        </h3>
-        <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-2 list-decimal list-inside">
-          <li>Téléchargez et vérifiez vos devis</li>
-          <li>Cliquez sur "Confirmer et soumettre"</li>
-          <li>L'équipe ARS recevra une notification automatique</li>
-          <li>Vous serez contacté pour les pièces justificatives</li>
-          <li>Après validation, votre devis devient un contrat</li>
-        </ol>
-      </div>
-
       {simulation?.quotes && simulation.quotes.length > 0 && (
         <>
           {pdfUrl && (
@@ -168,10 +158,13 @@ export const ConfirmationStep = ({ simulationId, onBack }: ConfirmationStepProps
                     {quote.company.name}
                   </h4>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    N° {quote.quoteNumber}
+                    N° {quote.displayNumber ? `DEVIS-${String(quote.displayNumber).padStart(5, '0')}` : quote.quoteNumber}
                   </p>
                   {simulation.vehicle && (
                     <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {simulation.vehicle.registration && (
+                        <span className="font-semibold text-blue-600 dark:text-blue-400">Immat: {simulation.vehicle.registration}</span>
+                      )}
                       <span>VN: {simulation.vehicle.newValue.toLocaleString()} DT</span>
                       <span>VV: {simulation.vehicle.marketValue.toLocaleString()} DT</span>
                       <span>CV: {simulation.vehicle.fiscalHorsepower}</span>

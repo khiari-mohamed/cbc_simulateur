@@ -60,7 +60,7 @@ export class FlouciService {
     });
   }
 
-  async createPaymentOrder(quoteId: string, deliveryType: string, userId: string) {
+  async createPaymentOrder(quoteId: string, deliveryType: string, userId: string, effectiveDate?: string) {
     if (!this.flouciAppToken || !this.flouciAppSecret) {
       throw new BadRequestException('Payment gateway not configured');
     }
@@ -104,6 +104,7 @@ export class FlouciService {
     await this.prisma.quote.update({
       where: { id: quoteId },
       data: {
+        effectiveDate: effectiveDate ? new Date(effectiveDate) : null,
         pricingSnapshot: {
           ...(quote.pricingSnapshot as any),
           paymentId: payment.id,
@@ -117,7 +118,7 @@ export class FlouciService {
     const flouciRequest: FlouciPaymentRequest = {
       app_token: this.flouciAppToken,
       app_secret: this.flouciAppSecret,
-      amount: Math.round(totalAmount * 1000), // Flouci uses millimes
+      amount: Math.round(totalAmount * 1000), // Flouci uses millimes (max 9999999)
       accept_card: 'true',
       session_timeout_secs: 1200,
       success_link: `${this.config.get('FRONTEND_URL')}/payment/success?paymentId=${payment.id}&quoteId=${quoteId}`,
@@ -125,11 +126,18 @@ export class FlouciService {
       developer_tracking_id: orderId,
     };
 
+    // Validate amount doesn't exceed Flouci limit
+    if (flouciRequest.amount > 9999999) {
+      throw new BadRequestException(`Le montant ${totalAmount} DT dépasse la limite de Flouci (9999.999 DT)`);
+    }
+
     try {
       const response = await this.axiosInstance.post<FlouciPaymentResponse>(
         '/generate_payment',
         flouciRequest,
       );
+
+      console.log('✅ Flouci API Response:', response.data);
 
       if (!response.data?.result?.link) {
         throw new InternalServerErrorException('Invalid Flouci API response');
@@ -158,6 +166,8 @@ export class FlouciService {
         orderId,
       };
     } catch (error: any) {
+      console.error('❌ Flouci API Error:', error.response?.data || error.message);
+      
       await this.auditService.log(
         userId,
         'PAYMENT_FAILED',
@@ -207,7 +217,7 @@ export class FlouciService {
 
       const quote = await this.prisma.quote.findUnique({
         where: { id: payment.quoteId },
-        include: { user: true, company: true },
+        include: { user: true, company: true, simulation: true },
       });
 
       if (quote) {
@@ -237,6 +247,21 @@ export class FlouciService {
           where: { id: quote.id },
           data: { status: 'TRANSFORMED_TO_CONTRACT' },
         });
+
+        // Reject all other quotes from the same simulation
+        if (quote.simulationId) {
+          await this.prisma.quote.updateMany({
+            where: {
+              simulationId: quote.simulationId,
+              id: { not: quote.id },
+              status: { in: ['GENERATED', 'SUBMITTED', 'VALIDATED'] },
+            },
+            data: {
+              status: 'REJECTED',
+              rejectionReason: 'Un autre devis de cette simulation a été transformé en contrat.',
+            },
+          });
+        }
 
         await this.notificationsService.notifyContractCreated(
           quote.user.email,
@@ -298,5 +323,12 @@ export class FlouciService {
       console.error('Failed to verify payment with Flouci:', error.message);
       return false;
     }
+  }
+
+  async getPaymentsByQuote(quoteId: string) {
+    return this.prisma.payment.findMany({
+      where: { quoteId },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 }

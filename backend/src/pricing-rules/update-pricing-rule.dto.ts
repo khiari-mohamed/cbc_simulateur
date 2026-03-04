@@ -18,6 +18,22 @@ export class UpdatePricingRuleDto {
   reductionRate?: number;
 
   @IsOptional()
+  @IsNumber()
+  ratePercentage?: number;
+
+  @IsOptional()
+  @IsNumber()
+  minCapital?: number;
+
+  @IsOptional()
+  @IsNumber()
+  maxCapital?: number;
+
+  @IsOptional()
+  @IsNumber()
+  franchiseRate?: number;
+
+  @IsOptional()
   @IsDateString()
   validTo?: Date;
 }

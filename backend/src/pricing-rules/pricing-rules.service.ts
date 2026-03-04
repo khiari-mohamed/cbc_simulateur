@@ -66,6 +66,10 @@ export class PricingRulesService {
       fixedPremium?: number;
       multiplier?: number;
       reductionRate?: number;
+      ratePercentage?: number;
+      franchiseRate?: number;
+      minCapital?: number;
+      maxCapital?: number;
       usageType?: UsageType;
       validFrom?: Date;
       validTo?: Date;
@@ -82,10 +86,14 @@ export class PricingRulesService {
         maxPower: data.maxPower,
         minAge: data.minAge,
         maxAge: data.maxAge,
-        baseRate: data.baseRate ? new Decimal(data.baseRate) : null,
-        fixedPremium: data.fixedPremium ? new Decimal(data.fixedPremium) : null,
-        multiplier: data.multiplier ? new Decimal(data.multiplier) : null,
-        reductionRate: data.reductionRate ? new Decimal(data.reductionRate) : null,
+        baseRate: data.baseRate !== undefined ? new Decimal(data.baseRate) : null,
+        fixedPremium: data.fixedPremium !== undefined ? new Decimal(data.fixedPremium) : null,
+        multiplier: data.multiplier !== undefined ? new Decimal(data.multiplier) : null,
+        reductionRate: data.reductionRate !== undefined ? new Decimal(data.reductionRate) : null,
+        ratePercentage: data.ratePercentage !== undefined ? new Decimal(data.ratePercentage) : null,
+        franchiseRate: data.franchiseRate,
+        minCapital: data.minCapital !== undefined ? new Decimal(data.minCapital) : null,
+        maxCapital: data.maxCapital !== undefined ? new Decimal(data.maxCapital) : null,
         usageType: data.usageType,
         validFrom: data.validFrom || new Date(),
         validTo: data.validTo,
@@ -112,10 +120,14 @@ export class PricingRulesService {
   async update(
     id: string,
     data: {
+      ratePercentage?: number;
       baseRate?: number;
       fixedPremium?: number;
       multiplier?: number;
       reductionRate?: number;
+      minCapital?: number;
+      maxCapital?: number;
+      franchiseRate?: number;
       validTo?: Date;
     },
     userId: string,
@@ -125,10 +137,14 @@ export class PricingRulesService {
     const updated = await this.prisma.pricingRule.update({
       where: { id },
       data: {
+        ...(data.ratePercentage !== undefined && { ratePercentage: new Decimal(data.ratePercentage) }),
         ...(data.baseRate !== undefined && { baseRate: new Decimal(data.baseRate) }),
         ...(data.fixedPremium !== undefined && { fixedPremium: new Decimal(data.fixedPremium) }),
         ...(data.multiplier !== undefined && { multiplier: new Decimal(data.multiplier) }),
         ...(data.reductionRate !== undefined && { reductionRate: new Decimal(data.reductionRate) }),
+        ...(data.minCapital !== undefined && { minCapital: new Decimal(data.minCapital) }),
+        ...(data.maxCapital !== undefined && { maxCapital: new Decimal(data.maxCapital) }),
+        ...(data.franchiseRate !== undefined && { franchiseRate: data.franchiseRate }),
         ...(data.validTo !== undefined && { validTo: data.validTo }),
       },
       include: {
@@ -143,8 +159,8 @@ export class PricingRulesService {
       'PRICING_RULE_UPDATED',
       'PricingRule',
       id,
-      { baseRate: existing.baseRate, fixedPremium: existing.fixedPremium },
-      { baseRate: updated.baseRate, fixedPremium: updated.fixedPremium },
+      { ratePercentage: existing.ratePercentage, baseRate: existing.baseRate, fixedPremium: existing.fixedPremium, minCapital: existing.minCapital },
+      { ratePercentage: updated.ratePercentage, baseRate: updated.baseRate, fixedPremium: updated.fixedPremium, minCapital: updated.minCapital },
     );
 
     return updated;
@@ -196,7 +212,7 @@ export class PricingRulesService {
   }
 
   async getOptionalGuaranteesRules(companyId?: string) {
-    const optionalGuarantees = ['VOL', 'INCENDIE', 'TOUS_RISQUES_0', 'DOMMAGES_COLLISIONS'];
+    const optionalGuarantees = ['VOL', 'INCENDIE', 'TOUS_RISQUES_ZERO', 'DOMMAGES_COLLISIONS'];
     
     const guarantees = await this.prisma.guarantee.findMany({
       where: { code: { in: optionalGuarantees } },

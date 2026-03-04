@@ -85,6 +85,7 @@ export type Simulation = {
 export type Quote = {
   id: string;
   quoteNumber: string;
+  displayNumber?: number;
   simulationId: string;
   userId: string;
   companyId: string;

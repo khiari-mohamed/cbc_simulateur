@@ -25,11 +25,29 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
+    // Clean email (remove mailto: prefix if present)
+    dto.email = dto.email.replace(/^mailto:/, '');
+    
+    // Validate organization if provided
+    if (dto.organizationCode && dto.organizationJoinKey) {
+      const orgId = await this.validateOrganizationAccess(
+        dto.organizationCode,
+        dto.organizationJoinKey,
+      );
+      if (!orgId) {
+        throw new BadRequestException('Invalid organization code or join key');
+      }
+      dto.organizationId = orgId;
+    }
+
     const hashedPassword = await bcrypt.hash(dto.password, 10);
     const otp = this.generateOTP();
     
+    // Remove organizationCode and organizationJoinKey before passing to user service
+    const { organizationCode, organizationJoinKey, ...userDto } = dto;
+    
     const user = await this.usersService.create({
-      ...dto,
+      ...userDto,
       password: hashedPassword,
       otpSecret: otp,
       otpEnabled: true,
@@ -41,7 +59,7 @@ export class AuthService {
       'User',
       user.id,
       null,
-      { email: user.email, role: user.role },
+      { email: user.email, role: user.role, organizationId: user.organizationId },
     );
 
     // Send OTP for account verification
@@ -54,7 +72,22 @@ export class AuthService {
     return result;
   }
 
+  private async validateOrganizationAccess(code: string, joinKey: string): Promise<string | null> {
+    const org = await this.prisma.clientOrganization.findUnique({
+      where: { code, isActive: true },
+      select: { id: true, joinKey: true },
+    });
+
+    if (!org) return null;
+
+    const isValid = await bcrypt.compare(joinKey, org.joinKey);
+    return isValid ? org.id : null;
+  }
+
   async login(dto: LoginDto) {
+    // Clean email (remove mailto: prefix if present)
+    dto.email = dto.email.replace(/^mailto:/, '');
+    
     const user = await this.usersService.findByEmail(dto.email);
 
     if (!user || !(await bcrypt.compare(dto.password, user.password))) {

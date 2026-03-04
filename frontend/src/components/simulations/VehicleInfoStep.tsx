@@ -1,18 +1,22 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useEffect } from 'react';
 import { Input } from '../ui/Input';
-import { Car } from 'lucide-react';
+import { Select } from '../ui/Select';
+import { Car, User } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { VehicleData } from '../../pages/simulations/NewSimulationPage';
 
-const vehicleSchema = z.object({
+const combinedSchema = z.object({
   registration: z.string().optional(),
   fiscalHorsepower: z.coerce.number().int().min(1, 'Minimum 1 CV').max(50, 'Maximum 50 CV'),
   numberOfSeats: z.coerce.number().int().min(2, 'Minimum 2 places').max(50, 'Maximum 50 places'),
   newValue: z.coerce.number().min(0, 'Valeur requise'),
   marketValue: z.coerce.number().min(0, 'Valeur requise'),
   firstCirculationDate: z.string().min(1, 'Date requise'),
+  bonusMalus: z.coerce.number().int().min(1, 'Classe minimale 1').max(8, 'Classe maximale 8'),
+  usage: z.string().min(1, 'Usage requis'),
 }).refine(data => data.newValue >= data.marketValue, {
   message: 'La valeur à neuf doit être supérieure ou égale à la valeur vénale',
   path: ['newValue'],
@@ -23,20 +27,31 @@ const vehicleSchema = z.object({
 
 interface VehicleInfoStepProps {
   data?: VehicleData;
-  onUpdate: (data: VehicleData) => void;
+  driverData?: { bonusMalus?: number; usage?: string };
+  onUpdate: (data: VehicleData, driverData: { bonusMalus: number; usage: string }) => void;
   onNext: () => void;
 }
 
-export const VehicleInfoStep = ({ data, onUpdate, onNext }: VehicleInfoStepProps) => {
+export const VehicleInfoStep = ({ data, driverData, onUpdate, onNext }: VehicleInfoStepProps) => {
   const { t } = useLanguage();
   const { register, handleSubmit, formState: { errors }, watch } = useForm({
-    resolver: zodResolver(vehicleSchema) as any,
-    defaultValues: data,
+    resolver: zodResolver(combinedSchema) as any,
+    defaultValues: { ...data, ...driverData },
     mode: 'onChange',
   });
 
+  const watchedData = watch();
+
+  useEffect(() => {
+    const { bonusMalus, usage, ...vehicleData } = watchedData;
+    if (vehicleData.firstCirculationDate && vehicleData.fiscalHorsepower && vehicleData.numberOfSeats && vehicleData.newValue && vehicleData.marketValue && bonusMalus && usage) {
+      onUpdate(vehicleData as VehicleData, { bonusMalus: Number(bonusMalus), usage });
+    }
+  }, [watchedData.firstCirculationDate]);
+
   const onSubmit = (formData: any) => {
-    onUpdate(formData as VehicleData);
+    const { bonusMalus, usage, ...vehicleData } = formData;
+    onUpdate(vehicleData as VehicleData, { bonusMalus, usage });
     onNext();
   };
 
@@ -45,6 +60,7 @@ export const VehicleInfoStep = ({ data, onUpdate, onNext }: VehicleInfoStepProps
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {/* Vehicle Section */}
       <div className="flex items-center gap-3 mb-6">
         <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
           <Car className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -127,6 +143,54 @@ export const VehicleInfoStep = ({ data, onUpdate, onNext }: VehicleInfoStepProps
         <p className="text-sm text-blue-800 dark:text-blue-200">
           💡 {t('vehicle.tip')}
         </p>
+      </div>
+
+      {/* Driver Section */}
+      <div className="flex items-center gap-3 mb-6 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+          <User className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Profil du conducteur
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Informations sur l'utilisation et le bonus/malus
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Select
+            label="Classe Bonus/Malus"
+            {...register('bonusMalus')}
+            error={errors.bonusMalus?.message}
+            required
+            options={[
+              { value: '', label: 'Sélectionner une classe (1 à 8)' },
+              { value: '1', label: 'Classe 1' },
+              { value: '2', label: 'Classe 2' },
+              { value: '3', label: 'Classe 3' },
+              { value: '4', label: 'Classe 4' },
+              { value: '5', label: 'Classe 5' },
+              { value: '6', label: 'Classe 6' },
+              { value: '7', label: 'Classe 7' },
+              { value: '8', label: 'Classe 8' },
+            ]}
+          />
+        </div>
+
+        <Select
+          label="Type d'usage"
+          {...register('usage')}
+          error={errors.usage?.message}
+          required
+          options={[
+            { value: '', label: 'Sélectionner un usage' },
+            { value: 'PRIVATE_BUSINESS', label: 'Promenade et Affaires' },
+          ]}
+        />
       </div>
 
       <button

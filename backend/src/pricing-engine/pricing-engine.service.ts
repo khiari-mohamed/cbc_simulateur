@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { FormulaType, UsageType } from '@prisma/client';
+import { FormulaType, UsageType, ReductionMetric } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { ReductionRatesService } from './reduction-rates.service';
 
@@ -228,10 +228,10 @@ export class PricingEngineService {
     if (!company) throw new BadRequestException('Company not found');
     
     // Get all values from company settings - NO FALLBACKS
-    if (!company.contractFees) throw new BadRequestException('Contract fees not configured');
-    if (!company.fpac) throw new BadRequestException('FPAC not configured');
-    if (!company.fssr) throw new BadRequestException('FSSR not configured');
-    if (!company.fg) throw new BadRequestException('FG not configured');
+    if (company.contractFees === null) throw new BadRequestException('Contract fees not configured');
+    if (company.fpac === null) throw new BadRequestException('FPAC not configured');
+    if (company.fssr === null) throw new BadRequestException('FSSR not configured');
+    if (company.fg === null) throw new BadRequestException('FG not configured');
     
     const frais = new Decimal(company.contractFees);
     const fpac = new Decimal(company.fpac);
@@ -289,7 +289,7 @@ export class PricingEngineService {
 
   private validateBusinessRules(formulaType: FormulaType, vehicleAge: number, selectedGuarantees: string[]) {
     // Rule 1: DOMMAGES_COLLISIONS and TOUS_RISQUES_0 are mutually exclusive
-    if (formulaType === FormulaType.DOMMAGES_COLLISIONS && selectedGuarantees.includes('TOUS_RISQUES_0')) {
+    if (formulaType === FormulaType.DOMMAGES_COLLISIONS && selectedGuarantees.includes('TOUS_RISQUES_ZERO')) {
       throw new BadRequestException('Dommages Collision cannot be combined with Tous Risques');
     }
 
@@ -303,9 +303,9 @@ export class PricingEngineService {
       throw new BadRequestException('Tous Risques 0% is only available for vehicles less than 2 years old');
     }
 
-    // Rule 4: STANDARD formula excludes TOUS_RISQUES_0 and DOMMAGES_COLLISIONS
+    // Rule 4: STANDARD formula excludes TOUS_RISQUES_ZERO and DOMMAGES_COLLISIONS
     if (formulaType === FormulaType.STANDARD) {
-      if (selectedGuarantees.includes('TOUS_RISQUES_0') || selectedGuarantees.includes('DOMMAGES_COLLISIONS')) {
+      if (selectedGuarantees.includes('TOUS_RISQUES_ZERO') || selectedGuarantees.includes('DOMMAGES_COLLISIONS')) {
         throw new BadRequestException('Standard formula cannot include Tous Risques or Dommages Collision');
       }
     }
@@ -315,10 +315,10 @@ export class PricingEngineService {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'RC' } });
     if (!guarantee) return null;
 
-    // Convert bonusMalus decimal to class (1-8)
     const bonusMalusClass = Math.round(simulation.bonusMalus.toNumber());
+    const conventionScope = conventionId ? { conventionId } : { conventionId: null };
 
-    const rule = await this.prisma.pricingRule.findFirst({
+    let rule = await this.prisma.pricingRule.findFirst({
       where: {
         companyId,
         guaranteeId: guarantee.id,
@@ -326,11 +326,25 @@ export class PricingEngineService {
         minPower: { lte: vehicle.fiscalHorsepower },
         maxPower: { gte: vehicle.fiscalHorsepower },
         bonusMalusClass: bonusMalusClass,
-        conventionId: conventionId || null,
+        ...conventionScope,
       },
     });
     
-    if (!rule || !rule.fixedPremium) return null;
+    if (!rule && conventionId) {
+      rule = await this.prisma.pricingRule.findFirst({
+        where: {
+          companyId,
+          guaranteeId: guarantee.id,
+          isActive: true,
+          minPower: { lte: vehicle.fiscalHorsepower },
+          maxPower: { gte: vehicle.fiscalHorsepower },
+          bonusMalusClass: bonusMalusClass,
+          conventionId: null,
+        },
+      });
+    }
+    
+    if (!rule || rule.fixedPremium === null) return null;
 
     return {
       guaranteeCode: 'RC',
@@ -344,16 +358,29 @@ export class PricingEngineService {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'CAS' } });
     if (!guarantee) return null;
 
-    const rule = await this.prisma.pricingRule.findFirst({
+    const conventionScope = conventionId ? { conventionId } : { conventionId: null };
+
+    let rule = await this.prisma.pricingRule.findFirst({
       where: {
         companyId,
         guaranteeId: guarantee.id,
         isActive: true,
-        conventionId: conventionId || null,
+        ...conventionScope,
       },
     });
     
-    if (!rule || !rule.fixedPremium) return null;
+    if (!rule && conventionId) {
+      rule = await this.prisma.pricingRule.findFirst({
+        where: {
+          companyId,
+          guaranteeId: guarantee.id,
+          isActive: true,
+          conventionId: null,
+        },
+      });
+    }
+    
+    if (!rule || rule.fixedPremium === null) return null;
 
     return {
       guaranteeCode: 'CAS',
@@ -367,12 +394,50 @@ export class PricingEngineService {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'VOL' } });
     if (!guarantee) return null;
 
-    // Formula: ((marketValue * 2.36) / 1000 + 30) * taux_reduction
-    let prime = vehicle.marketValue.mul(new Decimal(2.36)).div(new Decimal(1000)).add(new Decimal(30));
+    const conventionScope = conventionId ? { conventionId } : { conventionId: null };
 
-    // Apply reduction rate from pricing rule
-    const reductionRate = await this.reductionRatesService.getReductionRate(companyId, 'VOL', conventionId);
-    prime = this.reductionRatesService.applyReductionRate(prime, reductionRate);
+    let rule = await this.prisma.pricingRule.findFirst({
+      where: {
+        companyId,
+        guaranteeId: guarantee.id,
+        isActive: true,
+        ...conventionScope,
+      },
+    });
+    
+    if (!rule && conventionId) {
+      rule = await this.prisma.pricingRule.findFirst({
+        where: {
+          companyId,
+          guaranteeId: guarantee.id,
+          isActive: true,
+          conventionId: null,
+        },
+      });
+    }
+
+    if (!rule || rule.ratePercentage === null || rule.fixedPremium === null) return null;
+
+    // FORMULA: ((marketValue * ratePercentage) + fixedPremium) * (1 - discountPercent/100)
+    let prime = vehicle.marketValue.mul(rule.ratePercentage).add(rule.fixedPremium);
+    
+    // Apply formula discount (stored as percent: 15 means 15% discount)
+    if (rule.reductionRate && rule.reductionRate.gt(0)) {
+      const multiplier = new Decimal(1).sub(rule.reductionRate.div(100));
+      prime = prime.mul(multiplier);
+    }
+
+    // Apply convention reduction if exists
+    if (conventionId) {
+      const discountPercent = await this.reductionRatesService.getReductionPercent(
+        companyId,
+        'VOL',
+        conventionId,
+        vehicle.marketValue,
+        'MARKET_VALUE' as ReductionMetric,
+      );
+      prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+    }
 
     return {
       guaranteeCode: 'VOL',
@@ -386,12 +451,50 @@ export class PricingEngineService {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'INCENDIE' } });
     if (!guarantee) return null;
 
-    // Formula: ((marketValue * 2.75) / 1000 + 30) * taux_reduction
-    let prime = vehicle.marketValue.mul(new Decimal(2.75)).div(new Decimal(1000)).add(new Decimal(30));
+    const conventionScope = conventionId ? { conventionId } : { conventionId: null };
 
-    // Apply reduction rate from pricing rule
-    const reductionRate = await this.reductionRatesService.getReductionRate(companyId, 'INCENDIE', conventionId);
-    prime = this.reductionRatesService.applyReductionRate(prime, reductionRate);
+    let rule = await this.prisma.pricingRule.findFirst({
+      where: {
+        companyId,
+        guaranteeId: guarantee.id,
+        isActive: true,
+        ...conventionScope,
+      },
+    });
+    
+    if (!rule && conventionId) {
+      rule = await this.prisma.pricingRule.findFirst({
+        where: {
+          companyId,
+          guaranteeId: guarantee.id,
+          isActive: true,
+          conventionId: null,
+        },
+      });
+    }
+
+    if (!rule || rule.ratePercentage === null || rule.fixedPremium === null) return null;
+
+    // FORMULA: ((marketValue * ratePercentage) + fixedPremium) * (1 - discountPercent/100)
+    let prime = vehicle.marketValue.mul(rule.ratePercentage).add(rule.fixedPremium);
+    
+    // Apply formula discount
+    if (rule.reductionRate && rule.reductionRate.gt(0)) {
+      const multiplier = new Decimal(1).sub(rule.reductionRate.div(100));
+      prime = prime.mul(multiplier);
+    }
+
+    // Apply convention reduction if exists
+    if (conventionId) {
+      const discountPercent = await this.reductionRatesService.getReductionPercent(
+        companyId,
+        'INCENDIE',
+        conventionId,
+        vehicle.marketValue,
+        'MARKET_VALUE' as ReductionMetric,
+      );
+      prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+    }
 
     return {
       guaranteeCode: 'INCENDIE',
@@ -405,21 +508,33 @@ export class PricingEngineService {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'PERSONNES_TRANSPORTEES' } });
     if (!guarantee) return null;
 
-    // Get all PTA rules for this company sorted by capital descending
-    const rules = await this.prisma.pricingRule.findMany({
+    const conventionScope = conventionId ? { conventionId } : { conventionId: null };
+
+    let rules = await this.prisma.pricingRule.findMany({
       where: {
         companyId,
         guaranteeId: guarantee.id,
         isActive: true,
-        conventionId: conventionId || null,
+        ...conventionScope,
       },
       orderBy: { minCapital: 'desc' },
     });
 
+    if (!rules.length && conventionId) {
+      rules = await this.prisma.pricingRule.findMany({
+        where: {
+          companyId,
+          guaranteeId: guarantee.id,
+          isActive: true,
+          conventionId: null,
+        },
+        orderBy: { minCapital: 'desc' },
+      });
+    }
+
     if (!rules.length) return null;
 
-    // Find matching rule based on selected capital
-    let matchedRule = rules[0]; // Default to first (highest capital)
+    let matchedRule = rules[0];
     if (selectedCapital) {
       for (const rule of rules) {
         if (rule.minCapital && selectedCapital.gte(rule.minCapital)) {
@@ -429,7 +544,7 @@ export class PricingEngineService {
       }
     }
 
-    if (!matchedRule.fixedPremium || !matchedRule.minCapital) return null;
+    if (matchedRule.fixedPremium === null || matchedRule.minCapital === null) return null;
 
     return {
       guaranteeCode: 'PERSONNES_TRANSPORTEES',
@@ -443,16 +558,29 @@ export class PricingEngineService {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'ASSISTANCE' } });
     if (!guarantee) return null;
 
-    const rule = await this.prisma.pricingRule.findFirst({
+    const conventionScope = conventionId ? { conventionId } : { conventionId: null };
+
+    let rule = await this.prisma.pricingRule.findFirst({
       where: {
         companyId,
         guaranteeId: guarantee.id,
         isActive: true,
-        conventionId: conventionId || null,
+        ...conventionScope,
       },
     });
     
-    if (!rule || !rule.fixedPremium) return null;
+    if (!rule && conventionId) {
+      rule = await this.prisma.pricingRule.findFirst({
+        where: {
+          companyId,
+          guaranteeId: guarantee.id,
+          isActive: true,
+          conventionId: null,
+        },
+      });
+    }
+    
+    if (!rule || rule.fixedPremium === null) return null;
 
     return {
       guaranteeCode: 'ASSISTANCE',
@@ -469,29 +597,52 @@ export class PricingEngineService {
       return null;
     }
 
-    // Apply bonus/malus to franchise rate
-    const bonusMalusValue = simulation.bonusMalus.toNumber();
-    const adjustedFranchiseRate = franchiseRate;
+    const conventionScope = conventionId ? { conventionId } : { conventionId: null };
 
-    // Get franchise-specific rule from database
-    const rule = await this.prisma.pricingRule.findFirst({
+    let rule = await this.prisma.pricingRule.findFirst({
       where: {
         companyId,
         guaranteeId: guarantee.id,
         franchiseRate: franchiseRate,
         isActive: true,
-        conventionId: conventionId || null,
+        ...conventionScope,
       },
     });
 
-    if (!rule || !rule.ratePercentage || !rule.fixedPremium) return null;
+    if (!rule && conventionId) {
+      rule = await this.prisma.pricingRule.findFirst({
+        where: {
+          companyId,
+          guaranteeId: guarantee.id,
+          franchiseRate: franchiseRate,
+          isActive: true,
+          conventionId: null,
+        },
+      });
+    }
 
-    // Formula: ((newValue * rate) + fixedPremium) * reductionRate
+    if (!rule || rule.ratePercentage === null || rule.fixedPremium === null) return null;
+
+    // FORMULA: ((newValue * ratePercentage) + fixedPremium) * (1 - discountPercent/100)
     let prime = vehicle.newValue.mul(rule.ratePercentage).add(rule.fixedPremium);
+    
+    // Apply formula discount
+    if (rule.reductionRate && rule.reductionRate.gt(0)) {
+      const multiplier = new Decimal(1).sub(rule.reductionRate.div(100));
+      prime = prime.mul(multiplier);
+    }
 
-    // Apply reduction rate
-    const reductionRate = await this.reductionRatesService.getReductionRate(companyId, 'TOUS_RISQUES_ZERO', conventionId);
-    prime = this.reductionRatesService.applyReductionRate(prime, reductionRate);
+    if (conventionId) {
+      const discountPercent = await this.reductionRatesService.getReductionPercent(
+        companyId,
+        'TOUS_RISQUES_ZERO',
+        conventionId,
+        vehicle.newValue,
+        'NEW_VALUE' as ReductionMetric,
+        FormulaType.TOUS_RISQUES_0,
+      );
+      prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+    }
 
     return {
       guaranteeCode: 'TOUS_RISQUES_ZERO',
@@ -505,139 +656,295 @@ export class PricingEngineService {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'DOMMAGES_COLLISIONS' } });
     if (!guarantee) return null;
 
-    const capital = selectedCapital || new Decimal(1000);
+    const vv = vehicle.marketValue;
 
-    if (simulation.usage === 'COMMERCIAL') {
-      // For COMMERCIAL (Affaire) - lookup from matrix
-      const rule = await this.prisma.pricingRule.findFirst({
+    // Get DC config for this usage type
+    const dcConfig = await this.prisma.dcConfig.findFirst({
+      where: { 
+        companyId,
+        usageType: simulation.usage,
+        isActive: true,
+      },
+    });
+
+    if (!dcConfig) {
+      console.log('❌ DC Config not found for company and usage type');
+      return null;
+    }
+
+    // Validate and enforce capital limits
+    const requestedCapital = selectedCapital || dcConfig.minCapital;
+    
+    // Rule: capital >= minCapital
+    if (requestedCapital.lt(dcConfig.minCapital)) {
+      throw new BadRequestException(`Capital must be at least ${dcConfig.minCapital} DT`);
+    }
+
+    // Rule: capital <= min(maxCapitalPercent * VV, maxCapitalAbsolute)
+    const percentCeiling = vv.mul(dcConfig.maxCapitalPercent.div(100));
+    const effectiveCeiling = percentCeiling.lt(dcConfig.maxCapitalAbsolute) 
+      ? percentCeiling 
+      : dcConfig.maxCapitalAbsolute;
+    
+    if (requestedCapital.gt(effectiveCeiling)) {
+      throw new BadRequestException(`Capital cannot exceed ${effectiveCeiling.toFixed(2)} DT`);
+    }
+
+    // Validate capital steps
+    const isValidStep = await this.validateCapitalStep(companyId, simulation.usage, requestedCapital);
+    if (!isValidStep) {
+      throw new BadRequestException('Capital does not match allowed increments');
+    }
+
+    const capital = requestedCapital;
+
+    if (dcConfig.useMatrix) {
+      return await this.calculateDC_Matrix(companyId, guarantee.id, vv, capital, dcConfig, simulation.usage, conventionId);
+    } else {
+      return await this.calculateDC_Progressive(companyId, guarantee.id, vv, capital, dcConfig, simulation.usage, conventionId);
+    }
+  }
+
+  private async validateCapitalStep(companyId: string, usageType: UsageType, capital: Decimal): Promise<boolean> {
+    const tiers = await this.prisma.dcCapitalTier.findMany({
+      where: { companyId, usageType, isActive: true },
+      orderBy: { minAmount: 'asc' },
+    });
+
+    for (const tier of tiers) {
+      if (capital.gte(tier.minAmount) && (!tier.maxAmount || capital.lte(tier.maxAmount))) {
+        const offset = capital.sub(tier.minAmount);
+        const remainder = offset.mod(tier.step);
+        return remainder.eq(0);
+      }
+    }
+
+    return false;
+  }
+
+  private async calculateDC_Matrix(companyId: string, guaranteeId: string, vv: Decimal, capital: Decimal, dcConfig: any, usageType: UsageType, conventionId?: string) {
+    // Find matching VV range for this usage type
+    const vvRange = await this.prisma.dcMatrixVvRange.findFirst({
+      where: {
+        companyId,
+        usageType,
+        minVv: { lte: vv },
+        OR: [
+          { maxVv: { gte: vv } },
+          { maxVv: null },
+        ],
+        isActive: true,
+      },
+    });
+
+    if (!vvRange) {
+      throw new BadRequestException(`No matrix VV range found for usage ${usageType} and VV ${vv}`);
+    }
+
+    // Find matching capital for this usage type
+    const capitalEntry = await this.prisma.dcMatrixCapital.findFirst({
+      where: {
+        companyId,
+        usageType,
+        amount: capital,
+        isActive: true,
+      },
+    });
+
+    if (!capitalEntry) {
+      throw new BadRequestException(`No matrix capital found for usage ${usageType} and capital ${capital}`);
+    }
+
+    // Get price from matrix
+    const matrixPrice = await this.prisma.dcMatrixPrice.findUnique({
+      where: {
+        vvRangeId_capitalId: {
+          vvRangeId: vvRange.id,
+          capitalId: capitalEntry.id,
+        },
+      },
+    });
+
+    if (!matrixPrice) {
+      throw new BadRequestException(`No matrix price found for VV range and capital combination`);
+    }
+
+    // FORMULA: (matrixPrime + basePremium) * (1 - discountPercent/100)
+    let prime = new Decimal(matrixPrice.prime).add(dcConfig.basePremium);
+
+    // Apply formula discount
+    if (dcConfig.discountPercent && dcConfig.discountPercent.gt(0)) {
+      const multiplier = new Decimal(1).sub(dcConfig.discountPercent.div(100));
+      prime = prime.mul(multiplier);
+    }
+
+    // Apply convention reduction
+    if (conventionId) {
+      const discountPercent = await this.reductionRatesService.getReductionPercent(
+        companyId,
+        'DOMMAGES_COLLISIONS',
+        conventionId,
+        capital,
+        'DC_CAPITAL' as ReductionMetric,
+        FormulaType.DOMMAGES_COLLISIONS,
+        usageType,
+      );
+      prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+    }
+
+    return {
+      guaranteeCode: 'DOMMAGES_COLLISIONS',
+      guaranteeId,
+      capital,
+      prime,
+    };
+  }
+
+  private async calculateDC_CommercialLegacy(companyId: string, guaranteeId: string, vv: Decimal, capital: Decimal, dcConfig: any, conventionId?: string) {
+    const conventionScope = conventionId ? { conventionId } : { conventionId: null };
+
+    let rule = await this.prisma.pricingRule.findFirst({
+      where: {
+        companyId,
+        guaranteeId,
+        usageType: 'COMMERCIAL',
+        minMarketValue: { lte: vv },
+        OR: [
+          { maxMarketValue: { gte: vv } },
+          { maxMarketValue: null }
+        ],
+        minCapital: capital,
+        maxCapital: capital,
+        isActive: true,
+        ...conventionScope,
+      },
+      orderBy: [{ minMarketValue: 'desc' }]
+    });
+
+    if (!rule && conventionId) {
+      rule = await this.prisma.pricingRule.findFirst({
         where: {
           companyId,
-          guaranteeId: guarantee.id,
+          guaranteeId,
           usageType: 'COMMERCIAL',
-          minMarketValue: { lte: vehicle.marketValue },
+          minMarketValue: { lte: vv },
           OR: [
-            { maxMarketValue: { gte: vehicle.marketValue } },
+            { maxMarketValue: { gte: vv } },
             { maxMarketValue: null }
           ],
           minCapital: capital,
           maxCapital: capital,
           isActive: true,
-          conventionId: conventionId || null,
+          conventionId: null,
         },
+        orderBy: [{ minMarketValue: 'desc' }]
       });
-
-      if (!rule || !rule.fixedPremium) return null;
-
-      let prime = new Decimal(rule.fixedPremium);
-
-      // Apply reduction rate
-      const reductionRate = await this.reductionRatesService.getReductionRate(companyId, 'DOMMAGES_COLLISIONS', conventionId);
-      prime = this.reductionRatesService.applyReductionRate(prime, reductionRate);
-
-      return {
-        guaranteeCode: 'DOMMAGES_COLLISIONS',
-        guaranteeId: guarantee.id,
-        capital,
-        prime,
-      };
-    } else {
-      // For PRIVATE_BUSINESS (Promenade et Affaire) - tier system
-      const baseRule = await this.prisma.pricingRule.findFirst({
-        where: {
-          companyId,
-          guaranteeId: guarantee.id,
-          basePremium: { not: null },
-          usageType: 'PRIVATE_BUSINESS',
-          isActive: true,
-          conventionId: conventionId || null,
-        },
-      });
-
-      if (!baseRule || !baseRule.basePremium) return null;
-
-      const tierRules = await this.prisma.pricingRule.findMany({
-        where: {
-          companyId,
-          guaranteeId: guarantee.id,
-          tierLevel: { not: null },
-          usageType: 'PRIVATE_BUSINESS',
-          isActive: true,
-          conventionId: conventionId || null,
-        },
-        orderBy: { tierLevel: 'asc' },
-      });
-
-      if (!tierRules.length) return null;
-
-      const vv = vehicle.marketValue;
-      let prime = new Decimal(baseRule.basePremium);
-
-      // Calculate percentage of VV
-      const capitalPercent = capital.div(vv).mul(100);
-
-      // Apply tiered rates
-      if (capitalPercent.lte(10)) {
-        const tier1 = tierRules.find(t => t.tierLevel === 1);
-        if (tier1?.tierRate) {
-          prime = prime.add(capital.mul(tier1.tierRate));
-        }
-      } else if (capitalPercent.lte(20)) {
-        const tier1 = tierRules.find(t => t.tierLevel === 1);
-        const tier2 = tierRules.find(t => t.tierLevel === 2);
-        if (tier1?.tierRate && tier2?.tierRate) {
-          const first10 = vv.mul(new Decimal(0.1)).mul(tier1.tierRate);
-          const excess = capital.sub(vv.mul(new Decimal(0.1))).mul(tier2.tierRate);
-          prime = prime.add(first10).add(excess);
-        }
-      } else if (capitalPercent.lte(30)) {
-        const tier1 = tierRules.find(t => t.tierLevel === 1);
-        const tier2 = tierRules.find(t => t.tierLevel === 2);
-        const tier3 = tierRules.find(t => t.tierLevel === 3);
-        if (tier1?.tierRate && tier2?.tierRate && tier3?.tierRate) {
-          const first10 = vv.mul(new Decimal(0.1)).mul(tier1.tierRate);
-          const second10 = vv.mul(new Decimal(0.1)).mul(tier2.tierRate);
-          const excess = capital.sub(vv.mul(new Decimal(0.2))).mul(tier3.tierRate);
-          prime = prime.add(first10).add(second10).add(excess);
-        }
-      } else if (capitalPercent.lte(40)) {
-        const tier1 = tierRules.find(t => t.tierLevel === 1);
-        const tier2 = tierRules.find(t => t.tierLevel === 2);
-        const tier3 = tierRules.find(t => t.tierLevel === 3);
-        const tier4 = tierRules.find(t => t.tierLevel === 4);
-        if (tier1?.tierRate && tier2?.tierRate && tier3?.tierRate && tier4?.tierRate) {
-          const first10 = vv.mul(new Decimal(0.1)).mul(tier1.tierRate);
-          const second10 = vv.mul(new Decimal(0.1)).mul(tier2.tierRate);
-          const third10 = vv.mul(new Decimal(0.1)).mul(tier3.tierRate);
-          const excess = capital.sub(vv.mul(new Decimal(0.3))).mul(tier4.tierRate);
-          prime = prime.add(first10).add(second10).add(third10).add(excess);
-        }
-      } else {
-        const tier1 = tierRules.find(t => t.tierLevel === 1);
-        const tier2 = tierRules.find(t => t.tierLevel === 2);
-        const tier3 = tierRules.find(t => t.tierLevel === 3);
-        const tier4 = tierRules.find(t => t.tierLevel === 4);
-        const tier5 = tierRules.find(t => t.tierLevel === 5);
-        if (tier1?.tierRate && tier2?.tierRate && tier3?.tierRate && tier4?.tierRate && tier5?.tierRate) {
-          const first10 = vv.mul(new Decimal(0.1)).mul(tier1.tierRate);
-          const second10 = vv.mul(new Decimal(0.1)).mul(tier2.tierRate);
-          const third10 = vv.mul(new Decimal(0.1)).mul(tier3.tierRate);
-          const fourth10 = vv.mul(new Decimal(0.1)).mul(tier4.tierRate);
-          const excess = capital.sub(vv.mul(new Decimal(0.4))).mul(tier5.tierRate);
-          prime = prime.add(first10).add(second10).add(third10).add(fourth10).add(excess);
-        }
-      }
-
-      // Apply reduction rate
-      const reductionRate = await this.reductionRatesService.getReductionRate(companyId, 'DOMMAGES_COLLISIONS', conventionId);
-      prime = this.reductionRatesService.applyReductionRate(prime, reductionRate);
-
-      return {
-        guaranteeCode: 'DOMMAGES_COLLISIONS',
-        guaranteeId: guarantee.id,
-        capital,
-        prime,
-      };
     }
+
+    if (!rule || rule.fixedPremium === null) return null;
+
+    // FORMULA: (fixedPremium + basePremium) * (1 - discountPercent/100)
+    let prime = new Decimal(rule.fixedPremium).add(dcConfig.basePremium);
+
+    // Apply formula discount
+    if (dcConfig.discountPercent && dcConfig.discountPercent.gt(0)) {
+      const multiplier = new Decimal(1).sub(dcConfig.discountPercent.div(100));
+      prime = prime.mul(multiplier);
+    }
+
+    if (conventionId) {
+      const discountPercent = await this.reductionRatesService.getReductionPercent(
+        companyId,
+        'DOMMAGES_COLLISIONS',
+        conventionId,
+        capital,
+        'DC_CAPITAL' as ReductionMetric,
+        FormulaType.DOMMAGES_COLLISIONS,
+        UsageType.COMMERCIAL,
+      );
+      prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+    }
+
+    return {
+      guaranteeCode: 'DOMMAGES_COLLISIONS',
+      guaranteeId,
+      capital,
+      prime,
+    };
+  }
+
+  private async calculateDC_Progressive(companyId: string, guaranteeId: string, vv: Decimal, capital: Decimal, dcConfig: any, usageType: UsageType, conventionId?: string) {
+    // Get progressive tiers for this usage type
+    const tiers = await this.prisma.dcProgressiveTier.findMany({
+      where: {
+        companyId,
+        usageType,
+        isActive: true,
+      },
+      orderBy: { tierNumber: 'asc' },
+    });
+
+    if (!tiers.length) return null;
+
+    const capitalPercent = capital.div(vv).mul(100);
+    let primeVariable = new Decimal(0);
+
+    // Simple case: <= 10%
+    if (capitalPercent.lte(10)) {
+      const tier1 = tiers.find(t => t.tierNumber === 1);
+      if (!tier1) return null;
+      primeVariable = capital.mul(tier1.tierRate);
+    } else {
+      // Progressive calculation: each tranche = 10% of VV
+      let capitalRemaining = capital;
+      const trancheSize = vv.mul(0.1); // 10% of VV
+      let tierIndex = 0;
+
+      while (capitalRemaining.gt(0)) {
+        if (tierIndex >= tiers.length) {
+          // No more tiers defined - apply last tier rate to remainder
+          const lastTier = tiers[tiers.length - 1];
+          primeVariable = primeVariable.add(capitalRemaining.mul(lastTier.tierRate));
+          break;
+        }
+
+        const tier = tiers[tierIndex];
+        const amountInTier = capitalRemaining.gt(trancheSize) ? trancheSize : capitalRemaining;
+        primeVariable = primeVariable.add(amountInTier.mul(tier.tierRate));
+        capitalRemaining = capitalRemaining.sub(amountInTier);
+        tierIndex++;
+      }
+    }
+
+    // FORMULA: (primeVariable + basePremium) * (1 - discountPercent/100)
+    let prime = primeVariable.add(dcConfig.basePremium);
+
+    // Apply formula discount
+    if (dcConfig.discountPercent && dcConfig.discountPercent.gt(0)) {
+      const multiplier = new Decimal(1).sub(dcConfig.discountPercent.div(100));
+      prime = prime.mul(multiplier);
+    }
+
+    // Apply convention reduction
+    if (conventionId) {
+      const discountPercent = await this.reductionRatesService.getReductionPercent(
+        companyId,
+        'DOMMAGES_COLLISIONS',
+        conventionId,
+        capital,
+        'DC_CAPITAL' as ReductionMetric,
+        FormulaType.DOMMAGES_COLLISIONS,
+        usageType,
+      );
+      prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+    }
+
+    return {
+      guaranteeCode: 'DOMMAGES_COLLISIONS',
+      guaranteeId,
+      capital,
+      prime,
+    };
   }
 
   private async calculateBG(companyId: string, vehicle: VehicleData, isTousRisques: boolean, selectedCapital?: Decimal, conventionId?: string) {
@@ -646,29 +953,47 @@ export class PricingEngineService {
 
     const capital = selectedCapital ?? vehicle.marketValue;
 
-    // CDC Rule: BG is FREE if TOUS_RISQUES_0
     if (isTousRisques) {
       return {
         guaranteeCode: 'BG',
         guaranteeId: guarantee.id,
         capital,
-        prime: new Decimal(0), // FREE
+        prime: new Decimal(0),
       };
     }
 
-    // Get BG rate from database
-    const rule = await this.prisma.pricingRule.findFirst({
+    const conventionScope = conventionId ? { conventionId } : { conventionId: null };
+
+    let rule = await this.prisma.pricingRule.findFirst({
       where: {
         companyId,
         guaranteeId: guarantee.id,
         isActive: true,
-        conventionId: conventionId || null,
+        ...conventionScope,
       },
     });
 
-    if (!rule || !rule.ratePercentage) return null;
+    if (!rule && conventionId) {
+      rule = await this.prisma.pricingRule.findFirst({
+        where: {
+          companyId,
+          guaranteeId: guarantee.id,
+          isActive: true,
+          conventionId: null,
+        },
+      });
+    }
 
-    const prime = capital.mul(rule.ratePercentage);
+    if (!rule || rule.ratePercentage === null) return null;
+
+    // FORMULA: (capital * ratePercentage) * (1 - discountPercent/100)
+    let prime = capital.mul(rule.ratePercentage);
+    
+    // Apply formula discount
+    if (rule.reductionRate && rule.reductionRate.gt(0)) {
+      const multiplier = new Decimal(1).sub(rule.reductionRate.div(100));
+      prime = prime.mul(multiplier);
+    }
 
     return {
       guaranteeCode: 'BG',
@@ -684,12 +1009,14 @@ export class PricingEngineService {
     formulaType: FormulaType | null,
     conventionId?: string,
   ) {
-    return this.prisma.pricingRule.findFirst({
+    const conventionScope = conventionId ? { conventionId } : { conventionId: null };
+
+    let rule = await this.prisma.pricingRule.findFirst({
       where: {
         companyId,
         guaranteeId,
         isActive: true,
-        conventionId: conventionId || null,
+        ...conventionScope,
         OR: [
           { formulaType: formulaType },
           { formulaType: null },
@@ -697,6 +1024,24 @@ export class PricingEngineService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    if (!rule && conventionId) {
+      rule = await this.prisma.pricingRule.findFirst({
+        where: {
+          companyId,
+          guaranteeId,
+          isActive: true,
+          conventionId: null,
+          OR: [
+            { formulaType: formulaType },
+            { formulaType: null },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    return rule;
   }
 
   private calculateVehicleAge(firstCirculationDate: Date): number {
@@ -711,16 +1056,29 @@ export class PricingEngineService {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'INCENDIE_EMEUTES' } });
     if (!guarantee) return null;
 
-    const rule = await this.prisma.pricingRule.findFirst({
+    const conventionScope = conventionId ? { conventionId } : { conventionId: null };
+
+    let rule = await this.prisma.pricingRule.findFirst({
       where: {
         companyId,
         guaranteeId: guarantee.id,
         isActive: true,
-        conventionId: conventionId || null,
+        ...conventionScope,
       },
     });
     
-    if (!rule || !rule.fixedPremium) return null;
+    if (!rule && conventionId) {
+      rule = await this.prisma.pricingRule.findFirst({
+        where: {
+          companyId,
+          guaranteeId: guarantee.id,
+          isActive: true,
+          conventionId: null,
+        },
+      });
+    }
+    
+    if (!rule || rule.fixedPremium === null) return null;
 
     return {
       guaranteeCode: 'INCENDIE_EMEUTES',
@@ -732,26 +1090,57 @@ export class PricingEngineService {
 
   private async calculateCATNAT(companyId: string, vehicle: VehicleData, formulaType: FormulaType, conventionId?: string) {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'CATASTROPHES_NATURELLES' } });
-    if (!guarantee) return null;
+    if (!guarantee) {
+      console.log('❌ CATNAT: Guarantee not found');
+      return null;
+    }
 
-    // CDC: AMANA only, 40 DT, only for Tous Risques
-    if (formulaType !== FormulaType.TOUS_RISQUES_0) return null;
+    const isTousRisques = formulaType === FormulaType.TOUS_RISQUES_0;
+    
+    if (!isTousRisques) {
+      console.log('❌ CATNAT: Not Tous Risques formula:', formulaType);
+      return null;
+    }
 
-    // Verify company is AMANA
     const company = await this.prisma.company.findUnique({ where: { id: companyId } });
-    if (!company || company.code !== 'AMANA') return null;
+    if (!company || company.code !== 'AMANA') {
+      console.log('❌ CATNAT: Company is not AMANA:', company?.code);
+      return null;
+    }
 
-    const rule = await this.prisma.pricingRule.findFirst({
+    const conventionScope = conventionId ? { conventionId } : { conventionId: null };
+
+    console.log('🔍 CATNAT: Looking for rule with formulaType:', formulaType);
+    let rule = await this.prisma.pricingRule.findFirst({
       where: {
         companyId,
         guaranteeId: guarantee.id,
-        formulaType: FormulaType.TOUS_RISQUES_0,
+        OR: [
+          { formulaType: formulaType },
+          { formulaType: null },
+        ],
         isActive: true,
-        conventionId: conventionId || null,
+        ...conventionScope,
       },
     });
     
-    if (!rule || !rule.fixedPremium) return null;
+    if (!rule && conventionId) {
+      rule = await this.prisma.pricingRule.findFirst({
+        where: {
+          companyId,
+          guaranteeId: guarantee.id,
+          OR: [
+            { formulaType: formulaType },
+            { formulaType: null },
+          ],
+          isActive: true,
+          conventionId: null,
+        },
+      });
+    }
+    
+    console.log('🔍 CATNAT: Rule found:', rule ? 'YES' : 'NO');
+    if (!rule || rule.fixedPremium === null) return null;
 
     return {
       guaranteeCode: 'CATASTROPHES_NATURELLES',
@@ -765,16 +1154,29 @@ export class PricingEngineService {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'DOMMAGES_EMEUTES' } });
     if (!guarantee) return null;
 
-    const rule = await this.prisma.pricingRule.findFirst({
+    const conventionScope = conventionId ? { conventionId } : { conventionId: null };
+
+    let rule = await this.prisma.pricingRule.findFirst({
       where: {
         companyId,
         guaranteeId: guarantee.id,
         isActive: true,
-        conventionId: conventionId || null,
+        ...conventionScope,
       },
     });
     
-    if (!rule || !rule.fixedPremium) return null;
+    if (!rule && conventionId) {
+      rule = await this.prisma.pricingRule.findFirst({
+        where: {
+          companyId,
+          guaranteeId: guarantee.id,
+          isActive: true,
+          conventionId: null,
+        },
+      });
+    }
+    
+    if (!rule || rule.fixedPremium === null) return null;
 
     return {
       guaranteeCode: 'DOMMAGES_EMEUTES',

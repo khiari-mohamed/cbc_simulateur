@@ -15,11 +15,19 @@ export class AuthController {
 
   @Post('register')
   register(@Body() dto: RegisterDto) {
+    // Strip mailto: prefix if present
+    if (dto.email?.startsWith('mailto:')) {
+      dto.email = dto.email.replace(/^mailto:/, '');
+    }
     return this.authService.register(dto);
   }
 
   @Post('login')
   login(@Body() dto: LoginDto) {
+    // Strip mailto: prefix if present
+    if (dto.email?.startsWith('mailto:')) {
+      dto.email = dto.email.replace(/^mailto:/, '');
+    }
     return this.authService.login(dto);
   }
 

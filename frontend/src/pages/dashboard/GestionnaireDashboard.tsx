@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FileCheck, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { FileCheck, Clock, CheckCircle, XCircle, AlertCircle, History, Calendar, Building2 } from 'lucide-react';
 import api from '../../lib/api/client';
 import { Link } from 'react-router-dom';
 
 export const GestionnaireDashboard = () => {
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const { data: stats } = useQuery({
     queryKey: ['gestionnaire-stats'],
     queryFn: async () => {
@@ -41,16 +43,43 @@ export const GestionnaireDashboard = () => {
     },
   });
 
+  const { data: processedQuotes } = useQuery({
+    queryKey: ['processed-quotes'],
+    queryFn: async () => {
+      const { data } = await api.get('/quotes/all/stats');
+      return data.filter((q: any) => 
+        q.status === 'VALIDATED' || q.status === 'REJECTED' || q.status === 'TRANSFORMED_TO_CONTRACT'
+      );
+    },
+  });
+
   const { data: pendingQuotes } = useQuery({
     queryKey: ['pending-quotes'],
     queryFn: async () => {
-      // Get all quotes that need validation (not yet validated or rejected)
-      const { data } = await api.get('/quotes');
+      const { data } = await api.get('/quotes/all/stats');
       return data.filter((q: any) => 
         q.status === 'PENDING' || q.status === 'SUBMITTED' || q.status === 'GENERATED'
       );
     },
   });
+
+  const getStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      VALIDATED: 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200',
+      REJECTED: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200',
+      TRANSFORMED_TO_CONTRACT: 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200',
+    };
+    const labels: Record<string, string> = {
+      VALIDATED: 'Validé',
+      REJECTED: 'Rejeté',
+      TRANSFORMED_TO_CONTRACT: 'Contrat',
+    };
+    return (
+      <span className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status] || 'bg-gray-100 text-gray-800'}`}>
+        {labels[status] || status}
+      </span>
+    );
+  };
 
   return (
       <div className="max-w-7xl mx-auto">
@@ -116,7 +145,10 @@ export const GestionnaireDashboard = () => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border-l-4 border-blue-500 p-6">
+          <button
+            onClick={() => setShowHistoryModal(true)}
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border-l-4 border-blue-500 p-6 hover:shadow-md transition-shadow cursor-pointer"
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
@@ -131,7 +163,7 @@ export const GestionnaireDashboard = () => {
               </div>
               <FileCheck className="w-12 h-12 text-blue-500 opacity-20" />
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Alert if pending quotes */}
@@ -268,6 +300,84 @@ export const GestionnaireDashboard = () => {
             <p className="text-gray-600 dark:text-gray-400">
               Tous les devis ont été traités. Vous serez notifié lors de nouvelles soumissions.
             </p>
+          </div>
+        )}
+
+        {/* History Modal */}
+        {showHistoryModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <History className="w-6 h-6" />
+                  Historique des devis traités
+                </h2>
+                <button
+                  onClick={() => setShowHistoryModal(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="space-y-4">
+                  {processedQuotes && processedQuotes.length > 0 ? (
+                    processedQuotes.map((quote: any) => (
+                      <div
+                        key={quote.id}
+                        className="bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 p-4"
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                Devis N° {quote.displayNumber ? `DEVIS-${String(quote.displayNumber).padStart(5, '0')}` : quote.quoteNumber}
+                              </h3>
+                              {getStatusBadge(quote.status)}
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                              <span className="flex items-center gap-1">
+                                <Building2 className="w-4 h-4" />
+                                {quote.company.name}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                {new Date(quote.updatedAt).toLocaleDateString('fr-FR')}
+                              </span>
+                            </div>
+                            {quote.user && (
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                Client: {quote.user.firstName} {quote.user.lastName}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Montant</p>
+                            <p className="text-xl font-bold text-gray-600 dark:text-gray-400">
+                              {quote.totalAPayer.toLocaleString()} DT
+                            </p>
+                          </div>
+                        </div>
+                        {quote.rejectionReason && (
+                          <div className="pt-3 border-t border-gray-300 dark:border-gray-600">
+                            <p className="text-xs font-medium text-red-600 dark:text-red-400 mb-1">
+                              Motif de rejet:
+                            </p>
+                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                              {quote.rejectionReason}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-gray-500 dark:text-gray-400 py-8">
+                      Aucun devis traité
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

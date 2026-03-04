@@ -4,12 +4,12 @@ async function testSMTP() {
   console.log('🔍 Testing SMTP connection...\n');
   
   const transporter = nodemailer.createTransport({
-    host: 'smtp.gnet.tn',
-    port: 25,
+    host: '197.14.56.80',
+    port: 587,
     secure: false,
     auth: {
-      user: 'donotreply@arstunisie.tn',
-      pass: 'NR*ars2025**##',
+      user: 'ARSMAIL.arstunisie.com',
+      pass: 'Ars*2025*++',
     },
     tls: {
       rejectUnauthorized: false
@@ -22,8 +22,8 @@ async function testSMTP() {
     
     console.log('📧 Sending test email...');
     const info = await transporter.sendMail({
-      from: 'ARS Tunisia <donotreply@arstunisie.tn>',
-      to: 'mohamedkhiari@ulytechai.com',
+      from: 'ARS Tunisia <donotreply@arstunisie.com>',
+      to: 'khiarim725@gmail.com',
       subject: 'Test SMTP - ARS',
       text: 'This is a test email from ARS backend.',
       html: '<p>This is a test email from ARS backend.</p>',

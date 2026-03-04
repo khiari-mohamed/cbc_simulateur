@@ -20,13 +20,14 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   async initializePayment(
-    @Body() data: { quoteId: string; deliveryType: string },
+    @Body() data: { quoteId: string; deliveryType: string; effectiveDate?: string },
     @Request() req: any,
   ) {
     return this.flouciService.createPaymentOrder(
       data.quoteId,
       data.deliveryType,
       req.user.id,
+      data.effectiveDate,
     );
   }
 
@@ -47,5 +48,11 @@ export class PaymentsController {
   async verifyPayment(@Param('paymentId') paymentId: string) {
     const isVerified = await this.flouciService.verifyPaymentWithFlouci(paymentId);
     return { verified: isVerified };
+  }
+
+  @Get('quote/:quoteId')
+  @UseGuards(JwtAuthGuard)
+  async getPaymentsByQuote(@Param('quoteId') quoteId: string) {
+    return this.flouciService.getPaymentsByQuote(quoteId);
   }
 }

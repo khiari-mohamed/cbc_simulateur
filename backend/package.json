@@ -14,7 +14,9 @@
     "db:reset": "ts-node reset-db.ts",
     "seed:test-quotes": "node seed-test-quotes.js",
     "check:quotes": "node check-quotes.js",
-    "check:admin": "node check-admin-dashboard.js"
+    "check:admin": "node check-admin-dashboard.js",
+    "setup:dommages-collisions": "ts-node prisma/setup-dommages-collisions.ts",
+    "test:dommages-collisions": "ts-node prisma/test-dommages-collisions.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",

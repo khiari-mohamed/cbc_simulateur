@@ -1,4 +1,5 @@
-import { IsString, MinLength, MaxLength, IsUUID, IsOptional, IsNumber, Min, Max, IsDateString } from 'class-validator';
+import { IsString, MinLength, MaxLength, IsUUID, IsOptional, IsDateString, IsArray, IsEnum } from 'class-validator';
+import { ConventionStatus } from '@prisma/client';
 
 export class CreateConventionDto {
   @IsString()
@@ -7,31 +8,11 @@ export class CreateConventionDto {
   name: string;
 
   @IsUUID()
-  companyId: string;
+  organizationId: string;
 
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(1)
-  reductionTousRisques?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(1)
-  reductionDommagesCollision?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(1)
-  reductionVol?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(1)
-  reductionIncendie?: number;
+  @IsArray()
+  @IsUUID('4', { each: true })
+  companyIds: string[];
 
   @IsOptional()
   @IsDateString()
@@ -42,6 +23,6 @@ export class CreateConventionDto {
   endDate?: string;
 
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsEnum(ConventionStatus)
+  status?: ConventionStatus;
 }

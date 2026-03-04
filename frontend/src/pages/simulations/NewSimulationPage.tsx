@@ -1,10 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { VehicleInfoStep } from '../../components/simulations/VehicleInfoStep';
-import { DriverProfileStep } from '../../components/simulations/DriverProfileStep';
 import { CoverageSelectionStep } from '../../components/simulations/CoverageSelectionStep';
 import { QuoteGenerationStep } from '../../components/simulations/QuoteGenerationStep';
 import { ConfirmationStep } from '../../components/simulations/ConfirmationStep';
-import { Button } from '../../components/ui/Button';
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { FormulaType, UsageType } from '../../types';
 
@@ -48,10 +46,9 @@ export const NewSimulationPage = () => {
 
   const STEPS = [
     { id: 1, name: t('simulation.vehicle') },
-    { id: 2, name: t('simulation.driver') },
-    { id: 3, name: t('simulation.coverage') },
-    { id: 4, name: t('simulation.quote') },
-    { id: 5, name: t('simulation.confirmation') },
+    { id: 2, name: t('simulation.coverage') },
+    { id: 3, name: t('simulation.quote') },
+    { id: 4, name: t('simulation.confirmation') },
   ];
 
   const updateData = (data: Partial<SimulationData>) => {
@@ -60,33 +57,35 @@ export const NewSimulationPage = () => {
     localStorage.setItem('simulationData', JSON.stringify(updated));
   };
 
-  const clearSimulation = () => {
-    localStorage.removeItem('simulationStep');
-    localStorage.removeItem('simulationData');
-    localStorage.removeItem('simulationId');
-    setCurrentStep(1);
-    setSimulationData({ selectedGuarantees: [] });
-    setSimulationId(null);
-  };
+  // Clear invalid formula when vehicle age changes
+  useEffect(() => {
+    if (simulationData.vehicle?.firstCirculationDate && simulationData.formulaType) {
+      const vehicleAge = Math.floor((new Date().getTime() - new Date(simulationData.vehicle.firstCirculationDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      const isTousRisques = simulationData.formulaType.startsWith('TOUS_RISQUES');
+      const isDommagesCollision = simulationData.formulaType === 'DOMMAGES_COLLISIONS';
+      
+      if ((isTousRisques && vehicleAge >= 2) || (isDommagesCollision && vehicleAge >= 10)) {
+        updateData({ formulaType: undefined, franchiseRate: undefined, dcCapital: undefined });
+      }
+    }
+  }, [simulationData.vehicle?.firstCirculationDate]);
 
   const canShowStep2 = () => {
     return simulationData.vehicle?.fiscalHorsepower && 
            simulationData.vehicle?.numberOfSeats &&
            simulationData.vehicle?.newValue &&
            simulationData.vehicle?.marketValue &&
-           simulationData.vehicle?.firstCirculationDate;
+           simulationData.vehicle?.firstCirculationDate &&
+           simulationData.bonusMalus &&
+           simulationData.usage;
   };
 
   const canShowStep3 = () => {
-    return canShowStep2() && simulationData.bonusMalus && simulationData.usage;
+    return canShowStep2() && simulationData.formulaType;
   };
 
   const canShowStep4 = () => {
-    return canShowStep3() && simulationData.formulaType;
-  };
-
-  const canShowStep5 = () => {
-    return canShowStep4() && simulationId;
+    return canShowStep3() && simulationId;
   };
 
   return (
@@ -124,29 +123,18 @@ export const NewSimulationPage = () => {
 
         {/* All Steps Vertically */}
         <div className="space-y-6">
-          {/* Step 1: Vehicle Info */}
+          {/* Step 1: Vehicle Info + Driver Profile Combined */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 sm:p-6">
             <VehicleInfoStep
               data={simulationData.vehicle}
-              onUpdate={(vehicle) => updateData({ vehicle })}
+              driverData={{ bonusMalus: simulationData.bonusMalus, usage: simulationData.usage }}
+              onUpdate={(vehicle, driverData) => updateData({ vehicle, bonusMalus: driverData.bonusMalus, usage: driverData.usage as UsageType })}
               onNext={() => setCurrentStep(2)}
             />
           </div>
 
-          {/* Step 2: Driver Profile */}
-          {canShowStep2() && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 sm:p-6">
-              <DriverProfileStep
-                data={{ bonusMalus: simulationData.bonusMalus, usage: simulationData.usage }}
-                onUpdate={(data) => updateData({ bonusMalus: data.bonusMalus, usage: data.usage as UsageType })}
-                onNext={() => setCurrentStep(3)}
-                onBack={() => setCurrentStep(1)}
-              />
-            </div>
-          )}
-
-          {/* Step 3: Coverage Selection */}
-          {canShowStep3() && simulationData.vehicle?.firstCirculationDate && (
+          {/* Step 2: Coverage Selection */}
+          {canShowStep2() && simulationData.vehicle?.firstCirculationDate && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 sm:p-6">
               <CoverageSelectionStep
                 vehicleAge={Math.floor((new Date().getTime() - new Date(simulationData.vehicle.firstCirculationDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000))}
@@ -158,45 +146,35 @@ export const NewSimulationPage = () => {
                 dcCapital={simulationData.dcCapital}
                 firstCirculationDate={new Date(simulationData.vehicle.firstCirculationDate)}
                 onUpdate={(data) => updateData(data)}
-                onNext={() => setCurrentStep(4)}
-                onBack={() => setCurrentStep(2)}
+                onNext={() => setCurrentStep(3)}
+                onBack={() => setCurrentStep(1)}
               />
             </div>
           )}
 
-          {/* Step 4: Quote Generation */}
-          {canShowStep4() && (
+          {/* Step 3: Quote Generation */}
+          {canShowStep3() && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 sm:p-6">
               <QuoteGenerationStep
                 simulationData={simulationData as SimulationData}
                 onSimulationCreated={(id) => {
                   setSimulationId(id);
-                  setCurrentStep(5);
+                  setCurrentStep(4);
                 }}
+                onBack={() => setCurrentStep(2)}
+              />
+            </div>
+          )}
+
+          {/* Step 4: Confirmation */}
+          {canShowStep4() && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 sm:p-6">
+              <ConfirmationStep
+                simulationId={simulationId!}
                 onBack={() => setCurrentStep(3)}
               />
             </div>
           )}
-
-          {/* Step 5: Confirmation */}
-          {canShowStep5() && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 sm:p-6">
-              <ConfirmationStep
-                simulationId={simulationId!}
-                onBack={() => setCurrentStep(4)}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Blue Nouvelle Simulation Button - Always visible at bottom */}
-        <div className="mt-6 flex justify-center">
-          <Button
-            onClick={clearSimulation}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            Nouvelle simulation
-          </Button>
         </div>
     </div>
   );
