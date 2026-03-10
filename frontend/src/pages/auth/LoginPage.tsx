@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,7 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { GoogleButton } from '../../components/ui/GoogleButton';
 import { AuthLayout } from './AuthLayout';
-import { Lock, Mail, Shield } from 'lucide-react';
+import { Lock, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const loginSchema = z.object({
@@ -19,12 +18,8 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export const LoginPage = () => {
-  const { login, verifyOtp } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
-  const [showOtp, setShowOtp] = useState(false);
-  const [userId, setUserId] = useState<string>('');
-  const [otp, setOtp] = useState('');
-  const [otpLoading, setOtpLoading] = useState(false);
   
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -32,66 +27,13 @@ export const LoginPage = () => {
 
   const onSubmit = async (data: LoginForm) => {
     try {
-      const result = await login(data.email, data.password);
-      
-      if (result.requiresOtp && result.userId) {
-        setUserId(result.userId);
-        setShowOtp(true);
-        toast.success('Code OTP envoyé à votre email');
-      } else {
-        toast.success('Connexion réussie');
-        navigate('/dashboard');
-      }
+      await login(data.email, data.password);
+      toast.success('Connexion réussie');
+      navigate('/dashboard');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Erreur de connexion');
     }
   };
-
-  const handleOtpSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setOtpLoading(true);
-    try {
-      await verifyOtp(userId, otp);
-      toast.success('Connexion réussie');
-      navigate('/dashboard');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Code OTP invalide');
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  if (showOtp) {
-    return (
-      <AuthLayout title="Vérification OTP" subtitle="Entrez le code envoyé à votre email">
-        <form onSubmit={handleOtpSubmit} className="space-y-4">
-          <div className="relative">
-            <Shield className="absolute left-2.5 top-6 w-4 h-4 text-gray-400" />
-            <Input
-              label="Code OTP"
-              type="text"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              placeholder="123456"
-              className="pl-8 text-center text-lg tracking-widest"
-              maxLength={6}
-            />
-          </div>
-          <Button type="submit" loading={otpLoading} className="w-full" size="md">
-            Vérifier
-          </Button>
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={() => setShowOtp(false)} 
-            className="w-full"
-          >
-            Retour
-          </Button>
-        </form>
-      </AuthLayout>
-    );
-  }
 
   return (
     <AuthLayout title="Connexion" subtitle="Accédez à votre espace client">

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FormulaType, UsageType, ReductionMetric } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { ReductionRatesService } from './reduction-rates.service';
+import { FormulaEvaluatorService } from './formula-evaluator.service';
 
 interface VehicleData {
   fiscalHorsepower: number;
@@ -49,6 +50,7 @@ export class PricingEngineService {
   constructor(
     private prisma: PrismaService,
     private reductionRatesService: ReductionRatesService,
+    private formulaEvaluator: FormulaEvaluatorService,
   ) {}
 
   async calculatePremium(
@@ -416,15 +418,28 @@ export class PricingEngineService {
       });
     }
 
-    if (!rule || rule.ratePercentage === null || rule.fixedPremium === null) return null;
+    if (!rule) return null;
 
-    // FORMULA: ((marketValue * ratePercentage) + fixedPremium) * (1 - discountPercent/100)
-    let prime = vehicle.marketValue.mul(rule.ratePercentage).add(rule.fixedPremium);
-    
-    // Apply formula discount (stored as percent: 15 means 15% discount)
-    if (rule.reductionRate && rule.reductionRate.gt(0)) {
-      const multiplier = new Decimal(1).sub(rule.reductionRate.div(100));
-      prime = prime.mul(multiplier);
+    let prime: Decimal;
+
+    // Use custom formula if provided
+    if (rule.formula) {
+      const variables = {
+        VV: vehicle.marketValue.toNumber(),
+        rate: rule.ratePercentage?.toNumber() || 0,
+        fixed: rule.fixedPremium?.toNumber() || 0,
+        reduction: rule.reductionRate ? (1 - rule.reductionRate.toNumber() / 100) : 1,
+      };
+      prime = new Decimal(this.formulaEvaluator.evaluateFormula(rule.formula, variables));
+    } else {
+      // Fallback to hardcoded formula
+      if (rule.ratePercentage === null || rule.fixedPremium === null) return null;
+      prime = vehicle.marketValue.mul(rule.ratePercentage).add(rule.fixedPremium);
+      
+      if (rule.reductionRate && rule.reductionRate.gt(0)) {
+        const multiplier = new Decimal(1).sub(rule.reductionRate.div(100));
+        prime = prime.mul(multiplier);
+      }
     }
 
     // Apply convention reduction if exists
@@ -473,15 +488,28 @@ export class PricingEngineService {
       });
     }
 
-    if (!rule || rule.ratePercentage === null || rule.fixedPremium === null) return null;
+    if (!rule) return null;
 
-    // FORMULA: ((marketValue * ratePercentage) + fixedPremium) * (1 - discountPercent/100)
-    let prime = vehicle.marketValue.mul(rule.ratePercentage).add(rule.fixedPremium);
-    
-    // Apply formula discount
-    if (rule.reductionRate && rule.reductionRate.gt(0)) {
-      const multiplier = new Decimal(1).sub(rule.reductionRate.div(100));
-      prime = prime.mul(multiplier);
+    let prime: Decimal;
+
+    // Use custom formula if provided
+    if (rule.formula) {
+      const variables = {
+        VV: vehicle.marketValue.toNumber(),
+        rate: rule.ratePercentage?.toNumber() || 0,
+        fixed: rule.fixedPremium?.toNumber() || 0,
+        reduction: rule.reductionRate ? (1 - rule.reductionRate.toNumber() / 100) : 1,
+      };
+      prime = new Decimal(this.formulaEvaluator.evaluateFormula(rule.formula, variables));
+    } else {
+      // Fallback to hardcoded formula
+      if (rule.ratePercentage === null || rule.fixedPremium === null) return null;
+      prime = vehicle.marketValue.mul(rule.ratePercentage).add(rule.fixedPremium);
+      
+      if (rule.reductionRate && rule.reductionRate.gt(0)) {
+        const multiplier = new Decimal(1).sub(rule.reductionRate.div(100));
+        prime = prime.mul(multiplier);
+      }
     }
 
     // Apply convention reduction if exists
@@ -621,15 +649,29 @@ export class PricingEngineService {
       });
     }
 
-    if (!rule || rule.ratePercentage === null || rule.fixedPremium === null) return null;
+    if (!rule) return null;
 
-    // FORMULA: ((newValue * ratePercentage) + fixedPremium) * (1 - discountPercent/100)
-    let prime = vehicle.newValue.mul(rule.ratePercentage).add(rule.fixedPremium);
-    
-    // Apply formula discount
-    if (rule.reductionRate && rule.reductionRate.gt(0)) {
-      const multiplier = new Decimal(1).sub(rule.reductionRate.div(100));
-      prime = prime.mul(multiplier);
+    let prime: Decimal;
+
+    // Use custom formula if provided
+    if (rule.formula) {
+      const variables = {
+        VN: vehicle.newValue.toNumber(),
+        rate: rule.ratePercentage?.toNumber() || 0,
+        fixed: rule.fixedPremium?.toNumber() || 0,
+        reduction: rule.reductionRate ? (1 - rule.reductionRate.toNumber() / 100) : 1,
+        franchise: franchiseRate,
+      };
+      prime = new Decimal(this.formulaEvaluator.evaluateFormula(rule.formula, variables));
+    } else {
+      // Fallback to hardcoded formula
+      if (rule.ratePercentage === null || rule.fixedPremium === null) return null;
+      prime = vehicle.newValue.mul(rule.ratePercentage).add(rule.fixedPremium);
+      
+      if (rule.reductionRate && rule.reductionRate.gt(0)) {
+        const multiplier = new Decimal(1).sub(rule.reductionRate.div(100));
+        prime = prime.mul(multiplier);
+      }
     }
 
     if (conventionId) {

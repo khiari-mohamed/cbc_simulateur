@@ -17,6 +17,10 @@ export class CreatePricingRuleDto {
   formulaType?: FormulaType;
 
   @IsOptional()
+  @IsString()
+  formula?: string;
+
+  @IsOptional()
   @IsNumber()
   minPower?: number;
 

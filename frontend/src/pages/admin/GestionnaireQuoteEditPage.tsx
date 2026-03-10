@@ -201,64 +201,23 @@ export const GestionnaireQuoteEditPage = () => {
           Détail des garanties
         </h3>
         <div className="space-y-2">
-          {quote?.items?.map((item: any) => {
-            const getFormula = (code: string, capital: number, prime: number) => {
-              const marketValue = quote?.simulation?.vehicle?.marketValue || 0;
-              const newValue = quote?.simulation?.vehicle?.newValue || 0;
-              
-              switch(code) {
-                case 'RC':
-                  return 'Tarif fixe selon puissance fiscale et bonus/malus';
-                case 'CAS':
-                  return 'Tarif fixe: 45 DT';
-                case 'VOL':
-                  return `((${marketValue} × 2.36) / 1000 + 30) × taux réduction`;
-                case 'INCENDIE':
-                  return `((${marketValue} × 2.75) / 1000 + 30) × taux réduction`;
-                case 'PERSONNES_TRANSPORTEES':
-                  return `Tarif fixe selon capital: ${capital} DT`;
-                case 'ASSISTANCE':
-                  return 'Tarif fixe: 115 DT';
-                case 'TOUS_RISQUES_ZERO':
-                  return `(${newValue} × taux%) + prime fixe × taux réduction`;
-                case 'DOMMAGES_COLLISIONS':
-                  return `Prime de base + (${capital} × taux palier) × taux réduction`;
-                case 'BG':
-                  return prime === 0 ? 'Gratuit avec Tous Risques 0%' : `${capital} × 0.08`;
-                case 'DOMMAGES_EMEUTES':
-                  return 'Tarif fixe: 30 DT';
-                case 'CATASTROPHES_NATURELLES':
-                  return 'Tarif fixe: 40 DT (AMANA uniquement)';
-                case 'INCENDIE_EMEUTES':
-                  return 'Tarif fixe selon compagnie';
-                case 'DEFENSE_RECOURS':
-                  return prime === 0 ? 'Gratuit avec Tous Risques 0%' : 'Tarif fixe';
-                default:
-                  return 'Calcul selon règles tarifaires';
-              }
-            };
-            
-            return (
-              <div key={item.id} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="flex justify-between items-start mb-1">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    {item.guarantee.nameFr}
-                  </span>
-                  <div className="text-right">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      Capital: {item.capital.toLocaleString()} DT
-                    </div>
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Prime: {item.prime.toLocaleString()} DT
-                    </div>
+          {quote?.items?.map((item: any) => (
+            <div key={item.id} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="flex justify-between items-start">
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {item.guarantee.nameFr}
+                </span>
+                <div className="text-right">
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Capital: {item.capital.toLocaleString()} DT
+                  </div>
+                  <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Prime: {item.prime.toLocaleString()} DT
                   </div>
                 </div>
-                <div className="text-xs text-blue-600 dark:text-blue-400 font-mono mt-1">
-                  {getFormula(item.guarantee.code, Number(item.capital), Number(item.prime))}
-                </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </Card>
 

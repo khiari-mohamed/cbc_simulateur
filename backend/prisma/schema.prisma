@@ -382,6 +382,7 @@
     conventionId    String?
     convention      Convention?  @relation(fields: [conventionId], references: [id])
     formulaType     FormulaType?
+    formula         String?      @db.Text
     minPower        Int?
     maxPower        Int?
     bonusMalusClass Int?

@@ -18,6 +18,9 @@
     "setup:dommages-collisions": "ts-node prisma/setup-dommages-collisions.ts",
     "test:dommages-collisions": "ts-node prisma/test-dommages-collisions.ts"
   },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
     "@nestjs/config": "^3.1.1",
@@ -38,7 +41,9 @@
     "passport-jwt": "^4.0.1",
     "puppeteer": "^21.6.1",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.2.1",

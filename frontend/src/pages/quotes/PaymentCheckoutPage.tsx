@@ -203,6 +203,19 @@ export const PaymentCheckoutPage = () => {
   // };
 
   const handleDateChange = (dateString: string) => {
+    if (!serverTime) return;
+
+    const selectedDate = new Date(dateString);
+    const now = new Date(serverTime);
+    now.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+
+    // Prevent retroactivity - cannot select past dates
+    if (selectedDate < now) {
+      toast.error('La date d\'effet ne peut pas être dans le passé.');
+      return;
+    }
+
     if (isClosestWeekend(dateString)) {
       toast.error('Le weekend le plus proche n\'est pas autorisé. Veuillez choisir une autre date.');
       return;
@@ -238,6 +251,22 @@ export const PaymentCheckoutPage = () => {
 
     if (!effectiveDate) {
       toast.error('Veuillez sélectionner une date d\'effet');
+      return;
+    }
+
+    if (!serverTime) {
+      toast.error('Erreur de synchronisation du temps');
+      return;
+    }
+
+    const selectedDate = new Date(effectiveDate);
+    const now = new Date(serverTime);
+    now.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+
+    // Prevent retroactivity
+    if (selectedDate < now) {
+      toast.error('La date d\'effet ne peut pas être dans le passé');
       return;
     }
 

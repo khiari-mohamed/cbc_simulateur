@@ -106,33 +106,16 @@ export class AuthService {
       throw new UnauthorizedException('Account is inactive. Please verify your email.');
     }
 
-    // Check if 2FA is enabled for this user
-    if (user.otpEnabled) {
-      const otp = this.generateOTP();
-      await this.usersService.updateOtpSecret(user.id, otp);
-      
-      this.notificationsService.sendOTP(user.email, otp)
-        .catch(err => console.error('Failed to send OTP email:', err.message));
+    // Direct login without OTP
+    await this.auditService.log(
+      user.id,
+      'LOGIN_SUCCESS',
+      'User',
+      user.id,
+      null,
+      { email: user.email },
+    );
 
-      console.log('🔐 Login OTP for', user.email, ':', otp);
-
-      await this.auditService.log(
-        user.id,
-        'LOGIN_OTP_SENT',
-        'User',
-        user.id,
-        null,
-        { email: user.email },
-      );
-
-      return {
-        requiresOtp: true,
-        userId: user.id,
-        message: 'OTP sent to your email',
-      };
-    }
-
-    // Direct login if 2FA disabled
     return this.generateTokens(user);
   }
 
@@ -160,7 +143,7 @@ export class AuthService {
         where: { id: user.id },
         data: { 
           isActive: true,
-          otpEnabled: true, // Keep 2FA enabled for daily logins
+          otpEnabled: false, // Disable OTP after registration verification
         },
       });
 

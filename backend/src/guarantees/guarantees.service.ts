@@ -121,6 +121,25 @@ export class GuaranteesService {
     return updated;
   }
 
+  async delete(id: string, userId: string) {
+    const guarantee = await this.findById(id);
+
+    await this.prisma.guarantee.delete({
+      where: { id },
+    });
+
+    await this.auditService.log(
+      userId,
+      'GUARANTEE_DELETED',
+      'Guarantee',
+      id,
+      { code: guarantee.code, nameFr: guarantee.nameFr },
+      null,
+    );
+
+    return { message: 'Guarantee deleted permanently' };
+  }
+
   async getRequiredGuarantees() {
     return this.prisma.guarantee.findMany({
       where: {

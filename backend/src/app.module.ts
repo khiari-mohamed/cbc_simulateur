@@ -23,6 +23,7 @@ import { PdfModule } from './pdf/pdf.module';
 import { ReportingModule } from './reporting/reporting.module';
 import { PricingRulesModule } from './pricing-rules/pricing-rules.module';
 import { SystemModule } from './system/system.module';
+import { SeedModule } from './seed/seed.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { SystemModule } from './system/system.module';
     ReportingModule,
     PricingRulesModule,
     SystemModule,
+    SeedModule,
   ],
 })
 export class AppModule {}

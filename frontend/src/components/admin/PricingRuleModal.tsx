@@ -19,6 +19,7 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
     guaranteeId: rule?.guaranteeId || '',
     conventionId: rule?.conventionId || '',
     formulaType: rule?.formulaType || '',
+    formula: rule?.formula || '',
     bonusMalusClass: rule?.bonusMalusClass || '',
     minPower: rule?.minPower || '',
     maxPower: rule?.maxPower || '',
@@ -155,6 +156,22 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
               <p className="text-sm text-blue-800 dark:text-blue-200">{getFormulaHint()}</p>
             </div>
           )}
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Formule personnalisée
+            </label>
+            <textarea
+              value={formData.formula}
+              onChange={(e) => setFormData({ ...formData, formula: e.target.value })}
+              placeholder="Exemple: ((VV * rate) + fixed) * reduction"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-sm"
+              rows={3}
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Variables disponibles: VV (valeur vénale), VN (valeur neuve), rate, fixed, reduction, capital, etc.
+            </p>
+          </div>
 
           <div className="grid grid-cols-3 gap-4">
             <Select

@@ -108,6 +108,10 @@ export type Company = {
   name: string;
   code: string;
   isActive: boolean;
+  contractFees?: number;
+  fpac?: number;
+  fssr?: number;
+  fg?: number;
   conventions?: { id: string; name: string }[];
   _count?: { quotes: number; pricingRules: number };
   createdAt?: string;

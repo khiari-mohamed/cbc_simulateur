@@ -49,10 +49,17 @@ export class GuaranteesController {
     return this.guaranteesService.update(id, dto, req.user.id);
   }
 
-  @Delete(':id')
+  @Patch(':id/deactivate')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMINISTRATEUR_ARS)
   deactivate(@Param('id') id: string, @Request() req: any) {
     return this.guaranteesService.deactivate(id, req.user.id);
+  }
+
+  @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMINISTRATEUR_ARS)
+  delete(@Param('id') id: string, @Request() req: any) {
+    return this.guaranteesService.delete(id, req.user.id);
   }
 }

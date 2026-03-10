@@ -44,9 +44,9 @@ export const GuaranteesPage = () => {
     },
   });
 
-  const deleteMutation = useMutation({
+  const deactivateMutation = useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/guarantees/${id}`);
+      await api.patch(`/guarantees/${id}/deactivate`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['guarantees'] });
@@ -54,6 +54,19 @@ export const GuaranteesPage = () => {
     },
     onError: () => {
       toast.error('Erreur lors de la désactivation');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/guarantees/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['guarantees'] });
+      toast.success('Garantie supprimée');
+    },
+    onError: () => {
+      toast.error('Erreur lors de la suppression');
     },
   });
 
@@ -94,6 +107,13 @@ export const GuaranteesPage = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate code format
+    if (!/^[A-Z_]+$/.test(formData.code)) {
+      toast.error('Le code doit contenir uniquement des lettres majuscules et des underscores (_)');
+      return;
+    }
+    
     createMutation.mutate(formData);
   };
 
@@ -181,17 +201,31 @@ export const GuaranteesPage = () => {
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm('Désactiver cette garantie ?')) {
-                          deleteMutation.mutate(guarantee.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {guarantee.isActive ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm('Désactiver cette garantie ?')) {
+                            deactivateMutation.mutate(guarantee.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm('Supprimer définitivement cette garantie ?')) {
+                            deleteMutation.mutate(guarantee.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -213,14 +247,17 @@ export const GuaranteesPage = () => {
               </div>
 
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                <Input
-                  label="Code *"
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  placeholder="RC, VOL, INCENDIE..."
-                  required
-                  disabled={!!selectedGuarantee}
-                />
+                <div>
+                  <Input
+                    label="Code *"
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                    placeholder="RC, VOL, INCENDIE..."
+                    required
+                    disabled={!!selectedGuarantee}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Lettres majuscules et underscores uniquement (ex: RC, VOL_INCENDIE)</p>
+                </div>
 
                 <Input
                   label="Nom (Français) *"

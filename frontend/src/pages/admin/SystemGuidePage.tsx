@@ -1,12 +1,41 @@
 import { useState } from 'react';
-import { BookOpen, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, FileText, Shield, Calculator, Database, Workflow, User, UserCheck, UserCog, ArrowRight, Play, Edit, Upload, Send, CreditCard, FileCheck, Bell, Search, Building2, Handshake, DollarSign, Users, BarChart3, CheckSquare, Clipboard } from 'lucide-react';
+import { BookOpen, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, FileText, Shield, Calculator, Database, Workflow, User, UserCheck, UserCog, ArrowRight, Play, Edit, Upload, Send, CreditCard, FileCheck, Bell, Search, Building2, Handshake, DollarSign, Users, BarChart3, CheckSquare, Clipboard, Loader2 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import api from '../../lib/api/client';
+import toast from 'react-hot-toast';
 
 export const SystemGuidePage = () => {
   const [expandedSection, setExpandedSection] = useState<string | null>('workflow');
+  const [loadingMinimal, setLoadingMinimal] = useState(false);
+  const [loadingFull, setLoadingFull] = useState(false);
 
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
+  };
+
+  const runMinimalSeed = async () => {
+    setLoadingMinimal(true);
+    try {
+      const response = await api.post('/seed/minimal');
+      toast.success(response.data.message || 'Seed minimal exécuté avec succès!');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Erreur lors du seed minimal');
+    } finally {
+      setLoadingMinimal(false);
+    }
+  };
+
+  const runFullSeed = async () => {
+    setLoadingFull(true);
+    try {
+      const response = await api.post('/seed/full');
+      toast.success(response.data.message || 'Seed complet exécuté avec succès!');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Erreur lors du seed complet');
+    } finally {
+      setLoadingFull(false);
+    }
   };
 
   const workflowSteps = [
@@ -392,6 +421,222 @@ export const SystemGuidePage = () => {
                 <p className="text-sm text-yellow-800 dark:text-yellow-200">
                   <AlertCircle className="inline w-4 h-4 mr-1" /> <strong>Actions possibles:</strong> Valider, Modifier avec note, Rejeter avec motif, Transformer en contrat (après paiement agence)
                 </p>
+              </div>
+            </div>
+
+            {/* DATABASE SETUP SCENARIOS */}
+            <div className="border-2 border-indigo-200 dark:border-indigo-800 rounded-xl p-6 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-900/20 dark:to-blue-900/20 mb-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center animate-pulse">
+                  <Database className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">🗄️ Configuration Base de Données</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">3 scénarios de démarrage selon l'état de la base de données</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Scenario 0: Truly Empty - Manual Everything */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-lg border-2 border-gray-400 dark:border-gray-600">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 bg-gray-100 dark:bg-gray-900/30 rounded-full flex items-center justify-center">
+                      <XCircle className="w-5 h-5 text-gray-600" />
+                    </div>
+                    <h4 className="font-bold text-gray-900 dark:text-white">Scénario 0: Manuel Complet</h4>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">Tout créer manuellement (y compris RC)</p>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600 font-bold">1.</span>
+                      <div className="text-gray-700 dark:text-gray-300">
+                        <div className="font-semibold">S'inscrire</div>
+                        <div className="text-gray-500">Page: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/register</code></div>
+                        <div className="text-gray-500">Rôle: ADMINISTRATEUR_ARS</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600 font-bold">2.</span>
+                      <div className="text-gray-700 dark:text-gray-300">
+                        <div className="font-semibold">Créer 2 compagnies</div>
+                        <div className="text-gray-500">Page: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/admin/companies</code></div>
+                        <div className="text-gray-500">Bouton: "Nouvelle compagnie"</div>
+                        <div className="text-gray-500">Lloyd + Amana</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600 font-bold">3.</span>
+                      <div className="text-gray-700 dark:text-gray-300">
+                        <div className="font-semibold">Créer 14 garanties</div>
+                        <div className="text-gray-500">Page: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/admin/guarantees</code></div>
+                        <div className="text-gray-500">Bouton: "Nouvelle garantie"</div>
+                        <div className="text-gray-500">RC, VOL, INCENDIE, CAS, etc.</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600 font-bold">4.</span>
+                      <div className="text-gray-700 dark:text-gray-300">
+                        <div className="font-semibold">Créer 80 règles RC</div>
+                        <div className="text-gray-500">Page: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/admin/pricing-rules</code></div>
+                        <div className="text-gray-500">Bouton: "Nouvelle règle"</div>
+                        <div className="text-gray-500">8 classes × 5 CV × 2 compagnies</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600 font-bold">5.</span>
+                      <div className="text-gray-700 dark:text-gray-300">
+                        <div className="font-semibold">Créer règles tarifaires</div>
+                        <div className="text-gray-500">Page: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/admin/pricing-rules</code></div>
+                        <div className="text-gray-500">VOL, INCENDIE, TR, PTA, etc.</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600 font-bold">6.</span>
+                      <div className="text-gray-700 dark:text-gray-300">
+                        <div className="font-semibold">Configurer DC</div>
+                        <div className="text-gray-500">Page: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/admin/formulas</code></div>
+                        <div className="text-gray-500">Onglet: "Dommages Collision"</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Scenario 1: Empty DB with Minimal Seed */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-lg border-2 border-yellow-300 dark:border-yellow-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
+                      <AlertCircle className="w-5 h-5 text-yellow-600" />
+                    </div>
+                    <h4 className="font-bold text-gray-900 dark:text-white">Scénario 1: Seed Minimal (RC)</h4>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">Créer manuellement puis seed RC automatique</p>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600 font-bold">1.</span>
+                      <div className="text-gray-700 dark:text-gray-300">
+                        <div className="font-semibold">S'inscrire</div>
+                        <div className="text-gray-500">Page: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/register</code></div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600 font-bold">2.</span>
+                      <div className="text-gray-700 dark:text-gray-300">
+                        <div className="font-semibold">Créer 2 compagnies</div>
+                        <div className="text-gray-500">Page: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/admin/companies</code></div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600 font-bold">3.</span>
+                      <div className="text-gray-700 dark:text-gray-300">
+                        <div className="font-semibold">Créer garantie RC</div>
+                        <div className="text-gray-500">Page: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/admin/guarantees</code></div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600 font-bold">4.</span>
+                      <div className="text-gray-700 dark:text-gray-300">
+                        <div className="font-semibold">Lancer seed minimal</div>
+                        <div className="text-gray-500">Bouton ci-dessous (80 règles RC)</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600 font-bold">5.</span>
+                      <div className="text-gray-700 dark:text-gray-300">
+                        <div className="font-semibold">Créer 13 autres garanties</div>
+                        <div className="text-gray-500">Page: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/admin/guarantees</code></div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600 font-bold">6.</span>
+                      <div className="text-gray-700 dark:text-gray-300">
+                        <div className="font-semibold">Créer règles tarifaires</div>
+                        <div className="text-gray-500">Page: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/admin/pricing-rules</code></div>
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={runMinimalSeed}
+                    disabled={loadingMinimal}
+                    className="w-full mt-3 bg-yellow-600 hover:bg-yellow-700 text-white"
+                    size="sm"
+                  >
+                    {loadingMinimal ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Exécution...</>
+                    ) : (
+                      <><Play className="w-4 h-4 mr-2" /> Lancer Seed Minimal</>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Scenario 2: Full Seed */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-lg border-2 border-green-300 dark:border-green-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                    </div>
+                    <h4 className="font-bold text-gray-900 dark:text-white">Scénario 2: Seed Complet</h4>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">Tout créer automatiquement</p>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-700 dark:text-gray-300">3 utilisateurs (admin, gestionnaire, client)</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-700 dark:text-gray-300">2 compagnies (Lloyd, Amana)</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-700 dark:text-gray-300">14 garanties complètes</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-700 dark:text-gray-300">200+ règles tarifaires</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-700 dark:text-gray-300">Configuration DC complète</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600 font-bold">→</span>
+                      <span className="text-gray-700 dark:text-gray-300">Lancer seed complet</span>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={runFullSeed}
+                    disabled={loadingFull}
+                    className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white"
+                    size="sm"
+                  >
+                    {loadingFull ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Exécution...</>
+                    ) : (
+                      <><Play className="w-4 h-4 mr-2" /> Lancer Seed Complet</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+                  <Database className="w-4 h-4" />
+                  Comment utiliser les seeds
+                </h5>
+                <div className="space-y-2 text-xs text-blue-800 dark:text-blue-200">
+                  <div className="bg-white dark:bg-gray-800 rounded p-3">
+                    <div className="font-semibold mb-1">Seed Minimal (RC uniquement)</div>
+                    <div className="text-gray-600 dark:text-gray-400">
+                      Cliquez sur le bouton <span className="font-medium text-yellow-600">"Lancer Seed Minimal"</span> dans le Scénario 1 ci-dessus
+                    </div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded p-3">
+                    <div className="font-semibold mb-1">Seed Complet (toutes les données)</div>
+                    <div className="text-gray-600 dark:text-gray-400">
+                      Cliquez sur le bouton <span className="font-medium text-green-600">"Lancer Seed Complet"</span> dans le Scénario 2 ci-dessus
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

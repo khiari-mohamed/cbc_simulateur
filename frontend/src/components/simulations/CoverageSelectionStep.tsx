@@ -45,6 +45,8 @@ export const CoverageSelectionStep = ({
   const [localBgLimit, setLocalBgLimit] = useState<number>(bgLimit || 1000);
   const [localDcCapital, setLocalDcCapital] = useState<number>(dcCapital || 1000);
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
+  const [showFormulaModal, setShowFormulaModal] = useState(false);
+  const [pendingFormula, setPendingFormula] = useState<FormulaType | null>(null);
 
   const { data: guarantees } = useQuery({
     queryKey: ['guarantees'],
@@ -85,22 +87,6 @@ export const CoverageSelectionStep = ({
   const vehicleAge = calculateAge(firstCirculationDate);
   console.log('🚗 Vehicle age calculation:', { firstCirculationDate, vehicleAge, canSelectTousRisques: vehicleAge < 2 });
   
-  // DC capital step enforcement based on CDC
-  const snapDcCapital = (value: number, marketValue?: number) => {
-    if (!marketValue) return value;
-    const maxAllowed = Math.min(marketValue * 0.5, 100000);
-    let capped = Math.max(1000, Math.min(value, maxAllowed));
-    if (capped <= 10000) {
-      capped = Math.round(capped / 1000) * 1000;
-    } else if (capped <= 20000) {
-      capped = Math.round((capped - 10000) / 5000) * 5000 + 10000;
-    } else if (capped <= 50000) {
-      capped = Math.round((capped - 20000) / 10000) * 10000 + 20000;
-    } else {
-      capped = Math.round((capped - 50000) / 25000) * 25000 + 50000;
-    }
-    return Math.max(1000, Math.min(capped, maxAllowed));
-  };
   const canSelectTousRisques = vehicleAge < 2;
   const canSelectDommagesCollision = vehicleAge < 10;
 
@@ -114,6 +100,14 @@ export const CoverageSelectionStep = ({
   }, [localFormula, optionalGuarantees, localGuarantees]);
 
   const handleFormulaChange = (formula: string) => {
+    // If selecting DC or TR, show modal first
+    if (formula === FormulaType.DOMMAGES_COLLISIONS || formula === FormulaType.TOUS_RISQUES_0) {
+      setPendingFormula(formula as FormulaType);
+      setShowFormulaModal(true);
+      return;
+    }
+
+    // Standard formula - apply directly
     setLocalFormula(formula as FormulaType);
     
     let updatedGuarantees = localGuarantees;
@@ -133,6 +127,34 @@ export const CoverageSelectionStep = ({
       bgLimit: localBgLimit,
       dcCapital: localDcCapital,
     });
+  };
+
+  const confirmFormulaSelection = () => {
+    if (!pendingFormula) return;
+
+    setLocalFormula(pendingFormula);
+    
+    let updatedGuarantees = localGuarantees;
+    if (pendingFormula === FormulaType.TOUS_RISQUES_0) {
+      const brisDeGlacesGuarantee = optionalGuarantees.find(g => g.code === 'BG');
+      if (brisDeGlacesGuarantee && !localGuarantees.includes(brisDeGlacesGuarantee.id)) {
+        updatedGuarantees = [...localGuarantees, brisDeGlacesGuarantee.id];
+        setLocalGuarantees(updatedGuarantees);
+      }
+      setLocalBgLimit(1000);
+    }
+    
+    onUpdate({
+      formulaType: pendingFormula,
+      selectedGuarantees: updatedGuarantees,
+      conventionId: localConvention || undefined,
+      franchiseRate: localFranchiseRate,
+      bgLimit: localBgLimit,
+      dcCapital: localDcCapital,
+    });
+
+    setShowFormulaModal(false);
+    setPendingFormula(null);
   };
 
   const handleGuaranteeToggle = (guaranteeId: string) => {
@@ -173,6 +195,7 @@ export const CoverageSelectionStep = ({
   const isBrisDeGlacesFree = localFormula === FormulaType.TOUS_RISQUES_0;
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
@@ -227,427 +250,71 @@ export const CoverageSelectionStep = ({
             </div>
           </label>
 
-          {/* Show Dommages Collision only if Tous Risques is NOT selected */}
-          {localFormula !== FormulaType.TOUS_RISQUES_0 && (
-            <label
-              className={`flex items-start p-4 border-2 rounded-lg transition-all ${
-                !canSelectDommagesCollision
-                  ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-900'
-                  : localFormula === FormulaType.DOMMAGES_COLLISIONS
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 cursor-pointer'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 cursor-pointer'
-              }`}
-            >
-              <input
-                type="radio"
-                value={FormulaType.DOMMAGES_COLLISIONS}
-                checked={localFormula === FormulaType.DOMMAGES_COLLISIONS}
-                onChange={(e) => handleFormulaChange(e.target.value)}
-                disabled={!canSelectDommagesCollision}
-                className="mt-1"
-              />
-              <div className="ml-3 flex-1">
-                <div className="font-semibold text-gray-900 dark:text-white">
-                  Dommages Collision
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Couverture des dommages en cas de collision avec un autre véhicule terrestre
-                </p>
-                {!canSelectDommagesCollision && (
-                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                    ⚠ Disponible uniquement pour véhicules &lt; 10 ans
-                  </p>
-                )}
+          <label
+            className={`flex items-start p-4 border-2 rounded-lg transition-all ${
+              !canSelectDommagesCollision
+                ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-900'
+                : localFormula === FormulaType.DOMMAGES_COLLISIONS
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 cursor-pointer'
+                : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 cursor-pointer'
+            }`}
+          >
+            <input
+              type="radio"
+              value={FormulaType.DOMMAGES_COLLISIONS}
+              checked={localFormula === FormulaType.DOMMAGES_COLLISIONS}
+              onChange={(e) => handleFormulaChange(e.target.value)}
+              disabled={!canSelectDommagesCollision}
+              className="mt-1"
+            />
+            <div className="ml-3 flex-1">
+              <div className="font-semibold text-gray-900 dark:text-white">
+                Dommages Collision
               </div>
-            </label>
-          )}
-
-          {/* Show Tous Risques only if Dommages Collision is NOT selected */}
-          {localFormula !== FormulaType.DOMMAGES_COLLISIONS && (
-            <label
-              className={`flex items-start p-4 border-2 rounded-lg transition-all ${
-                !canSelectTousRisques
-                  ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-900'
-                  : localFormula === FormulaType.TOUS_RISQUES_0
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 cursor-pointer'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 cursor-pointer'
-              }`}
-            >
-              <input
-                type="radio"
-                value={FormulaType.TOUS_RISQUES_0}
-                checked={localFormula === FormulaType.TOUS_RISQUES_0}
-                onChange={(e) => handleFormulaChange(e.target.value)}
-                disabled={!canSelectTousRisques}
-                className="mt-1"
-              />
-              <div className="ml-3 flex-1">
-                <div className="font-semibold text-gray-900 dark:text-white">
-                  Tous Risques
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Couverture maximale sans franchise
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Couverture des dommages en cas de collision avec un autre véhicule terrestre
+              </p>
+              {!canSelectDommagesCollision && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  ⚠ Disponible uniquement pour véhicules &lt; 10 ans
                 </p>
-                {isBrisDeGlacesFree && (
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                    ✓ Bris de Glaces GRATUIT avec cette formule
-                  </p>
-                )}
+              )}
+            </div>
+          </label>
 
+          <label
+            className={`flex items-start p-4 border-2 rounded-lg transition-all ${
+              !canSelectTousRisques
+                ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-900'
+                : localFormula === FormulaType.TOUS_RISQUES_0
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 cursor-pointer'
+                : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 cursor-pointer'
+            }`}
+          >
+            <input
+              type="radio"
+              value={FormulaType.TOUS_RISQUES_0}
+              checked={localFormula === FormulaType.TOUS_RISQUES_0}
+              onChange={(e) => handleFormulaChange(e.target.value)}
+              disabled={!canSelectTousRisques}
+              className="mt-1"
+            />
+            <div className="ml-3 flex-1">
+              <div className="font-semibold text-gray-900 dark:text-white">
+                Tous Risques
               </div>
-            </label>
-          )}
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Couverture maximale sans franchise
+              </p>
+              {isBrisDeGlacesFree && (
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  ✓ Bris de Glaces GRATUIT avec cette formule
+                </p>
+              )}
+            </div>
+          </label>
         </div>
       </div>
-
-
-
-      {mandatoryGuarantees.length > 0 && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Garanties incluses systématiquement
-          </label>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            Ces garanties sont automatiquement incluses dans toutes les formules
-          </p>
-          <div className="space-y-2">
-            {mandatoryGuarantees.map((guarantee) => (
-              <div
-                key={guarantee.id}
-                className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600"
-              >
-                <input
-                  type="checkbox"
-                  checked={true}
-                  disabled={true}
-                  className="mr-3"
-                />
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    {guarantee.nameFr}
-                  </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Obligatoire
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {optionalGuarantees.length > 0 && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            Garanties optionnelles
-          </label>
-          <div className="space-y-2">
-            {optionalGuarantees
-              .filter((guarantee) => {
-                // NEVER show these - they are formulas, not optional guarantees
-                if (guarantee.code === 'DOMMAGES_COLLISIONS') return false;
-                if (guarantee.code === 'TOUS_RISQUES_ZERO') return false;
-                if (guarantee.code === 'DEFENSE_RECOURS') return false;
-                
-                // Hide individual CAT NAT and DOMMAGES_EMEUTES if Lloyd is selected (they'll be combined)
-                const hasLloyd = companies?.some((c: any) => c.code === 'LLOYD' && selectedCompanies.includes(c.id));
-                const hasOnlyLloyd = hasLloyd && selectedCompanies.length === 1;
-                
-                if (hasOnlyLloyd) {
-                  if (guarantee.code === 'CATASTROPHES_NATURELLES' || guarantee.code === 'DOMMAGES_EMEUTES') {
-                    return false; // Hide both, we'll show combined option
-                  }
-                }
-                
-                return true;
-              })
-              .map((guarantee) => {
-                const isDisabled = guarantee.code === 'BG' && isBrisDeGlacesFree;
-
-                return (
-                  <label
-                    key={guarantee.id}
-                    className={`flex items-center p-3 border rounded-lg transition-all ${
-                      isDisabled
-                        ? 'bg-gray-50 dark:bg-gray-900 opacity-60'
-                        : 'hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer'
-                    } ${
-                      localGuarantees.includes(guarantee.id)
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                        : 'border-gray-200 dark:border-gray-700'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={localGuarantees.includes(guarantee.id)}
-                      onChange={() => handleGuaranteeToggle(guarantee.id)}
-                      disabled={isDisabled}
-                      className="mr-3"
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        {guarantee.nameFr}
-                      </div>
-                      {guarantee.code === 'BG' && isBrisDeGlacesFree && (
-                        <span className="text-xs text-green-600 dark:text-green-400">
-                          Inclus gratuitement
-                        </span>
-                      )}
-                    </div>
-                  </label>
-                );
-              })}
-            
-            {/* Lloyd Combined Option: CAT NAT + Dommages Émeutes */}
-            {(() => {
-              const hasLloyd = companies?.some((c: any) => c.code === 'LLOYD' && selectedCompanies.includes(c.id));
-              const hasOnlyLloyd = hasLloyd && selectedCompanies.length === 1;
-              
-              if (!hasOnlyLloyd) return null;
-              
-              const catNatGuarantee = optionalGuarantees.find(g => g.code === 'CATASTROPHES_NATURELLES');
-              const dommagesEmeutesGuarantee = optionalGuarantees.find(g => g.code === 'DOMMAGES_EMEUTES');
-              
-              if (!catNatGuarantee || !dommagesEmeutesGuarantee) return null;
-              
-              const isBothSelected = localGuarantees.includes(catNatGuarantee.id) && localGuarantees.includes(dommagesEmeutesGuarantee.id);
-              
-              return (
-                <label
-                  className={`flex items-center p-3 border rounded-lg transition-all hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer ${
-                    isBothSelected
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-gray-700'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isBothSelected}
-                    onChange={() => {
-                      if (isBothSelected) {
-                        // Uncheck both
-                        const updated = localGuarantees.filter(id => id !== catNatGuarantee.id && id !== dommagesEmeutesGuarantee.id);
-                        setLocalGuarantees(updated);
-                        if (localFormula) {
-                          onUpdate({
-                            formulaType: localFormula,
-                            selectedGuarantees: updated,
-                            conventionId: localConvention || undefined,
-                            franchiseRate: localFranchiseRate,
-                            bgLimit: localBgLimit,
-                            dcCapital: localDcCapital,
-                          });
-                        }
-                      } else {
-                        // Check both
-                        const updated = [...localGuarantees, catNatGuarantee.id, dommagesEmeutesGuarantee.id];
-                        setLocalGuarantees(updated);
-                        if (localFormula) {
-                          onUpdate({
-                            formulaType: localFormula,
-                            selectedGuarantees: updated,
-                            conventionId: localConvention || undefined,
-                            franchiseRate: localFranchiseRate,
-                            bgLimit: localBgLimit,
-                            dcCapital: localDcCapital,
-                          });
-                        }
-                      }
-                    }}
-                    className="mr-3"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium text-gray-900 dark:text-white">
-                      Extension Catastrophes Naturelles
-                    </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      Inclut: Catastrophes Naturelles + Dommages suite émeutes
-                    </span>
-                  </div>
-                </label>
-              );
-            })()}
-            
-            {/* Info message when both companies selected */}
-            {(() => {
-              const hasLloyd = companies?.some((c: any) => c.code === 'LLOYD' && selectedCompanies.includes(c.id));
-              const hasAmana = companies?.some((c: any) => c.code === 'AMANA' && selectedCompanies.includes(c.id));
-              const hasBothCompanies = hasLloyd && hasAmana;
-              
-              if (!hasBothCompanies) return null;
-              
-              const catNatGuarantee = optionalGuarantees.find(g => g.code === 'CATASTROPHES_NATURELLES');
-              const dommagesEmeutesGuarantee = optionalGuarantees.find(g => g.code === 'DOMMAGES_EMEUTES');
-              
-              if (!catNatGuarantee || !dommagesEmeutesGuarantee) return null;
-              
-              const hasEither = localGuarantees.includes(catNatGuarantee.id) || localGuarantees.includes(dommagesEmeutesGuarantee.id);
-              
-              if (!hasEither) return null;
-              
-              return (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                  <p className="text-xs text-blue-800 dark:text-blue-200">
-                    ℹ️ <strong>Lloyd Tunisien:</strong> Les garanties "Catastrophes Naturelles" et "Dommages suite émeutes" sont toujours combinées.
-                  </p>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* Conditional fields based on formula and BG selection */}
-      {localFormula === FormulaType.TOUS_RISQUES_0 && (
-        <div className="space-y-4">
-          <Select
-            label="Taux de franchise"
-            value={localFranchiseRate.toString()}
-            onChange={(e) => {
-              const rate = Number(e.target.value);
-              setLocalFranchiseRate(rate);
-              onUpdate({
-                formulaType: localFormula,
-                selectedGuarantees: localGuarantees,
-                conventionId: localConvention || undefined,
-                franchiseRate: rate,
-                bgLimit: localBgLimit,
-                dcCapital: localDcCapital,
-              });
-            }}
-            options={[
-              { value: '0', label: '0% (Bris de Glaces gratuit et sans limite)' },
-              { value: '1', label: '1%' },
-              { value: '2', label: '2%' },
-              { value: '4', label: '4%' },
-            ]}
-          />
-          {localFranchiseRate > 0 && (
-            <Select
-              label="Limite Bris de Glaces (DT)"
-              value={localBgLimit.toString()}
-              onChange={(e) => {
-                const limit = Number(e.target.value);
-                setLocalBgLimit(limit);
-                onUpdate({
-                  formulaType: localFormula,
-                  selectedGuarantees: localGuarantees,
-                  conventionId: localConvention || undefined,
-                  franchiseRate: localFranchiseRate,
-                  bgLimit: limit,
-                  dcCapital: localDcCapital,
-                });
-              }}
-              options={[
-                { value: '500', label: '500 DT' },
-                { value: '700', label: '700 DT' },
-                { value: '1000', label: '1 000 DT' },
-                { value: '1500', label: '1 500 DT' },
-                { value: '2000', label: '2 000 DT' },
-                { value: '2500', label: '2 500 DT' },
-                { value: '3000', label: '3 000 DT' },
-              ]}
-            />
-          )}
-        </div>
-      )}
-
-      {localFormula === FormulaType.DOMMAGES_COLLISIONS && (
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Capital assuré (DT)
-            </label>
-            <input
-              type="number"
-              min="1000"
-              step="1000"
-              value={localDcCapital}
-              onChange={(e) => {
-                const raw = Number(e.target.value);
-                const marketValue = (window as any).currentSimulationMarketValue;
-                const capital = snapDcCapital(raw, marketValue);
-                setLocalDcCapital(capital);
-                onUpdate({
-                  formulaType: localFormula,
-                  selectedGuarantees: localGuarantees,
-                  conventionId: localConvention || undefined,
-                  franchiseRate: localFranchiseRate,
-                  bgLimit: localBgLimit,
-                  dcCapital: capital,
-                });
-              }}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Tranches: 1000 DT (1K-10K), 5000 DT (10K-20K), 10000 DT (20K-50K), 25000 DT (50K-100K)
-            </p>
-          </div>
-          {(() => {
-            const bgGuarantee = optionalGuarantees.find(g => g.code === 'BG');
-            const isBgSelected = bgGuarantee && localGuarantees.includes(bgGuarantee.id);
-            return isBgSelected ? (
-              <Select
-                label="Limite Bris de Glaces (DT) - Optionnel"
-                value={localBgLimit.toString()}
-                onChange={(e) => {
-                  const limit = Number(e.target.value);
-                  setLocalBgLimit(limit);
-                  onUpdate({
-                    formulaType: localFormula,
-                    selectedGuarantees: localGuarantees,
-                    conventionId: localConvention || undefined,
-                    franchiseRate: localFranchiseRate,
-                    bgLimit: limit,
-                    dcCapital: localDcCapital,
-                  });
-                }}
-                options={[
-                  { value: '500', label: '500 DT' },
-                  { value: '700', label: '700 DT' },
-                  { value: '1000', label: '1 000 DT' },
-                  { value: '1500', label: '1 500 DT' },
-                  { value: '2000', label: '2 000 DT' },
-                  { value: '2500', label: '2 500 DT' },
-                  { value: '3000', label: '3 000 DT' },
-                ]}
-              />
-            ) : null;
-          })()}
-        </div>
-      )}
-
-      {localFormula === FormulaType.STANDARD && (() => {
-        const bgGuarantee = optionalGuarantees.find(g => g.code === 'BG');
-        const isBgSelected = bgGuarantee && localGuarantees.includes(bgGuarantee.id);
-        return isBgSelected ? (
-          <Select
-            label="Limite Bris de Glaces (DT)"
-            value={localBgLimit.toString()}
-            onChange={(e) => {
-              const limit = Number(e.target.value);
-              setLocalBgLimit(limit);
-              onUpdate({
-                formulaType: localFormula,
-                selectedGuarantees: localGuarantees,
-                conventionId: localConvention || undefined,
-                franchiseRate: localFranchiseRate,
-                bgLimit: limit,
-                dcCapital: localDcCapital,
-              });
-            }}
-            options={[
-              { value: '500', label: '500 DT' },
-              { value: '700', label: '700 DT' },
-              { value: '1000', label: '1 000 DT' },
-              { value: '1500', label: '1 500 DT' },
-              { value: '2000', label: '2 000 DT' },
-              { value: '2500', label: '2 500 DT' },
-              { value: '3000', label: '3 000 DT' },
-            ]}
-          />
-        ) : null;
-      })()}
 
       {companies && companies.length > 0 && (
         <div>
@@ -691,6 +358,332 @@ export const CoverageSelectionStep = ({
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Vous pouvez comparer jusqu'à 2 compagnies.</p>
         </div>
       )}
+
+
+
+      {optionalGuarantees.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            Garanties optionnelles
+          </label>
+          <div className="space-y-2">
+            {optionalGuarantees
+              .filter((guarantee) => {
+                // NEVER show these - they are formulas, not optional guarantees
+                if (guarantee.code === 'DOMMAGES_COLLISIONS') return false;
+                if (guarantee.code === 'TOUS_RISQUES_ZERO') return false;
+                if (guarantee.code === 'DEFENSE_RECOURS') return false;
+                
+                // Only hide CAT NAT and DOMMAGES_EMEUTES if Lloyd is the ONLY company selected
+                const hasLloyd = companies?.some((c: any) => c.code === 'LLOYD' && selectedCompanies.includes(c.id));
+                const hasOnlyLloyd = hasLloyd && selectedCompanies.length === 1;
+                
+                if (hasOnlyLloyd && (guarantee.code === 'CATASTROPHES_NATURELLES' || guarantee.code === 'DOMMAGES_EMEUTES')) {
+                  return false;
+                }
+                
+                return true;
+              })
+              .map((guarantee) => {
+                const isDisabled = guarantee.code === 'BG' && isBrisDeGlacesFree;
+
+                return (
+                  <label
+                    key={guarantee.id}
+                    className={`flex items-center p-3 border rounded-lg transition-all ${
+                      isDisabled
+                        ? 'bg-gray-50 dark:bg-gray-900 opacity-60'
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer'
+                    } ${
+                      localGuarantees.includes(guarantee.id)
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-700'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={localGuarantees.includes(guarantee.id)}
+                      onChange={() => handleGuaranteeToggle(guarantee.id)}
+                      disabled={isDisabled}
+                      className="mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900 dark:text-white">
+                        {guarantee.nameFr}
+                      </div>
+                      {guarantee.code === 'BG' && isBrisDeGlacesFree && (
+                        <span className="text-xs text-green-600 dark:text-green-400">
+                          Inclus gratuitement
+                        </span>
+                      )}
+                    </div>
+                  </label>
+                );
+              })}
+            
+            {/* Lloyd Combined Option: Only show when Lloyd is the ONLY company selected */}
+            {(() => {
+              const hasLloyd = companies?.some((c: any) => c.code === 'LLOYD' && selectedCompanies.includes(c.id));
+              const hasOnlyLloyd = hasLloyd && selectedCompanies.length === 1;
+              
+              if (!hasOnlyLloyd) return null;
+              
+              const catNatGuarantee = optionalGuarantees.find(g => g.code === 'CATASTROPHES_NATURELLES');
+              const dommagesEmeutesGuarantee = optionalGuarantees.find(g => g.code === 'DOMMAGES_EMEUTES');
+              
+              if (!catNatGuarantee || !dommagesEmeutesGuarantee) return null;
+              
+              const isBothSelected = localGuarantees.includes(catNatGuarantee.id) && localGuarantees.includes(dommagesEmeutesGuarantee.id);
+              
+              return (
+                <label
+                  className={`flex items-center p-3 border rounded-lg transition-all hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer ${
+                    isBothSelected
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                      : 'border-gray-200 dark:border-gray-700'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isBothSelected}
+                    onChange={() => {
+                      if (isBothSelected) {
+                        const updated = localGuarantees.filter(id => id !== catNatGuarantee.id && id !== dommagesEmeutesGuarantee.id);
+                        setLocalGuarantees(updated);
+                        if (localFormula) {
+                          onUpdate({
+                            formulaType: localFormula,
+                            selectedGuarantees: updated,
+                            conventionId: localConvention || undefined,
+                            franchiseRate: localFranchiseRate,
+                            bgLimit: localBgLimit,
+                            dcCapital: localDcCapital,
+                          });
+                        }
+                      } else {
+                        const updated = [...localGuarantees, catNatGuarantee.id, dommagesEmeutesGuarantee.id];
+                        setLocalGuarantees(updated);
+                        if (localFormula) {
+                          onUpdate({
+                            formulaType: localFormula,
+                            selectedGuarantees: updated,
+                            conventionId: localConvention || undefined,
+                            franchiseRate: localFranchiseRate,
+                            bgLimit: localBgLimit,
+                            dcCapital: localDcCapital,
+                          });
+                        }
+                      }
+                    }}
+                    className="mr-3"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      Catastrophes Naturelles / Dommages suite émeutes
+                    </div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      Extension combinée (Lloyd Tunisien)
+                    </span>
+                  </div>
+                </label>
+              );
+            })()}
+            
+            {/* Info message when both companies selected */}
+            {(() => {
+              const hasLloyd = companies?.some((c: any) => c.code === 'LLOYD' && selectedCompanies.includes(c.id));
+              const hasAmana = companies?.some((c: any) => c.code === 'AMANA' && selectedCompanies.includes(c.id));
+              const hasBothCompanies = hasLloyd && hasAmana;
+              
+              if (!hasBothCompanies) return null;
+              
+              const catNatGuarantee = optionalGuarantees.find(g => g.code === 'CATASTROPHES_NATURELLES');
+              const dommagesEmeutesGuarantee = optionalGuarantees.find(g => g.code === 'DOMMAGES_EMEUTES');
+              
+              if (!catNatGuarantee || !dommagesEmeutesGuarantee) return null;
+              
+              const hasEither = localGuarantees.includes(catNatGuarantee.id) || localGuarantees.includes(dommagesEmeutesGuarantee.id);
+              
+              if (!hasEither) return null;
+              
+              return (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    ℹ️ <strong>Note:</strong> Lloyd Tunisien regroupe ces garanties en une seule extension. Les deux devis seront générés correctement selon les règles de chaque compagnie.
+                  </p>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* BG limit for DC formula when BG is selected */}
+      {localFormula === FormulaType.DOMMAGES_COLLISIONS && (() => {
+        const bgGuarantee = optionalGuarantees.find(g => g.code === 'BG');
+        const isBgSelected = bgGuarantee && localGuarantees.includes(bgGuarantee.id);
+        return isBgSelected ? (
+          <Select
+            label="Limite Bris de Glaces (DT) - Optionnel"
+            value={localBgLimit.toString()}
+            onChange={(e) => {
+              const limit = Number(e.target.value);
+              setLocalBgLimit(limit);
+              onUpdate({
+                formulaType: localFormula,
+                selectedGuarantees: localGuarantees,
+                conventionId: localConvention || undefined,
+                franchiseRate: localFranchiseRate,
+                bgLimit: limit,
+                dcCapital: localDcCapital,
+              });
+            }}
+            options={[
+              { value: '500', label: '500 DT' },
+              { value: '700', label: '700 DT' },
+              { value: '1000', label: '1 000 DT' },
+              { value: '1500', label: '1 500 DT' },
+              { value: '2000', label: '2 000 DT' },
+              { value: '2500', label: '2 500 DT' },
+              { value: '3000', label: '3 000 DT' },
+            ]}
+          />
+        ) : null;
+      })()}
+
+      {localFormula === FormulaType.STANDARD && (() => {
+        const bgGuarantee = optionalGuarantees.find(g => g.code === 'BG');
+        const isBgSelected = bgGuarantee && localGuarantees.includes(bgGuarantee.id);
+        return isBgSelected ? (
+          <Select
+            label="Limite Bris de Glaces (DT)"
+            value={localBgLimit.toString()}
+            onChange={(e) => {
+              const limit = Number(e.target.value);
+              setLocalBgLimit(limit);
+              onUpdate({
+                formulaType: localFormula,
+                selectedGuarantees: localGuarantees,
+                conventionId: localConvention || undefined,
+                franchiseRate: localFranchiseRate,
+                bgLimit: limit,
+                dcCapital: localDcCapital,
+              });
+            }}
+            options={[
+              { value: '500', label: '500 DT' },
+              { value: '700', label: '700 DT' },
+              { value: '1000', label: '1 000 DT' },
+              { value: '1500', label: '1 500 DT' },
+              { value: '2000', label: '2 000 DT' },
+              { value: '2500', label: '2 500 DT' },
+              { value: '3000', label: '3 000 DT' },
+            ]}
+          />
+        ) : null;
+      })()}
+
+      {mandatoryGuarantees.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Garanties incluses systématiquement
+          </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            Ces garanties sont automatiquement incluses dans toutes les formules
+          </p>
+          <div className="space-y-2">
+            {mandatoryGuarantees.map((guarantee) => (
+              <div
+                key={guarantee.id}
+                className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+              >
+                <input
+                  type="checkbox"
+                  checked={true}
+                  disabled={true}
+                  className="mr-3"
+                />
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900 dark:text-white">
+                    {guarantee.nameFr}
+                  </div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Obligatoire
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </form>
+
+    {/* Formula Configuration Modal */}
+    {showFormulaModal && pendingFormula && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+            {pendingFormula === FormulaType.DOMMAGES_COLLISIONS ? 'Configuration Dommages Collision' : 'Configuration Tous Risques'}
+          </h3>
+
+          {pendingFormula === FormulaType.DOMMAGES_COLLISIONS && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Capital assuré (DT)
+              </label>
+              <select
+                value={localDcCapital.toString()}
+                onChange={(e) => setLocalDcCapital(Number(e.target.value))}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+              >
+                <option value="1000">1000 DT (1K-10K)</option>
+                <option value="5000">5000 DT (10K-20K)</option>
+                <option value="10000">10000 DT (20K-50K)</option>
+                <option value="25000">25000 DT (50K-100K)</option>
+              </select>
+            </div>
+          )}
+
+          {pendingFormula === FormulaType.TOUS_RISQUES_0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Taux de franchise
+              </label>
+              <select
+                value={localFranchiseRate.toString()}
+                onChange={(e) => setLocalFranchiseRate(Number(e.target.value))}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+              >
+                <option value="0">0% (Bris de Glaces gratuit et sans limite)</option>
+                <option value="1">1%</option>
+                <option value="2">2%</option>
+                <option value="4">4%</option>
+              </select>
+            </div>
+          )}
+
+          <div className="flex gap-3 mt-6">
+            <button
+              type="button"
+              onClick={() => {
+                setShowFormulaModal(false);
+                setPendingFormula(null);
+              }}
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              onClick={confirmFormulaSelection}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Confirmer
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
