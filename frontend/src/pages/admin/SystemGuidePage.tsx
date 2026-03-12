@@ -9,6 +9,7 @@ export const SystemGuidePage = () => {
   const [expandedSection, setExpandedSection] = useState<string | null>('workflow');
   const [loadingMinimal, setLoadingMinimal] = useState(false);
   const [loadingFull, setLoadingFull] = useState(false);
+  const [loadingWipe, setLoadingWipe] = useState(false);
 
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
@@ -35,6 +36,21 @@ export const SystemGuidePage = () => {
       toast.error(error.response?.data?.message || 'Erreur lors du seed complet');
     } finally {
       setLoadingFull(false);
+    }
+  };
+
+  const wipeDatabase = async () => {
+    if (!window.confirm('⚠️ ATTENTION: Cette action va supprimer TOUTES les données de la base de données. Êtes-vous sûr?')) {
+      return;
+    }
+    setLoadingWipe(true);
+    try {
+      const response = await api.post('/seed/wipe');
+      toast.success(response.data.message || 'Base de données nettoyée avec succès!');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Erreur lors du nettoyage');
+    } finally {
+      setLoadingWipe(false);
     }
   };
 
@@ -436,7 +452,48 @@ export const SystemGuidePage = () => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {/* Wipe Database Button */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-lg border-2 border-red-400 dark:border-red-600">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                      <Database className="w-5 h-5 text-red-600" />
+                    </div>
+                    <h4 className="font-bold text-gray-900 dark:text-white">Nettoyer la DB</h4>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">Supprimer toutes les données pour tester avec une base vide</p>
+                  <div className="space-y-2 text-xs mb-3">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-700 dark:text-gray-300">Supprime TOUTES les tables</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-700 dark:text-gray-300">Utilisateurs, devis, contrats</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-700 dark:text-gray-300">Compagnies, garanties, règles</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-700 dark:text-gray-300">Fonctionne en dev et prod</span>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={wipeDatabase}
+                    disabled={loadingWipe}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white"
+                    size="sm"
+                  >
+                    {loadingWipe ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Nettoyage...</>
+                    ) : (
+                      <><Database className="w-4 h-4 mr-2" /> Nettoyer la DB</>
+                    )}
+                  </Button>
+                </div>
+
                 {/* Scenario 0: Truly Empty - Manual Everything */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-lg border-2 border-gray-400 dark:border-gray-600">
                   <div className="flex items-center gap-2 mb-3">
