@@ -46,21 +46,34 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
     saveConfigMutation.mutate(generalParams);
   };
 
-  const validateVvRange = (minVv: number, maxVv: number | null): string | null => {
+  const validateVvRange = (minVv: number, maxVv: number | null, excludeId?: string): string | null => {
     if (minVv <= 0) return 'Min VV doit être > 0';
     if (maxVv !== null && maxVv <= minVv) return 'Max VV doit être > Min VV';
     
-    // Check for overlaps
+    // Check for overlaps (exclude current range being edited)
     const overlaps = vvRanges?.some((range: any) => {
-      if (maxVv === null) return false;
-      const rangeMax = range.maxVv || Infinity;
-      return (
-        (minVv >= range.minVv && minVv < rangeMax) ||
-        (maxVv > range.minVv && maxVv <= rangeMax)
-      );
+      if (range.id === excludeId) return false; // Skip the range being edited
+      const rangeMax = range.maxVv ?? Infinity;
+
+      if (maxVv === null) {
+        // New range is infinite: overlaps if any existing range extends into [minVv, ∞)
+        return rangeMax >= minVv;
+      } else {
+        // New range is finite: check using standard interval overlap
+        return (
+          (minVv >= range.minVv && minVv < rangeMax) ||
+          (maxVv > range.minVv && maxVv <= rangeMax)
+        );
+      }
     });
     
     if (overlaps) return 'Chevauchement avec une tranche existante';
+    return null;
+  };
+
+  const validateReductionRate = (rate: number | null): string | null => {
+    if (rate === null) return null; // Empty is valid (uses global)
+    if (rate < 0 || rate > 100) return 'Doit être entre 0 et 100';
     return null;
   };
 
@@ -336,23 +349,47 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
                   <td className="px-4 py-2">
                     <input
                       type="number"
+                      min="0"
                       defaultValue={range.minVv}
                       onBlur={(e) => {
-                      const val = parseFloat(e.target.value);
-                      if (!isNaN(val)) saveVvRangeMutation.mutate({ id: range.id, minVv: val, maxVv: range.maxVv, reductionRate: range.reductionRate });
-                    }}
+                        const val = parseFloat(e.target.value);
+                        if (isNaN(val)) {
+                          toast.error('Valeur invalide');
+                          e.target.value = range.minVv;
+                          return;
+                        }
+                        const error = validateVvRange(val, range.maxVv, range.id);
+                        if (error) {
+                          toast.error(error);
+                          e.target.value = range.minVv;
+                          return;
+                        }
+                        saveVvRangeMutation.mutate({ id: range.id, minVv: val, maxVv: range.maxVv, reductionRate: range.reductionRate });
+                      }}
                       className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                   </td>
                   <td className="px-4 py-2">
                     <input
                       type="number"
+                      min="0"
                       defaultValue={range.maxVv || ''}
                       placeholder="∞"
                       onBlur={(e) => {
-                      const val = e.target.value ? parseFloat(e.target.value) : null;
-                      if (e.target.value === '' || !isNaN(val!)) saveVvRangeMutation.mutate({ id: range.id, minVv: range.minVv, maxVv: val, reductionRate: range.reductionRate });
-                    }}
+                        const val = e.target.value ? parseFloat(e.target.value) : null;
+                        if (e.target.value !== '' && isNaN(val!)) {
+                          toast.error('Valeur invalide');
+                          e.target.value = range.maxVv || '';
+                          return;
+                        }
+                        const error = validateVvRange(range.minVv, val, range.id);
+                        if (error) {
+                          toast.error(error);
+                          e.target.value = range.maxVv || '';
+                          return;
+                        }
+                        saveVvRangeMutation.mutate({ id: range.id, minVv: range.minVv, maxVv: val, reductionRate: range.reductionRate });
+                      }}
                       className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                   </td>
@@ -365,9 +402,20 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
                       defaultValue={range.reductionRate || ''}
                       placeholder="Global"
                       onBlur={(e) => {
-                      const val = e.target.value ? parseFloat(e.target.value) : null;
-                      if (e.target.value === '' || !isNaN(val!)) saveVvRangeMutation.mutate({ id: range.id, minVv: range.minVv, maxVv: range.maxVv, reductionRate: val });
-                    }}
+                        const val = e.target.value ? parseFloat(e.target.value) : null;
+                        if (e.target.value !== '' && isNaN(val!)) {
+                          toast.error('Valeur invalide');
+                          e.target.value = range.reductionRate || '';
+                          return;
+                        }
+                        const error = validateReductionRate(val);
+                        if (error) {
+                          toast.error(error);
+                          e.target.value = range.reductionRate || '';
+                          return;
+                        }
+                        saveVvRangeMutation.mutate({ id: range.id, minVv: range.minVv, maxVv: range.maxVv, reductionRate: val });
+                      }}
                       className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       title="Laisser vide pour utiliser le taux global"
                     />
@@ -412,11 +460,24 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
                   <td className="px-4 py-2">
                     <input
                       type="number"
+                      min="1"
+                      step="1"
                       defaultValue={capital.amount}
                       onBlur={(e) => {
-                      const val = parseFloat(e.target.value);
-                      if (!isNaN(val)) saveCapitalMutation.mutate({ id: capital.id, amount: val, order: capital.order });
-                    }}
+                        const val = parseFloat(e.target.value);
+                        if (isNaN(val)) {
+                          toast.error('Valeur invalide');
+                          e.target.value = capital.amount;
+                          return;
+                        }
+                        const error = validateCapital(val);
+                        if (error) {
+                          toast.error(error);
+                          e.target.value = capital.amount;
+                          return;
+                        }
+                        saveCapitalMutation.mutate({ id: capital.id, amount: val, order: capital.order });
+                      }}
                       className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                   </td>

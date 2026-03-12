@@ -44,11 +44,37 @@ export const GuaranteeRuleModal = ({
       toast.success(rule ? 'Règle modifiée' : 'Règle créée');
       onSuccess();
     },
-    onError: () => toast.error('Erreur'),
+    onError: (error: any) => {
+      const message = error?.response?.data?.message || 'Erreur lors de la sauvegarde';
+      toast.error(message);
+    },
   });
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
+
+    // Define required fields per guarantee
+    const requiredFields: Record<string, string[]> = {
+      'VOL': ['ratePercentage', 'fixedPremium'],
+      'INCENDIE': ['ratePercentage', 'fixedPremium'],
+      'TOUS_RISQUES_ZERO': ['franchiseRate', 'ratePercentage', 'fixedPremium'],
+      'CAS': ['fixedPremium'],
+      'ASSISTANCE': ['fixedPremium'],
+      'PERSONNES_TRANSPORTEES': ['minCapital', 'fixedPremium'],
+      'BG': ['ratePercentage'],
+      'INCENDIE_EMEUTES': ['fixedPremium'],
+      'DOMMAGES_EMEUTES': ['fixedPremium'],
+      'CATASTROPHES_NATURELLES': ['fixedPremium'],
+      'DOMMAGES_COLLISIONS': ['fixedPremium'],
+    };
+
+    // Check required fields are not empty
+    const required = requiredFields[guarantee.code] || [];
+    required.forEach(field => {
+      if (showField(field) && formData[field as keyof typeof formData] === '') {
+        newErrors[field] = 'Ce champ est obligatoire';
+      }
+    });
 
     // Validate reductionRate (0-100)
     if (formData.reductionRate !== '' && showField('reductionRate')) {
@@ -60,13 +86,15 @@ export const GuaranteeRuleModal = ({
       }
     }
 
-    // Validate ratePercentage (> 0)
+    // Validate ratePercentage
     if (formData.ratePercentage !== '' && showField('ratePercentage')) {
       const rate = parseFloat(formData.ratePercentage as string);
       if (isNaN(rate)) {
         newErrors.ratePercentage = 'Valeur invalide';
       } else if (rate <= 0) {
         newErrors.ratePercentage = 'Doit être supérieur à 0';
+      } else if (guarantee.code === 'BG' && rate > 100) {
+        newErrors.ratePercentage = 'Ne peut pas dépasser 100%';
       }
     }
 
@@ -95,6 +123,22 @@ export const GuaranteeRuleModal = ({
       const franchise = parseFloat(formData.franchiseRate as string);
       if (![0, 1, 2, 4].includes(franchise)) {
         newErrors.franchiseRate = 'Doit être 0, 1, 2 ou 4';
+      }
+    }
+
+    // Validate minMarketValue and maxMarketValue range
+    if (showField('minMarketValue') || showField('maxMarketValue')) {
+      const minVal = formData.minMarketValue !== '' ? parseFloat(formData.minMarketValue as string) : null;
+      const maxVal = formData.maxMarketValue !== '' ? parseFloat(formData.maxMarketValue as string) : null;
+
+      if (minVal !== null && (isNaN(minVal) || minVal < 0)) {
+        newErrors.minMarketValue = 'Doit être supérieur ou égal à 0';
+      }
+      if (maxVal !== null && (isNaN(maxVal) || maxVal < 0)) {
+        newErrors.maxMarketValue = 'Doit être supérieur ou égal à 0';
+      }
+      if (minVal !== null && maxVal !== null && !isNaN(minVal) && !isNaN(maxVal) && minVal > maxVal) {
+        newErrors.maxMarketValue = 'La valeur max doit être ≥ la valeur min';
       }
     }
 
@@ -430,14 +474,24 @@ export const GuaranteeRuleModal = ({
                 <input
                   type="number"
                   step="0.01"
+                  min="0"
                   value={formData.minMarketValue}
-                  onChange={(e) => setFormData({ ...formData, minMarketValue: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  onChange={(e) => {
+                    setFormData({ ...formData, minMarketValue: e.target.value });
+                    setErrors({ ...errors, minMarketValue: '' });
+                  }}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                    errors.minMarketValue ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
+                  }`}
                   placeholder="0"
                 />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Laisser vide pour aucune limite minimale
-                </p>
+                {errors.minMarketValue ? (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.minMarketValue}</p>
+                ) : (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Laisser vide pour aucune limite minimale
+                  </p>
+                )}
               </div>
             )}
 
@@ -449,14 +503,24 @@ export const GuaranteeRuleModal = ({
                 <input
                   type="number"
                   step="0.01"
+                  min="0"
                   value={formData.maxMarketValue}
-                  onChange={(e) => setFormData({ ...formData, maxMarketValue: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  onChange={(e) => {
+                    setFormData({ ...formData, maxMarketValue: e.target.value });
+                    setErrors({ ...errors, maxMarketValue: '' });
+                  }}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                    errors.maxMarketValue ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
+                  }`}
                   placeholder="0"
                 />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Laisser vide pour aucune limite maximale
-                </p>
+                {errors.maxMarketValue ? (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.maxMarketValue}</p>
+                ) : (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Laisser vide pour aucune limite maximale
+                  </p>
+                )}
               </div>
             )}
 

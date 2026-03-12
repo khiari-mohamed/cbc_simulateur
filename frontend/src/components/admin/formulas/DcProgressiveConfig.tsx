@@ -82,6 +82,18 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
     return Object.keys(newErrors).length === 0;
   };
 
+  const validateCapitalTier = (minAmount: number, maxAmount: number | null, step: number): string | null => {
+    if (minAmount <= 0) return 'Min doit être > 0';
+    if (maxAmount !== null && maxAmount <= minAmount) return 'Max doit être > Min';
+    if (step <= 0) return 'Pas doit être > 0';
+    return null;
+  };
+
+  const validateProgressiveTierRate = (rate: number): string | null => {
+    if (rate < 0 || rate > 1) return 'Le taux doit être compris entre 0 et 1';
+    return null;
+  };
+
   const handleSaveConfig = () => {
     if (!validateGeneralParams()) {
       toast.error('Veuillez corriger les erreurs de validation');
@@ -438,34 +450,73 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
                   <td className="px-4 py-2">
                     <input
                       type="number"
+                      min="1"
+                      step="1"
                       defaultValue={tier.minAmount}
                       onBlur={(e) => {
-                      const val = parseFloat(e.target.value);
-                      if (!isNaN(val)) saveCapitalTierMutation.mutate({ id: tier.id, minAmount: val, maxAmount: tier.maxAmount, step: tier.step });
-                    }}
+                        const val = parseFloat(e.target.value);
+                        if (isNaN(val)) {
+                          toast.error('Valeur invalide');
+                          e.target.value = tier.minAmount;
+                          return;
+                        }
+                        const error = validateCapitalTier(val, tier.maxAmount, tier.step);
+                        if (error) {
+                          toast.error(error);
+                          e.target.value = tier.minAmount;
+                          return;
+                        }
+                        saveCapitalTierMutation.mutate({ id: tier.id, minAmount: val, maxAmount: tier.maxAmount, step: tier.step });
+                      }}
                       className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                   </td>
                   <td className="px-4 py-2">
                     <input
                       type="number"
+                      min="1"
+                      step="1"
                       defaultValue={tier.maxAmount || ''}
                       placeholder="-"
                       onBlur={(e) => {
-                      const val = e.target.value ? parseFloat(e.target.value) : null;
-                      if (e.target.value === '' || !isNaN(val!)) saveCapitalTierMutation.mutate({ id: tier.id, minAmount: tier.minAmount, maxAmount: val, step: tier.step });
-                    }}
+                        const val = e.target.value ? parseFloat(e.target.value) : null;
+                        if (e.target.value !== '' && isNaN(val!)) {
+                          toast.error('Valeur invalide');
+                          e.target.value = tier.maxAmount || '';
+                          return;
+                        }
+                        const error = validateCapitalTier(tier.minAmount, val, tier.step);
+                        if (error) {
+                          toast.error(error);
+                          e.target.value = tier.maxAmount || '';
+                          return;
+                        }
+                        saveCapitalTierMutation.mutate({ id: tier.id, minAmount: tier.minAmount, maxAmount: val, step: tier.step });
+                      }}
                       className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                   </td>
                   <td className="px-4 py-2">
                     <input
                       type="number"
+                      min="1"
+                      step="1"
                       defaultValue={tier.step}
                       onBlur={(e) => {
-                      const val = parseFloat(e.target.value);
-                      if (!isNaN(val)) saveCapitalTierMutation.mutate({ id: tier.id, minAmount: tier.minAmount, maxAmount: tier.maxAmount, step: val });
-                    }}
+                        const val = parseFloat(e.target.value);
+                        if (isNaN(val)) {
+                          toast.error('Valeur invalide');
+                          e.target.value = tier.step;
+                          return;
+                        }
+                        const error = validateCapitalTier(tier.minAmount, tier.maxAmount, val);
+                        if (error) {
+                          toast.error(error);
+                          e.target.value = tier.step;
+                          return;
+                        }
+                        saveCapitalTierMutation.mutate({ id: tier.id, minAmount: tier.minAmount, maxAmount: tier.maxAmount, step: val });
+                      }}
                       className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                   </td>
@@ -473,7 +524,11 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => deleteCapitalTierMutation.mutate(tier.id)}
+                      onClick={() => {
+                        if (window.confirm('Supprimer définitivement ce palier ?')) {
+                          deleteCapitalTierMutation.mutate(tier.id);
+                        }
+                      }}
                     >
                       <Trash2 className="w-4 h-4 text-red-600" />
                     </Button>
@@ -516,7 +571,11 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => deleteProgressiveTierMutation.mutate(tier.id)}
+                  onClick={() => {
+                    if (window.confirm('Supprimer définitivement cette tranche ?')) {
+                      deleteProgressiveTierMutation.mutate(tier.id);
+                    }
+                  }}
                 >
                   <Trash2 className="w-3 h-3 text-red-600" />
                 </Button>
@@ -524,10 +583,23 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
               <input
                 type="number"
                 step="0.001"
+                min="0"
+                max="1"
                 defaultValue={Number(tier.tierRate)}
                 onBlur={(e) => {
                   const val = parseFloat(e.target.value);
-                  if (!isNaN(val)) saveProgressiveTierMutation.mutate({ id: tier.id, tierRate: val });
+                  if (isNaN(val)) {
+                    toast.error('Valeur invalide');
+                    e.target.value = tier.tierRate;
+                    return;
+                  }
+                  const error = validateProgressiveTierRate(val);
+                  if (error) {
+                    toast.error(error);
+                    e.target.value = tier.tierRate;
+                    return;
+                  }
+                  saveProgressiveTierMutation.mutate({ id: tier.id, tierRate: val });
                 }}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               />

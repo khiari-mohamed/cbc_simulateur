@@ -81,65 +81,53 @@ export class PricingEngineService {
 
     // 1. RC (MANDATORY - Always included)
     const rcResult = await this.calculateRC(companyId, vehicle, simulation, conventionId);
-    if (rcResult) {
-      console.log('✅ RC calculated:', rcResult.prime.toString());
-      items.push(rcResult);
-      primeNette = primeNette.add(rcResult.prime);
-      primeRC = rcResult.prime;
-    } else {
-      console.log('❌ RC NOT calculated - no pricing rule found');
+    if (!rcResult) {
+      throw new BadRequestException('RC pricing rule not found for company/vehicle combination');
     }
+    console.log('✅ RC calculated:', rcResult.prime.toString());
+    items.push(rcResult);
+    primeNette = primeNette.add(rcResult.prime);
+    primeRC = rcResult.prime;
 
     // 2. CAS (MANDATORY - Always included)
     const casResult = await this.calculateCAS(companyId, conventionId);
-    if (casResult) {
-      console.log('✅ CAS calculated:', casResult.prime.toString());
-      items.push(casResult);
-      primeNette = primeNette.add(casResult.prime);
-    } else {
-      console.log('❌ CAS NOT calculated - no pricing rule found');
+    if (!casResult) {
+      throw new BadRequestException('CAS pricing rule not found for company');
     }
+    console.log('✅ CAS calculated:', casResult.prime.toString());
+    items.push(casResult);
+    primeNette = primeNette.add(casResult.prime);
 
     // 3. VOL (MANDATORY - Always included)
     const volResult = await this.calculateVOL(companyId, vehicle, conventionId);
-    if (volResult) {
-      console.log('✅ VOL calculated:', volResult.prime.toString());
-      items.push(volResult);
-      primeNette = primeNette.add(volResult.prime);
-    } else {
-      console.log('❌ VOL NOT calculated - no pricing rule found');
-    }
+    console.log('✅ VOL calculated:', volResult.prime.toString());
+    items.push(volResult);
+    primeNette = primeNette.add(volResult.prime);
 
     // 4. INCENDIE (MANDATORY - Always included)
     const incendieResult = await this.calculateINCENDIE(companyId, vehicle, conventionId);
-    if (incendieResult) {
-      console.log('✅ INCENDIE calculated:', incendieResult.prime.toString());
-      items.push(incendieResult);
-      primeNette = primeNette.add(incendieResult.prime);
-    } else {
-      console.log('❌ INCENDIE NOT calculated - no pricing rule found');
-    }
+    console.log('✅ INCENDIE calculated:', incendieResult.prime.toString());
+    items.push(incendieResult);
+    primeNette = primeNette.add(incendieResult.prime);
 
     // 5. PERSONNES_TRANSPORTEES (MANDATORY - Always included)
     const selectedCapital = simulation.selectedCapitals?.['PERSONNES_TRANSPORTEES'];
     const ptResult = await this.calculatePERSONNES_TRANSPORTEES(companyId, selectedCapital, conventionId);
-    if (ptResult) {
-      console.log('✅ PTA calculated:', ptResult.prime.toString());
-      items.push(ptResult);
-      primeNette = primeNette.add(ptResult.prime);
-    } else {
-      console.log('❌ PTA NOT calculated - no pricing rule found');
+    if (!ptResult) {
+      throw new BadRequestException('PERSONNES_TRANSPORTEES pricing rule not found for company');
     }
+    console.log('✅ PTA calculated:', ptResult.prime.toString());
+    items.push(ptResult);
+    primeNette = primeNette.add(ptResult.prime);
 
     // 6. ASSISTANCE (MANDATORY - Always included)
     const assistanceResult = await this.calculateASSISTANCE(companyId, conventionId);
-    if (assistanceResult) {
-      console.log('✅ ASSISTANCE calculated:', assistanceResult.prime.toString());
-      items.push(assistanceResult);
-      primeNette = primeNette.add(assistanceResult.prime);
-    } else {
-      console.log('❌ ASSISTANCE NOT calculated - no pricing rule found');
+    if (!assistanceResult) {
+      throw new BadRequestException('ASSISTANCE pricing rule not found for company');
     }
+    console.log('✅ ASSISTANCE calculated:', assistanceResult.prime.toString());
+    items.push(assistanceResult);
+    primeNette = primeNette.add(assistanceResult.prime);
 
     // 7. TOUS_RISQUES_0 (Only if formula is TOUS_RISQUES_0)
     if (simulation.formulaType === FormulaType.TOUS_RISQUES_0) {
@@ -392,9 +380,16 @@ export class PricingEngineService {
     };
   }
 
-  private async calculateVOL(companyId: string, vehicle: VehicleData, conventionId?: string) {
+  private async calculateVOL(companyId: string, vehicle: VehicleData, conventionId?: string): Promise<{
+    guaranteeCode: string;
+    guaranteeId: string;
+    capital: Decimal;
+    prime: Decimal;
+  }> {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'VOL' } });
-    if (!guarantee) return null;
+    if (!guarantee) {
+      throw new BadRequestException('VOL guarantee not found in database');
+    }
 
     const conventionScope = conventionId ? { conventionId } : { conventionId: null };
 
@@ -404,6 +399,20 @@ export class PricingEngineService {
         guaranteeId: guarantee.id,
         isActive: true,
         ...conventionScope,
+        AND: [
+          {
+            OR: [
+              { minMarketValue: null },
+              { minMarketValue: { lte: vehicle.marketValue } },
+            ],
+          },
+          {
+            OR: [
+              { maxMarketValue: null },
+              { maxMarketValue: { gte: vehicle.marketValue } },
+            ],
+          },
+        ],
       },
     });
     
@@ -414,11 +423,27 @@ export class PricingEngineService {
           guaranteeId: guarantee.id,
           isActive: true,
           conventionId: null,
+          AND: [
+            {
+              OR: [
+                { minMarketValue: null },
+                { minMarketValue: { lte: vehicle.marketValue } },
+              ],
+            },
+            {
+              OR: [
+                { maxMarketValue: null },
+                { maxMarketValue: { gte: vehicle.marketValue } },
+              ],
+            },
+          ],
         },
       });
     }
 
-    if (!rule) return null;
+    if (!rule) {
+      throw new BadRequestException(`VOL pricing rule not found for company and vehicle market value ${vehicle.marketValue} DT`);
+    }
 
     let prime: Decimal;
 
@@ -433,7 +458,9 @@ export class PricingEngineService {
       prime = new Decimal(this.formulaEvaluator.evaluateFormula(rule.formula, variables));
     } else {
       // Fallback to hardcoded formula
-      if (rule.ratePercentage === null || rule.fixedPremium === null) return null;
+      if (rule.ratePercentage === null || rule.fixedPremium === null) {
+        throw new BadRequestException('VOL pricing rule is missing required fields (ratePercentage or fixedPremium)');
+      }
       prime = vehicle.marketValue.mul(rule.ratePercentage).add(rule.fixedPremium);
       
       if (rule.reductionRate && rule.reductionRate.gt(0)) {
@@ -462,9 +489,16 @@ export class PricingEngineService {
     };
   }
 
-  private async calculateINCENDIE(companyId: string, vehicle: VehicleData, conventionId?: string) {
+  private async calculateINCENDIE(companyId: string, vehicle: VehicleData, conventionId?: string): Promise<{
+    guaranteeCode: string;
+    guaranteeId: string;
+    capital: Decimal;
+    prime: Decimal;
+  }> {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'INCENDIE' } });
-    if (!guarantee) return null;
+    if (!guarantee) {
+      throw new BadRequestException('INCENDIE guarantee not found in database');
+    }
 
     const conventionScope = conventionId ? { conventionId } : { conventionId: null };
 
@@ -474,6 +508,20 @@ export class PricingEngineService {
         guaranteeId: guarantee.id,
         isActive: true,
         ...conventionScope,
+        AND: [
+          {
+            OR: [
+              { minMarketValue: null },
+              { minMarketValue: { lte: vehicle.marketValue } },
+            ],
+          },
+          {
+            OR: [
+              { maxMarketValue: null },
+              { maxMarketValue: { gte: vehicle.marketValue } },
+            ],
+          },
+        ],
       },
     });
     
@@ -484,11 +532,27 @@ export class PricingEngineService {
           guaranteeId: guarantee.id,
           isActive: true,
           conventionId: null,
+          AND: [
+            {
+              OR: [
+                { minMarketValue: null },
+                { minMarketValue: { lte: vehicle.marketValue } },
+              ],
+            },
+            {
+              OR: [
+                { maxMarketValue: null },
+                { maxMarketValue: { gte: vehicle.marketValue } },
+              ],
+            },
+          ],
         },
       });
     }
 
-    if (!rule) return null;
+    if (!rule) {
+      throw new BadRequestException(`INCENDIE pricing rule not found for company and vehicle market value ${vehicle.marketValue} DT`);
+    }
 
     let prime: Decimal;
 
@@ -503,7 +567,9 @@ export class PricingEngineService {
       prime = new Decimal(this.formulaEvaluator.evaluateFormula(rule.formula, variables));
     } else {
       // Fallback to hardcoded formula
-      if (rule.ratePercentage === null || rule.fixedPremium === null) return null;
+      if (rule.ratePercentage === null || rule.fixedPremium === null) {
+        throw new BadRequestException('INCENDIE pricing rule is missing required fields (ratePercentage or fixedPremium)');
+      }
       prime = vehicle.marketValue.mul(rule.ratePercentage).add(rule.fixedPremium);
       
       if (rule.reductionRate && rule.reductionRate.gt(0)) {
@@ -618,11 +684,16 @@ export class PricingEngineService {
     };
   }
 
-  private async calculateTOUS_RISQUES_0(companyId: string, vehicle: VehicleData, vehicleAge: number, simulation: SimulationData, franchiseRate: number, conventionId?: string) {
+  private async calculateTOUS_RISQUES_0(companyId: string, vehicle: VehicleData, vehicleAge: number, simulation: SimulationData, franchiseRate: number, conventionId?: string): Promise<{
+    guaranteeCode: string;
+    guaranteeId: string;
+    capital: Decimal;
+    prime: Decimal;
+  } | null> {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'TOUS_RISQUES_ZERO' } });
     if (!guarantee) {
       console.log('❌ TOUS_RISQUES_ZERO guarantee not found');
-      return null;
+      throw new BadRequestException('TOUS_RISQUES_ZERO guarantee not found in database');
     }
 
     const conventionScope = conventionId ? { conventionId } : { conventionId: null };
@@ -634,6 +705,20 @@ export class PricingEngineService {
         franchiseRate: franchiseRate,
         isActive: true,
         ...conventionScope,
+        AND: [
+          {
+            OR: [
+              { minMarketValue: null },
+              { minMarketValue: { lte: vehicle.newValue } },
+            ],
+          },
+          {
+            OR: [
+              { maxMarketValue: null },
+              { maxMarketValue: { gte: vehicle.newValue } },
+            ],
+          },
+        ],
       },
     });
 
@@ -645,11 +730,27 @@ export class PricingEngineService {
           franchiseRate: franchiseRate,
           isActive: true,
           conventionId: null,
+          AND: [
+            {
+              OR: [
+                { minMarketValue: null },
+                { minMarketValue: { lte: vehicle.newValue } },
+              ],
+            },
+            {
+              OR: [
+                { maxMarketValue: null },
+                { maxMarketValue: { gte: vehicle.newValue } },
+              ],
+            },
+          ],
         },
       });
     }
 
-    if (!rule) return null;
+    if (!rule) {
+      throw new BadRequestException(`TOUS_RISQUES_0 pricing rule not found for company, franchise ${franchiseRate}%, and vehicle new value ${vehicle.newValue} DT`);
+    }
 
     let prime: Decimal;
 
@@ -1016,6 +1117,20 @@ export class PricingEngineService {
         guaranteeId: guarantee.id,
         isActive: true,
         ...conventionScope,
+        AND: [
+          {
+            OR: [
+              { minMarketValue: null },
+              { minMarketValue: { lte: vehicle.marketValue } },
+            ],
+          },
+          {
+            OR: [
+              { maxMarketValue: null },
+              { maxMarketValue: { gte: vehicle.marketValue } },
+            ],
+          },
+        ],
       },
     });
 
@@ -1026,6 +1141,20 @@ export class PricingEngineService {
           guaranteeId: guarantee.id,
           isActive: true,
           conventionId: null,
+          AND: [
+            {
+              OR: [
+                { minMarketValue: null },
+                { minMarketValue: { lte: vehicle.marketValue } },
+              ],
+            },
+            {
+              OR: [
+                { maxMarketValue: null },
+                { maxMarketValue: { gte: vehicle.marketValue } },
+              ],
+            },
+          ],
         },
       });
     }
