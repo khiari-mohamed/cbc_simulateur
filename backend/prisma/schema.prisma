@@ -118,7 +118,7 @@
     id           String   @id @default(uuid())
     name         String   @unique
     code         String   @unique
-    contractFees Decimal? @db.Decimal(12, 2)
+    contractFees Decimal? @db.Decimal(15, 0)
     fpac         Decimal  @default(0.5) @db.Decimal(12, 2)
     fssr         Decimal  @default(0.3) @db.Decimal(12, 2)
     fg           Decimal  @default(3.0) @db.Decimal(12, 2)
@@ -219,8 +219,8 @@
     registration         String?
     fiscalHorsepower     Int
     numberOfSeats        Int
-    newValue             Decimal  @db.Decimal(12, 2)
-    marketValue          Decimal  @db.Decimal(12, 2)
+    newValue             Decimal  @db.Decimal(15, 0)
+    marketValue          Decimal  @db.Decimal(15, 0)
     firstCirculationDate DateTime
     createdAt            DateTime @default(now())
     updatedAt            DateTime @updatedAt
@@ -256,7 +256,7 @@
     formulaType   FormulaType
     franchiseRate Int?
     bgLimit       Int?
-    dcCapital     Decimal?         @db.Decimal(12, 2)
+    dcCapital     Decimal?         @db.Decimal(15, 0)
     status        SimulationStatus @default(DRAFT)
     createdAt     DateTime         @default(now())
     updatedAt     DateTime         @updatedAt
@@ -276,7 +276,7 @@
     guaranteeId  String
     guarantee    Guarantee  @relation(fields: [guaranteeId], references: [id])
     isSelected   Boolean    @default(false)
-    customValue  Decimal?   @db.Decimal(12, 2)
+    customValue  Decimal?   @db.Decimal(15, 0)
 
     @@map("simulation_guarantees")
   }
@@ -292,13 +292,13 @@
     companyId         String
     company           Company          @relation(fields: [companyId], references: [id])
     status            QuoteStatus      @default(GENERATED)
-    primeNette        Decimal          @db.Decimal(12, 2)
-    frais             Decimal          @db.Decimal(12, 2)
-    taxes             Decimal          @db.Decimal(12, 2)
-    fpac              Decimal          @db.Decimal(12, 2)
-    fssr              Decimal          @db.Decimal(12, 2)
-    fg                Decimal          @db.Decimal(12, 2)
-    totalAPayer       Decimal          @db.Decimal(12, 2)
+    primeNette        Decimal          @db.Decimal(15, 0)
+    frais             Decimal          @db.Decimal(15, 0)
+    taxes             Decimal          @db.Decimal(15, 0)
+    fpac              Decimal          @db.Decimal(15, 0)
+    fssr              Decimal          @db.Decimal(15, 0)
+    fg                Decimal          @db.Decimal(15, 0)
+    totalAPayer       Decimal          @db.Decimal(15, 0)
     pricingSnapshot   Json?
     pdfPath           String?
     validatedById     String?
@@ -326,8 +326,8 @@
     quote       Quote     @relation(fields: [quoteId], references: [id], onDelete: Cascade)
     guaranteeId String
     guarantee   Guarantee @relation(fields: [guaranteeId], references: [id])
-    capital     Decimal   @db.Decimal(12, 2)
-    prime       Decimal   @db.Decimal(12, 2)
+    capital     Decimal   @db.Decimal(15, 0)
+    prime       Decimal   @db.Decimal(15, 0)
 
     @@map("quote_items")
   }
@@ -344,7 +344,7 @@
     endDate         DateTime
     pdfPath         String?
     deliveryType    DeliveryType   @default(AGENCY_PICKUP)
-    deliveryFee     Decimal        @default(0) @db.Decimal(12, 2)
+    deliveryFee     Decimal        @default(0) @db.Decimal(15, 0)
     quittanceNumber String?
     createdById     String
     createdBy       User           @relation("ContractCreator", fields: [createdById], references: [id])
@@ -388,19 +388,19 @@
     bonusMalusClass Int?
     minAge          Int?
     maxAge          Int?
-    minCapital      Decimal?     @db.Decimal(12, 2)
-    maxCapital      Decimal?     @db.Decimal(12, 2)
-    minMarketValue  Decimal?     @db.Decimal(12, 2)
-    maxMarketValue  Decimal?     @db.Decimal(12, 2)
+    minCapital      Decimal?     @db.Decimal(15, 0)
+    maxCapital      Decimal?     @db.Decimal(15, 0)
+    minMarketValue  Decimal?     @db.Decimal(15, 0)
+    maxMarketValue  Decimal?     @db.Decimal(15, 0)
     franchiseRate   Int?
     ratePercentage  Decimal?     @db.Decimal(12, 6)
     baseRate        Decimal?     @db.Decimal(12, 4)
-    fixedPremium    Decimal?     @db.Decimal(12, 2)
+    fixedPremium    Decimal?     @db.Decimal(15, 0)
     multiplier      Decimal?     @db.Decimal(12, 4)
     reductionRate   Decimal?     @db.Decimal(5, 2)
     tierLevel       Int?
     tierRate        Decimal?     @db.Decimal(12, 6)
-    basePremium     Decimal?     @db.Decimal(12, 2)
+    basePremium     Decimal?     @db.Decimal(15, 0)
     usageType       UsageType?
     validFrom       DateTime     @default(now())
     validTo         DateTime?
@@ -416,9 +416,9 @@
     companyId  String
     company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
     usageType  UsageType
-    minAmount  Decimal   @db.Decimal(12, 2)
-    maxAmount  Decimal?  @db.Decimal(12, 2)
-    step       Decimal   @db.Decimal(12, 2)
+    minAmount  Decimal   @db.Decimal(15, 0)
+    maxAmount  Decimal?  @db.Decimal(15, 0)
+    step       Decimal   @db.Decimal(15, 0)
     isActive   Boolean   @default(true)
     createdAt  DateTime  @default(now())
     updatedAt  DateTime  @updatedAt
@@ -449,8 +449,8 @@
     companyId    String
     company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
     usageType    UsageType
-    minVv        Decimal   @db.Decimal(12, 2)
-    maxVv        Decimal?  @db.Decimal(12, 2)
+    minVv        Decimal   @db.Decimal(15, 0)
+    maxVv        Decimal?  @db.Decimal(15, 0)
     reductionRate Decimal? @db.Decimal(5, 2)
     isActive     Boolean   @default(true)
     createdAt    DateTime  @default(now())
@@ -468,7 +468,7 @@
     companyId  String
     company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
     usageType  UsageType
-    amount     Decimal   @db.Decimal(12, 2)
+    amount     Decimal   @db.Decimal(15, 0)
     order      Int
     isActive   Boolean   @default(true)
     createdAt  DateTime  @default(now())
@@ -490,7 +490,7 @@
     vvRange    DcMatrixVvRange @relation(fields: [vvRangeId], references: [id], onDelete: Cascade)
     capitalId  String
     capital    DcMatrixCapital @relation(fields: [capitalId], references: [id], onDelete: Cascade)
-    prime      Decimal         @db.Decimal(12, 2)
+    prime      Decimal         @db.Decimal(15, 0)
     createdAt  DateTime        @default(now())
     updatedAt  DateTime        @updatedAt
 
@@ -506,10 +506,10 @@
     usageType         UsageType
     useMatrix         Boolean   @default(false)
     franchise         Decimal   @default(0) @db.Decimal(5, 2)
-    minCapital        Decimal   @default(1000) @db.Decimal(12, 2)
+    minCapital        Decimal   @default(1000) @db.Decimal(15, 0)
     maxCapitalPercent Decimal   @default(50) @db.Decimal(5, 2)
-    maxCapitalAbsolute Decimal  @default(100000) @db.Decimal(12, 2)
-    basePremium       Decimal   @default(10) @db.Decimal(12, 2)
+    maxCapitalAbsolute Decimal  @default(100000) @db.Decimal(15, 0)
+    basePremium       Decimal   @default(10) @db.Decimal(15, 0)
     discountPercent   Decimal   @default(0) @db.Decimal(5, 2)
     isActive          Boolean   @default(true)
     createdAt         DateTime  @default(now())
@@ -539,7 +539,7 @@
     id        String        @id @default(uuid())
     quoteId   String
     orderId   String        @unique
-    amount    Decimal       @db.Decimal(12, 2)
+    amount    Decimal       @db.Decimal(15, 0)
     method    String
     status    PaymentStatus @default(PENDING)
     reference String?

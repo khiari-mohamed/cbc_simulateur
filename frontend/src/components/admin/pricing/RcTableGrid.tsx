@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Download, Upload, Save, AlertCircle, CheckCircle } from 'lucide-react';
+import { Download, Save, AlertCircle, CheckCircle, FileSpreadsheet } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
 import api from '../../../lib/api/client';
 import toast from 'react-hot-toast';
+import { useExcelImport } from '../../../hooks/useExcelImport';
 
 interface RcCell {
   id?: string;
@@ -31,6 +32,104 @@ export const RcTableGrid = () => {
   const [selectedCompany, setSelectedCompany] = useState('');
   const [editedCells, setEditedCells] = useState<Map<string, number>>(new Map());
   const [hasChanges, setHasChanges] = useState(false);
+  const [focusedCell, setFocusedCell] = useState<string | null>(null);
+
+  const formatNumber = (num: number): string => {
+    // Format with commas as thousand separators to match Excel format
+    return num.toLocaleString('en-US'); // Uses commas: 77,000
+  };
+
+  const parseNumberInput = (value: string): number => {
+    // Remove commas and parse the number
+    const cleanValue = value.replace(/,/g, '');
+    return cleanValue === '' ? 0 : parseFloat(cleanValue);
+  };
+
+  // Excel import hook
+  const { importFile, isImporting } = useExcelImport({
+    expectedColumns: 5, // At least 5 columns (CLASSE + 4 CV ranges minimum)
+    transform: (rows) => {
+      // Find start row containing "01" or "1" - scan more thoroughly
+      let startRow = -1;
+      
+      for (let i = 0; i < rows.length; i++) {
+        const firstCell = rows[i][0]?.toString().trim();
+        // Look for "01", "1", or even just a number 1
+        if (firstCell === '01' || firstCell === '1' || parseInt(firstCell) === 1) {
+          // Verify this looks like a class row by checking if next cells are numbers
+          const hasNumericData = rows[i].slice(1, 6).some(cell => {
+            const val = cell?.toString().replace(/[,\s]/g, '');
+            return val && !isNaN(parseFloat(val)) && parseFloat(val) > 0;
+          });
+          
+          if (hasNumericData) {
+            startRow = i;
+            break;
+          }
+        }
+      }
+      
+      if (startRow === -1) {
+        throw new Error('Format invalide: impossible de trouver le tableau RC. Vérifiez que la première colonne contient les classes 01-08 et que les données sont numériques.');
+      }
+
+      const newEdited = new Map<string, number>();
+      let processedClasses = 0;
+      
+      // Process up to 8 rows for classes 1 to 8
+      for (let i = 0; i < 8 && (startRow + i) < rows.length; i++) {
+        const classRow = rows[startRow + i];
+        if (!classRow || classRow.length < 2) continue;
+        
+        // Parse class number - handle "01", "1", etc.
+        const classStr = classRow[0]?.toString().trim() || '';
+        let classNum = parseInt(classStr);
+        
+        // If parsing failed, try to infer from row position
+        if (isNaN(classNum) || classNum < 1 || classNum > 8) {
+          classNum = i + 1; // Assume sequential: row 0 = class 1, row 1 = class 2, etc.
+        }
+        
+        if (classNum < 1 || classNum > 8) continue;
+
+        // For each power range, get the value from the appropriate column
+        // Handle both 5 and 6 column formats (some exports might have extra columns)
+        let validCellsInRow = 0;
+        
+        POWER_RANGES.forEach((range, idx) => {
+          const cellValue = classRow[idx + 1]; // +1 because first column is class
+          if (cellValue !== undefined && cellValue !== null && cellValue !== '') {
+            const strValue = cellValue.toString().trim();
+            if (strValue) {
+              // Enhanced number parsing - handle commas, spaces, and various formats
+              const cleanValue = strValue.replace(/[,\s]/g, ''); // Remove commas and spaces
+              const numValue = parseFloat(cleanValue);
+              
+              if (!isNaN(numValue) && numValue >= 0) {
+                const key = getCellKey(classNum, range);
+                newEdited.set(key, numValue);
+                validCellsInRow++;
+              }
+            }
+          }
+        });
+        
+        if (validCellsInRow > 0) {
+          processedClasses++;
+        }
+      }
+      
+      if (newEdited.size === 0) {
+        throw new Error('Aucune donnée valide trouvée. Vérifiez que le fichier contient des valeurs numériques dans les colonnes 2-6.');
+      }
+      
+      if (processedClasses < 3) {
+        throw new Error(`Seulement ${processedClasses} classes trouvées. Vérifiez que le fichier contient au moins les classes 01-03 avec des données valides.`);
+      }
+      
+      return newEdited;
+    },
+  });
 
   const { data: companies } = useQuery({
     queryKey: ['companies'],
@@ -73,11 +172,15 @@ export const RcTableGrid = () => {
       });
       return Promise.all(promises);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['rc-rules'] });
-      queryClient.invalidateQueries({ queryKey: ['pricing-rules'] });
+    onSuccess: async () => {
+      // Force refresh the data
+      await queryClient.invalidateQueries({ queryKey: ['rc-rules', selectedCompany] });
+      await queryClient.refetchQueries({ queryKey: ['rc-rules', selectedCompany] });
+      
+      // Clear edited cells and reset state
       setEditedCells(new Map());
       setHasChanges(false);
+      setFocusedCell(null); // Clear any focused cell
       toast.success('Tableau RC sauvegardé avec succès');
     },
     onError: () => toast.error('Erreur lors de la sauvegarde'),
@@ -102,12 +205,13 @@ export const RcTableGrid = () => {
       r.maxPower === powerRange.maxPower
     );
 
+    // ✅ FIX: Store full values in database, no multiplication needed
     return rule?.fixedPremium ? Number(rule.fixedPremium) : '';
   };
 
   const handleCellChange = (classNum: number, powerRange: typeof POWER_RANGES[0], value: string) => {
     const key = getCellKey(classNum, powerRange);
-    const numValue = value === '' ? 0 : parseFloat(value);
+    const numValue = parseNumberInput(value);
     
     const newEdited = new Map(editedCells);
     newEdited.set(key, numValue);
@@ -136,6 +240,7 @@ export const RcTableGrid = () => {
         bonusMalusClass: classNum,
         minPower,
         maxPower,
+        // ✅ FIX: Store full values in database for exact precision
         fixedPremium: premium,
       });
     });
@@ -156,6 +261,7 @@ export const RcTableGrid = () => {
       const row = [classNum.toString().padStart(2, '0')];
       POWER_RANGES.forEach(range => {
         const value = getCellValue(classNum, range);
+        // Export shows the display values (already multiplied by 1000)
         row.push(value ? value.toString() : '');
       });
       csv += row.join(',') + '\n';
@@ -171,47 +277,24 @@ export const RcTableGrid = () => {
     toast.success('Export réussi');
   };
 
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        const lines = text.split('\n').filter(l => l.trim());
-        
-        // Skip header
-        const dataLines = lines.slice(1);
-        
-        const newEdited = new Map(editedCells);
-        
-        dataLines.forEach((line, idx) => {
-          const values = line.split(',');
-          const classNum = parseInt(values[0]);
-          
-          if (classNum >= 1 && classNum <= 8) {
-            POWER_RANGES.forEach((range, rangeIdx) => {
-              const premium = values[rangeIdx + 1];
-              if (premium && premium.trim()) {
-                const key = getCellKey(classNum, range);
-                newEdited.set(key, parseFloat(premium));
-              }
-            });
-          }
-        });
-        
-        setEditedCells(newEdited);
+    try {
+      const importedData = await importFile(file);
+      if (importedData) {
+        setEditedCells(importedData);
         setHasChanges(true);
-        toast.success('Import réussi - Cliquez sur Sauvegarder pour appliquer');
-      } catch (error) {
-        toast.error('Erreur lors de l\'import du fichier');
+        toast.success(`Import réussi! ${importedData.size} cellules importées. Vérifiez les cellules surlignées en bleu, puis cliquez sur Sauvegarder.`);
       }
-    };
-    reader.readAsText(file);
-    
-    // Reset input
-    event.target.value = '';
+    } catch (error: any) {
+      console.error('Import error:', error);
+      toast.error(error.message || 'Erreur lors de l\'import du fichier.');
+    } finally {
+      // Reset input
+      event.target.value = '';
+    }
   };
 
   if (!companies || companies.length === 0) {
@@ -260,24 +343,32 @@ export const RcTableGrid = () => {
               <Download className="w-4 h-4 mr-2" />
               Exporter
             </Button>
-            <label className="flex-1 sm:flex-none">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!selectedCompany}
-                className="w-full"
-                as="span"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Importer
-              </Button>
-              <input
-                type="file"
-                accept=".csv"
-                onChange={handleImport}
-                className="hidden"
-              />
-            </label>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleImport}
+              className="hidden"
+              id="excel-import"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => document.getElementById('excel-import')?.click()}
+              disabled={!selectedCompany || isImporting}
+              className="flex-1 sm:flex-none"
+            >
+              {isImporting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                  Import...
+                </>
+              ) : (
+                <>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Importer Excel
+                </>
+              )}
+            </Button>
             <Button
               size="sm"
               onClick={handleSave}
@@ -332,6 +423,7 @@ export const RcTableGrid = () => {
                         const value = getCellValue(classNum, range);
                         const key = getCellKey(classNum, range);
                         const isEdited = editedCells.has(key);
+                        const numValue = typeof value === 'number' ? value : 0;
                         
                         return (
                           <td
@@ -340,16 +432,33 @@ export const RcTableGrid = () => {
                               isEdited ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                             }`}
                           >
-                            <input
-                              type="number"
-                              value={value}
-                              onChange={(e) => handleCellChange(classNum, range, e.target.value)}
-                              className={`w-full px-3 py-2 text-center bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white ${
-                                isEdited ? 'font-semibold' : ''
-                              }`}
-                              placeholder="0"
-                              step="0.01"
-                            />
+                            {focusedCell === key ? (
+                              <input
+                                type="text"
+                                value={numValue > 0 ? formatNumber(numValue) : ''}
+                                onChange={(e) => handleCellChange(classNum, range, e.target.value)}
+                                onBlur={() => setFocusedCell(null)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === 'Tab') {
+                                    setFocusedCell(null);
+                                  }
+                                }}
+                                autoFocus
+                                className={`w-full px-3 py-2 text-center bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white ${
+                                  isEdited ? 'font-semibold' : ''
+                                }`}
+                                placeholder="0"
+                              />
+                            ) : (
+                              <div
+                                onClick={() => setFocusedCell(key)}
+                                className={`w-full px-3 py-2 text-center cursor-text hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white min-h-[2.5rem] flex items-center justify-center ${
+                                  isEdited ? 'font-semibold' : ''
+                                }`}
+                              >
+                                {numValue > 0 ? formatNumber(numValue) : ''}
+                              </div>
+                            )}
                           </td>
                         );
                       })}
@@ -373,7 +482,8 @@ export const RcTableGrid = () => {
                 <li>Les cellules modifiées sont surlignées en bleu</li>
                 <li>Cliquez sur "Sauvegarder" pour appliquer les modifications</li>
                 <li>Utilisez "Exporter" pour télécharger en CSV</li>
-                <li>Utilisez "Importer" pour charger un fichier CSV</li>
+                <li>Utilisez "Importer Excel" pour charger un fichier Excel (.xlsx, .xls) ou CSV</li>
+                <li>Format attendu: Colonne 1 = Classes (01-08), Colonnes 2-6 = Primes par CV</li>
               </ul>
             </div>
           </div>

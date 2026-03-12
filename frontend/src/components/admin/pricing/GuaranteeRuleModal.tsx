@@ -184,7 +184,7 @@ export const GuaranteeRuleModal = ({
       'CAS': ['fixedPremium'],
       'ASSISTANCE': ['fixedPremium'],
       'PERSONNES_TRANSPORTEES': ['minCapital', 'fixedPremium'],
-      'BG': ['ratePercentage', 'minMarketValue', 'maxMarketValue', 'formula'],
+      'BG': ['ratePercentage', 'reductionRate', 'minMarketValue', 'maxMarketValue', 'formula'],
       'INCENDIE_EMEUTES': ['fixedPremium'],
       'DOMMAGES_EMEUTES': ['fixedPremium'],
       'CATASTROPHES_NATURELLES': ['fixedPremium', 'formulaType'],
