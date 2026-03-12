@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   ShieldHalf,
   DollarSign,
-  Calculator,
   Scale,
   ClipboardCheck,
   Users,

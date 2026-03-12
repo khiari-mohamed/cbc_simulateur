@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs';
-import { Shield, Table, Settings, Calculator, FileSpreadsheet } from 'lucide-react';
+import { Shield, Table, Calculator, FileSpreadsheet } from 'lucide-react';
 import { RcTableGrid } from '../../components/admin/pricing/RcTableGrid';
 import { GuaranteesConfig } from '../../components/admin/pricing/GuaranteesConfig';
 import { DcConfigTab } from './formulas/DcConfigTab';
