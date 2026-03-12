@@ -59,4 +59,21 @@ export class SeedService {
       throw new BadRequestException(error.message || 'Erreur lors de l\'exécution du seed complet');
     }
   }
+
+  async wipeDatabase() {
+    try {
+      // Run wipe database script
+      const { stdout, stderr } = await execAsync('npx ts-node prisma/wipe-database.ts', {
+        cwd: process.cwd(),
+      });
+
+      return {
+        success: true,
+        message: 'Base de données nettoyée avec succès',
+        output: stdout,
+      };
+    } catch (error) {
+      throw new BadRequestException(error.message || 'Erreur lors du nettoyage de la base de données');
+    }
+  }
 }

@@ -20,4 +20,9 @@ export class SeedController {
   async runFullSeed() {
     return this.seedService.runFullSeed();
   }
+
+  @Post('wipe')
+  async wipeDatabase() {
+    return this.seedService.wipeDatabase();
+  }
 }
