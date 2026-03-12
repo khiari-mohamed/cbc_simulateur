@@ -814,9 +814,13 @@ export class PricingEngineService {
     // FORMULA: (matrixPrime + basePremium) * (1 - discountPercent/100)
     let prime = new Decimal(matrixPrice.prime).add(dcConfig.basePremium);
 
-    // Apply formula discount
-    if (dcConfig.discountPercent && dcConfig.discountPercent.gt(0)) {
-      const multiplier = new Decimal(1).sub(dcConfig.discountPercent.div(100));
+    // Apply per-range reduction if available, otherwise use global discount
+    const reductionToApply = vvRange.reductionRate !== null && vvRange.reductionRate !== undefined
+      ? vvRange.reductionRate
+      : dcConfig.discountPercent;
+
+    if (reductionToApply && new Decimal(reductionToApply).gt(0)) {
+      const multiplier = new Decimal(1).sub(new Decimal(reductionToApply).div(100));
       prime = prime.mul(multiplier);
     }
 

@@ -445,15 +445,16 @@
   }
 
   model DcMatrixVvRange {
-    id         String    @id @default(uuid())
-    companyId  String
-    company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    usageType  UsageType
-    minVv      Decimal   @db.Decimal(12, 2)
-    maxVv      Decimal?  @db.Decimal(12, 2)
-    isActive   Boolean   @default(true)
-    createdAt  DateTime  @default(now())
-    updatedAt  DateTime  @updatedAt
+    id           String    @id @default(uuid())
+    companyId    String
+    company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    usageType    UsageType
+    minVv        Decimal   @db.Decimal(12, 2)
+    maxVv        Decimal?  @db.Decimal(12, 2)
+    reductionRate Decimal? @db.Decimal(5, 2)
+    isActive     Boolean   @default(true)
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
 
     matrixPrices DcMatrixPrice[]
 

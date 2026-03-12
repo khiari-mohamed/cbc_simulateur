@@ -205,6 +205,7 @@ export class DcConfigService {
     usageType: UsageType;
     minVv: number;
     maxVv?: number;
+    reductionRate?: number;
   }, userId: string) {
     const range = await this.prisma.dcMatrixVvRange.create({
       data: {
@@ -212,6 +213,7 @@ export class DcConfigService {
         usageType: data.usageType,
         minVv: new Decimal(data.minVv),
         maxVv: data.maxVv !== undefined ? new Decimal(data.maxVv) : null,
+        reductionRate: data.reductionRate !== undefined ? new Decimal(data.reductionRate) : null,
       },
     });
     await this.auditService.log(userId, 'DC_MATRIX_VV_RANGE_CREATED', 'DcMatrixVvRange', range.id, null, data);
@@ -221,12 +223,14 @@ export class DcConfigService {
   async updateMatrixVvRange(id: string, data: {
     minVv?: number;
     maxVv?: number;
+    reductionRate?: number;
   }, userId: string) {
     const updated = await this.prisma.dcMatrixVvRange.update({
       where: { id },
       data: {
         ...(data.minVv !== undefined && { minVv: new Decimal(data.minVv) }),
         ...(data.maxVv !== undefined && { maxVv: data.maxVv !== null ? new Decimal(data.maxVv) : null }),
+        ...(data.reductionRate !== undefined && { reductionRate: data.reductionRate !== null ? new Decimal(data.reductionRate) : null }),
       },
     });
     await this.auditService.log(userId, 'DC_MATRIX_VV_RANGE_UPDATED', 'DcMatrixVvRange', id, null, updated);

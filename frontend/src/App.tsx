@@ -14,6 +14,7 @@ import { GuaranteesPage } from './pages/admin/Guarantees/GuaranteesPage';
 import { OrganizationsPage } from './pages/admin/organizations/OrganizationsPage';
 import { ConventionReductionRulesPage } from './pages/admin/ConventionReductionRulesPage';
 import { FormulaConfigPage } from './pages/admin/FormulaConfigPage';
+import { PricingManagementPage } from './pages/admin/PricingManagementPage';
 
 import { UsersManagementPage } from './pages/admin/users/UsersManagementPage';
 import { ReportsPage } from './pages/admin/reports/ReportsPage';
@@ -101,6 +102,7 @@ function App() {
                 <Route path="admin/guarantees" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><GuaranteesPage /></ProtectedRoute>} />
                 <Route path="admin/users" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><UsersManagementPage /></ProtectedRoute>} />
                 <Route path="admin/reports" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><ReportsPage /></ProtectedRoute>} />
+                <Route path="admin/pricing-management" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><PricingManagementPage /></ProtectedRoute>} />
                 <Route path="admin/pricing-rules" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><PricingRulesPage /></ProtectedRoute>} />
                 <Route path="admin/formulas" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><FormulaConfigPage /></ProtectedRoute>} />
                 <Route path="admin/validation" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><ValidationPage /></ProtectedRoute>} />

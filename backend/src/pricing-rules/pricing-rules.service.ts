@@ -70,6 +70,8 @@ export class PricingRulesService {
       franchiseRate?: number;
       minCapital?: number;
       maxCapital?: number;
+      minMarketValue?: number;
+      maxMarketValue?: number;
       usageType?: UsageType;
       validFrom?: Date;
       validTo?: Date;
@@ -94,6 +96,8 @@ export class PricingRulesService {
         franchiseRate: data.franchiseRate,
         minCapital: data.minCapital !== undefined ? new Decimal(data.minCapital) : null,
         maxCapital: data.maxCapital !== undefined ? new Decimal(data.maxCapital) : null,
+        minMarketValue: data.minMarketValue !== undefined ? new Decimal(data.minMarketValue) : null,
+        maxMarketValue: data.maxMarketValue !== undefined ? new Decimal(data.maxMarketValue) : null,
         usageType: data.usageType,
         validFrom: data.validFrom || new Date(),
         validTo: data.validTo,
@@ -127,6 +131,8 @@ export class PricingRulesService {
       reductionRate?: number;
       minCapital?: number;
       maxCapital?: number;
+      minMarketValue?: number;
+      maxMarketValue?: number;
       franchiseRate?: number;
       validTo?: Date;
     },
@@ -144,6 +150,8 @@ export class PricingRulesService {
         ...(data.reductionRate !== undefined && { reductionRate: new Decimal(data.reductionRate) }),
         ...(data.minCapital !== undefined && { minCapital: new Decimal(data.minCapital) }),
         ...(data.maxCapital !== undefined && { maxCapital: new Decimal(data.maxCapital) }),
+        ...(data.minMarketValue !== undefined && { minMarketValue: new Decimal(data.minMarketValue) }),
+        ...(data.maxMarketValue !== undefined && { maxMarketValue: new Decimal(data.maxMarketValue) }),
         ...(data.franchiseRate !== undefined && { franchiseRate: data.franchiseRate }),
         ...(data.validTo !== undefined && { validTo: data.validTo }),
       },

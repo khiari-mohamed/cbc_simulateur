@@ -54,9 +54,7 @@ const getNavItems = (t: (key: string) => string): NavItem[] => [
 
   { icon: ShieldHalf, label: t('nav.guarantees'), path: '/admin/guarantees', roles: [Role.ADMINISTRATEUR_ARS] },
 
-  { icon: DollarSign, label: t('nav.pricing'), path: '/admin/pricing-rules', roles: [Role.ADMINISTRATEUR_ARS] },
-
-  { icon: Calculator, label: 'Configuration Formules', path: '/admin/formulas', roles: [Role.ADMINISTRATEUR_ARS] },
+  { icon: DollarSign, label: 'Gestion Tarification', path: '/admin/pricing-management', roles: [Role.ADMINISTRATEUR_ARS] },
 
   { icon: Scale, label: t('nav.validation'), path: '/admin/validation', roles: [Role.ADMINISTRATEUR_ARS] },
 

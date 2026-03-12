@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../../ui/Card';
 import { Button } from '../../ui/Button';
-import { Save, Plus, Trash2 } from 'lucide-react';
+import { Save, Plus, Trash2, AlertCircle } from 'lucide-react';
 import { AddVvRangeModal, AddCapitalColumnModal } from '../AddMatrixModals';
 import api from '../../../lib/api/client';
 import toast from 'react-hot-toast';
@@ -21,6 +21,53 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
     basePremium: config?.basePremium || 10,
     discountPercent: config?.discountPercent || 0,
   });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateGeneralParams = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (generalParams.basePremium < 0) {
+      newErrors.basePremium = 'Ne peut pas être négatif';
+    }
+    if (generalParams.discountPercent < 0 || generalParams.discountPercent > 100) {
+      newErrors.discountPercent = 'Doit être entre 0 et 100';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSaveConfig = () => {
+    if (!validateGeneralParams()) {
+      toast.error('Veuillez corriger les erreurs de validation');
+      return;
+    }
+    saveConfigMutation.mutate(generalParams);
+  };
+
+  const validateVvRange = (minVv: number, maxVv: number | null): string | null => {
+    if (minVv <= 0) return 'Min VV doit être > 0';
+    if (maxVv !== null && maxVv <= minVv) return 'Max VV doit être > Min VV';
+    
+    // Check for overlaps
+    const overlaps = vvRanges?.some((range: any) => {
+      if (maxVv === null) return false;
+      const rangeMax = range.maxVv || Infinity;
+      return (
+        (minVv >= range.minVv && minVv < rangeMax) ||
+        (maxVv > range.minVv && maxVv <= rangeMax)
+      );
+    });
+    
+    if (overlaps) return 'Chevauchement avec une tranche existante';
+    return null;
+  };
+
+  const validateCapital = (amount: number): string | null => {
+    if (amount <= 0) return 'Capital doit être > 0';
+    return null;
+  };
 
   useEffect(() => {
     if (config) {
@@ -159,6 +206,49 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           Paramètres Généraux
         </h3>
+
+        {/* VV Indicator */}
+        <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertCircle className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Valeur Véhicule (VV) utilisée:
+            </span>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 p-2 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700">
+              <div className="w-5 h-5 rounded-full border-2 border-green-600 bg-green-600 flex items-center justify-center">
+                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                  Valeur Vénale (VV)
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">
+                  Utilisée pour Dommages Collision (Méthode Matrice)
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-2 rounded bg-gray-100 dark:bg-gray-800 opacity-60">
+              <div className="w-5 h-5 rounded-full border-2 border-gray-400 dark:border-gray-600 flex items-center justify-center">
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                  Valeur à Neuf (VN)
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">
+                  Non utilisée pour cette garantie
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 italic">
+            ℹ️ Le type de VV est automatiquement choisi selon la garantie. Cette sélection ne peut pas être modifiée.
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -167,32 +257,54 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
             <input
               type="number"
               step="0.01"
+              min="0"
               value={generalParams.basePremium}
               onChange={(e) => {
                 const val = parseFloat(e.target.value);
-                if (!isNaN(val)) setGeneralParams({ ...generalParams, basePremium: val });
+                if (!isNaN(val)) {
+                  setGeneralParams({ ...generalParams, basePremium: val });
+                  setErrors({ ...errors, basePremium: '' });
+                }
               }}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                errors.basePremium ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              }`}
             />
+            {errors.basePremium && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.basePremium}</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Taux Réduction (%)
+              Taux Réduction Global (%)
             </label>
             <input
               type="number"
               step="0.01"
+              min="0"
+              max="100"
               value={generalParams.discountPercent}
               onChange={(e) => {
                 const val = parseFloat(e.target.value);
-                if (!isNaN(val)) setGeneralParams({ ...generalParams, discountPercent: val });
+                if (!isNaN(val)) {
+                  setGeneralParams({ ...generalParams, discountPercent: val });
+                  setErrors({ ...errors, discountPercent: '' });
+                }
               }}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                errors.discountPercent ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+              }`}
             />
+            {errors.discountPercent && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.discountPercent}</p>
+            )}
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Utilisé si aucune réduction spécifique n'est définie par tranche VV
+            </p>
           </div>
         </div>
         <div className="mt-4">
-          <Button onClick={() => saveConfigMutation.mutate(generalParams)} className="flex items-center gap-2">
+          <Button onClick={handleSaveConfig} className="flex items-center gap-2">
             <Save className="w-4 h-4" />
             Sauvegarder Paramètres
           </Button>
@@ -214,6 +326,7 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
               <tr>
                 <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Min VV</th>
                 <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Max VV</th>
+                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Réduction (%)</th>
                 <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Actions</th>
               </tr>
             </thead>
@@ -226,7 +339,7 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
                       defaultValue={range.minVv}
                       onBlur={(e) => {
                       const val = parseFloat(e.target.value);
-                      if (!isNaN(val)) saveVvRangeMutation.mutate({ id: range.id, minVv: val, maxVv: range.maxVv });
+                      if (!isNaN(val)) saveVvRangeMutation.mutate({ id: range.id, minVv: val, maxVv: range.maxVv, reductionRate: range.reductionRate });
                     }}
                       className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
@@ -238,9 +351,25 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
                       placeholder="∞"
                       onBlur={(e) => {
                       const val = e.target.value ? parseFloat(e.target.value) : null;
-                      if (e.target.value === '' || !isNaN(val!)) saveVvRangeMutation.mutate({ id: range.id, minVv: range.minVv, maxVv: val });
+                      if (e.target.value === '' || !isNaN(val!)) saveVvRangeMutation.mutate({ id: range.id, minVv: range.minVv, maxVv: val, reductionRate: range.reductionRate });
                     }}
                       className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                  </td>
+                  <td className="px-4 py-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      defaultValue={range.reductionRate || ''}
+                      placeholder="Global"
+                      onBlur={(e) => {
+                      const val = e.target.value ? parseFloat(e.target.value) : null;
+                      if (e.target.value === '' || !isNaN(val!)) saveVvRangeMutation.mutate({ id: range.id, minVv: range.minVv, maxVv: range.maxVv, reductionRate: val });
+                    }}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      title="Laisser vide pour utiliser le taux global"
                     />
                   </td>
                   <td className="px-4 py-2">
