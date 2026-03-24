@@ -11,7 +11,7 @@ export const PricingRulesPage = () => {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRule, setSelectedRule] = useState<any>(null);
-  const [filters, setFilters] = useState({ companyId: '', guaranteeId: '', bonusMalusClass: '' });
+  const [filters, setFilters] = useState({ companyId: '', guaranteeId: '', bonusMalusClass: '', usageType: '' });
   const [page, setPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -22,6 +22,7 @@ export const PricingRulesPage = () => {
       if (filters.companyId) params.append('companyId', filters.companyId);
       if (filters.guaranteeId) params.append('guaranteeId', filters.guaranteeId);
       if (filters.bonusMalusClass) params.append('bonusMalusClass', filters.bonusMalusClass);
+      if (filters.usageType) params.append('usageType', filters.usageType);
       const { data } = await api.get(`/pricing-rules?${params}`);
       return data;
     },
@@ -56,6 +57,14 @@ export const PricingRulesPage = () => {
     queryKey: ['guarantees'],
     queryFn: async () => {
       const { data } = await api.get('/guarantees');
+      return data;
+    },
+  });
+
+  const { data: usageTypes } = useQuery({
+    queryKey: ['usage-types'],
+    queryFn: async () => {
+      const { data } = await api.get('/usage-types');
       return data;
     },
   });
@@ -131,6 +140,16 @@ export const PricingRulesPage = () => {
             <option value="">Toutes les garanties</option>
             {guarantees?.map((g: any) => (
               <option key={g.id} value={g.id}>{g.nameFr}</option>
+            ))}
+          </select>
+          <select
+            value={filters.usageType}
+            onChange={(e) => setFilters({ ...filters, usageType: e.target.value })}
+            className="w-full sm:w-auto px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+          >
+            <option value="">Tous les usages</option>
+            {usageTypes?.map((usage: any) => (
+              <option key={usage.id} value={usage.id}>{usage.nameFr}</option>
             ))}
           </select>
           <select

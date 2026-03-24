@@ -1,6 +1,6 @@
-import { IsEnum, IsDecimal, IsOptional, IsUUID, IsArray, Min, Max } from 'class-validator';
+import { IsEnum, IsDecimal, IsOptional, IsUUID, IsArray, IsString, Min, Max } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { FormulaType, UsageType } from '@prisma/client';
+import { FormulaType } from '@prisma/client';
 
 export class UpdateSimulationDto {
   @IsOptional()
@@ -11,8 +11,8 @@ export class UpdateSimulationDto {
   bonusMalus?: number;
 
   @IsOptional()
-  @IsEnum(UsageType)
-  usage?: UsageType;
+  @IsString()
+  usageId?: string;
 
   @IsOptional()
   @IsEnum(FormulaType)

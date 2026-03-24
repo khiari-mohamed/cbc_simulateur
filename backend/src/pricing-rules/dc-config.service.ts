@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { UsageType } from '@prisma/client';
+import { ReferenceValue } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
@@ -11,11 +11,11 @@ export class DcConfigService {
     private auditService: AuditService,
   ) {}
 
-  async findAll(companyId?: string, usageType?: UsageType) {
+  async findAll(companyId?: string, usageId?: string) {
     return this.prisma.dcConfig.findMany({
       where: {
         ...(companyId && { companyId }),
-        ...(usageType && { usageType }),
+        ...(usageId && { usageId }),
         isActive: true,
       },
       include: { company: true },
@@ -33,7 +33,7 @@ export class DcConfigService {
 
   async create(data: {
     companyId: string;
-    usageType: UsageType;
+    usageId: string;
     useMatrix?: boolean;
     franchise?: number;
     minCapital?: number;
@@ -41,11 +41,12 @@ export class DcConfigService {
     maxCapitalAbsolute?: number;
     basePremium?: number;
     discountPercent?: number;
+    referenceValue?: ReferenceValue;
   }, userId: string) {
     const config = await this.prisma.dcConfig.create({
       data: {
         companyId: data.companyId,
-        usageType: data.usageType,
+        usageId: data.usageId,
         useMatrix: data.useMatrix ?? false,
         franchise: data.franchise !== undefined ? new Decimal(data.franchise) : new Decimal(0),
         minCapital: data.minCapital !== undefined ? new Decimal(data.minCapital) : new Decimal(1000),
@@ -53,6 +54,7 @@ export class DcConfigService {
         maxCapitalAbsolute: data.maxCapitalAbsolute !== undefined ? new Decimal(data.maxCapitalAbsolute) : new Decimal(100000),
         basePremium: data.basePremium !== undefined ? new Decimal(data.basePremium) : new Decimal(10),
         discountPercent: data.discountPercent !== undefined ? new Decimal(data.discountPercent) : new Decimal(0),
+        referenceValue: data.referenceValue ?? 'MARKET_VALUE',
       },
       include: { company: true },
     });
@@ -69,6 +71,7 @@ export class DcConfigService {
     maxCapitalAbsolute?: number;
     basePremium?: number;
     discountPercent?: number;
+    referenceValue?: ReferenceValue;
   }, userId: string) {
     const existing = await this.findById(id);
 
@@ -82,6 +85,7 @@ export class DcConfigService {
         ...(data.maxCapitalAbsolute !== undefined && { maxCapitalAbsolute: new Decimal(data.maxCapitalAbsolute) }),
         ...(data.basePremium !== undefined && { basePremium: new Decimal(data.basePremium) }),
         ...(data.discountPercent !== undefined && { discountPercent: new Decimal(data.discountPercent) }),
+        ...(data.referenceValue !== undefined && { referenceValue: data.referenceValue }),
       },
       include: { company: true },
     });
@@ -101,16 +105,16 @@ export class DcConfigService {
   }
 
   // Capital Tiers
-  async findCapitalTiers(companyId: string, usageType: UsageType) {
+  async findCapitalTiers(companyId: string, usageId: string) {
     return this.prisma.dcCapitalTier.findMany({
-      where: { companyId, usageType, isActive: true },
+      where: { companyId, usageId, isActive: true },
       orderBy: { minAmount: 'asc' },
     });
   }
 
   async createCapitalTier(data: {
     companyId: string;
-    usageType: UsageType;
+    usageId: string;
     minAmount: number;
     maxAmount?: number;
     step: number;
@@ -118,7 +122,7 @@ export class DcConfigService {
     const tier = await this.prisma.dcCapitalTier.create({
       data: {
         companyId: data.companyId,
-        usageType: data.usageType,
+        usageId: data.usageId,
         minAmount: new Decimal(data.minAmount),
         maxAmount: data.maxAmount !== undefined ? new Decimal(data.maxAmount) : null,
         step: new Decimal(data.step),
@@ -151,23 +155,23 @@ export class DcConfigService {
   }
 
   // Progressive Tiers
-  async findProgressiveTiers(companyId: string, usageType: UsageType) {
+  async findProgressiveTiers(companyId: string, usageId: string) {
     return this.prisma.dcProgressiveTier.findMany({
-      where: { companyId, usageType, isActive: true },
+      where: { companyId, usageId, isActive: true },
       orderBy: { tierNumber: 'asc' },
     });
   }
 
   async createProgressiveTier(data: {
     companyId: string;
-    usageType: UsageType;
+    usageId: string;
     tierNumber: number;
     tierRate: number;
   }, userId: string) {
     const tier = await this.prisma.dcProgressiveTier.create({
       data: {
         companyId: data.companyId,
-        usageType: data.usageType,
+        usageId: data.usageId,
         tierNumber: data.tierNumber,
         tierRate: new Decimal(data.tierRate),
       },
@@ -193,24 +197,35 @@ export class DcConfigService {
   }
 
   // Matrix VV Ranges
-  async findMatrixVvRanges(companyId: string, usageType: UsageType) {
+  async findMatrixVvRanges(companyId: string, usageId: string) {
     return this.prisma.dcMatrixVvRange.findMany({
-      where: { companyId, usageType, isActive: true },
+      where: { companyId, usageId, isActive: true },
       orderBy: { minVv: 'asc' },
     });
   }
 
   async createMatrixVvRange(data: {
     companyId: string;
-    usageType: UsageType;
+    usageId: string;
     minVv: number;
     maxVv?: number;
     reductionRate?: number;
   }, userId: string) {
+    // Validation
+    if (!data.usageId) {
+      throw new BadRequestException('Usage ID is required');
+    }
+    if (data.minVv <= 0) {
+      throw new BadRequestException('Min VV must be greater than 0');
+    }
+    if (data.maxVv !== undefined && data.maxVv !== null && data.maxVv <= data.minVv) {
+      throw new BadRequestException('Max VV must be greater than Min VV');
+    }
+
     const range = await this.prisma.dcMatrixVvRange.create({
       data: {
         companyId: data.companyId,
-        usageType: data.usageType,
+        usageId: data.usageId,
         minVv: new Decimal(data.minVv),
         maxVv: data.maxVv !== undefined ? new Decimal(data.maxVv) : null,
         reductionRate: data.reductionRate !== undefined ? new Decimal(data.reductionRate) : null,
@@ -243,23 +258,31 @@ export class DcConfigService {
   }
 
   // Matrix Capitals
-  async findMatrixCapitals(companyId: string, usageType: UsageType) {
+  async findMatrixCapitals(companyId: string, usageId: string) {
     return this.prisma.dcMatrixCapital.findMany({
-      where: { companyId, usageType, isActive: true },
+      where: { companyId, usageId, isActive: true },
       orderBy: { order: 'asc' },
     });
   }
 
   async createMatrixCapital(data: {
     companyId: string;
-    usageType: UsageType;
+    usageId: string;
     amount: number;
     order: number;
   }, userId: string) {
+    // Validation
+    if (!data.usageId) {
+      throw new BadRequestException('Usage ID is required');
+    }
+    if (data.amount <= 0) {
+      throw new BadRequestException('Capital amount must be greater than 0');
+    }
+
     const capital = await this.prisma.dcMatrixCapital.create({
       data: {
         companyId: data.companyId,
-        usageType: data.usageType,
+        usageId: data.usageId,
         amount: new Decimal(data.amount),
         order: data.order,
       },
@@ -289,28 +312,28 @@ export class DcConfigService {
   }
 
   // Matrix Prices
-  async findMatrixPrices(companyId: string, usageType: UsageType) {
+  async findMatrixPrices(companyId: string, usageId: string) {
     return this.prisma.dcMatrixPrice.findMany({
-      where: { companyId, usageType },
+      where: { companyId, usageId },
       include: { vvRange: true, capital: true },
     });
   }
 
   async upsertMatrixPrice(data: {
     companyId: string;
-    usageType: UsageType;
+    usageId: string;
     vvRangeId: string;
     capitalId: string;
     prime: number;
   }, userId: string) {
-    // Validate companyId and usageType match
+    // Validate companyId and usageId match
     const vvRange = await this.prisma.dcMatrixVvRange.findUnique({ where: { id: data.vvRangeId } });
     const capital = await this.prisma.dcMatrixCapital.findUnique({ where: { id: data.capitalId } });
     
-    if (!vvRange || vvRange.companyId !== data.companyId || vvRange.usageType !== data.usageType) {
+    if (!vvRange || vvRange.companyId !== data.companyId || vvRange.usageId !== data.usageId) {
       throw new BadRequestException('VV Range does not belong to this company and usage');
     }
-    if (!capital || capital.companyId !== data.companyId || capital.usageType !== data.usageType) {
+    if (!capital || capital.companyId !== data.companyId || capital.usageId !== data.usageId) {
       throw new BadRequestException('Capital does not belong to this company and usage');
     }
 
@@ -323,7 +346,7 @@ export class DcConfigService {
       },
       create: {
         companyId: data.companyId,
-        usageType: data.usageType,
+        usageId: data.usageId,
         vvRangeId: data.vvRangeId,
         capitalId: data.capitalId,
         prime: new Decimal(data.prime),

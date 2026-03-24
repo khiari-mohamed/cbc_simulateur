@@ -1,7 +1,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Settings, Shield, Percent, Users } from 'lucide-react';
-import { MainLayout } from '../../components/layout/MainLayout';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import api from '../../lib/api/client';
@@ -47,8 +46,7 @@ export const AdminSettingsPage = () => {
   });
 
   return (
-    <MainLayout>
-      <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
@@ -132,7 +130,7 @@ export const AdminSettingsPage = () => {
               Taux de réduction - Garanties facultatives
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Configurer les taux de réduction pour Tous Risques, Dommages Collision, Vol, Incendie
+              Configurer les taux de réduction pour toutes les garanties facultatives
             </p>
           </div>
           <div className="p-6">
@@ -146,11 +144,23 @@ export const AdminSettingsPage = () => {
                     <p className="font-medium text-gray-900 dark:text-white">
                       {rule.company.name} - {rule.guarantee.nameFr}
                     </p>
-                    {rule.convention && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Convention: {rule.convention.name}
-                      </p>
-                    )}
+                    <div className="flex gap-3 mt-1">
+                      {rule.usage && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Usage: {rule.usage.nameFr}
+                        </p>
+                      )}
+                      {rule.convention && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          • Convention: {rule.convention.name}
+                        </p>
+                      )}
+                      {rule.franchiseRate !== null && rule.franchiseRate !== undefined && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          • Franchise: {rule.franchiseRate}%
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <input
@@ -178,6 +188,5 @@ export const AdminSettingsPage = () => {
           </div>
         </Card>
       </div>
-    </MainLayout>
   );
 };

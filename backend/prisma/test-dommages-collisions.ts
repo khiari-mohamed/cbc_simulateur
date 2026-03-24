@@ -19,8 +19,10 @@ async function testDommagesCollisions() {
 
   const dcGuarantee = await prisma.guarantee.findUnique({ where: { code: 'DOMMAGES_COLLISIONS' } });
   const lloyd = await prisma.company.findUnique({ where: { code: 'LLOYD' } });
+  const commercialUsage = await prisma.usage.findUnique({ where: { code: 'COMMERCIAL' } });
+  const privateUsage = await prisma.usage.findUnique({ where: { code: 'PRIVATE_BUSINESS' } });
 
-  if (!dcGuarantee || !lloyd) {
+  if (!dcGuarantee || !lloyd || !commercialUsage || !privateUsage) {
     console.log('❌ Setup incomplete - run setup script first');
     return;
   }
@@ -147,7 +149,7 @@ async function testDommagesCollisions() {
           where: {
             companyId: lloyd.id,
             guaranteeId: dcGuarantee.id,
-            usageType: 'COMMERCIAL',
+            usageId: commercialUsage.id,
             minMarketValue: { lt: new Decimal(test.vv) },
             OR: [
               { maxMarketValue: { gte: new Decimal(test.vv) } },
@@ -172,7 +174,7 @@ async function testDommagesCollisions() {
           where: {
             companyId: lloyd.id,
             guaranteeId: dcGuarantee.id,
-            usageType: 'PRIVATE_BUSINESS',
+            usageId: privateUsage.id,
             basePremium: { not: null }
           }
         });
@@ -181,7 +183,7 @@ async function testDommagesCollisions() {
           where: {
             companyId: lloyd.id,
             guaranteeId: dcGuarantee.id,
-            usageType: 'PRIVATE_BUSINESS',
+            usageId: privateUsage.id,
             tierLevel: { not: null }
           },
           orderBy: { tierLevel: 'asc' }

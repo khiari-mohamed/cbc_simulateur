@@ -11,6 +11,7 @@ interface RcCell {
   id?: string;
   companyId: string;
   guaranteeId: string;
+  usageId?: string;
   bonusMalusClass: number;
   minPower: number;
   maxPower: number;
@@ -30,6 +31,7 @@ const CLASSES = [1, 2, 3, 4, 5, 6, 7, 8];
 export const RcTableGrid = () => {
   const queryClient = useQueryClient();
   const [selectedCompany, setSelectedCompany] = useState('');
+  const [selectedUsage, setSelectedUsage] = useState('');
   const [editedCells, setEditedCells] = useState<Map<string, number>>(new Map());
   const [hasChanges, setHasChanges] = useState(false);
   const [focusedCell, setFocusedCell] = useState<string | null>(null);
@@ -139,6 +141,14 @@ export const RcTableGrid = () => {
     },
   });
 
+  const { data: usageTypes } = useQuery({
+    queryKey: ['usage-types', 'active'],
+    queryFn: async () => {
+      const { data } = await api.get('/usage-types?includeInactive=false');
+      return data;
+    },
+  });
+
   const { data: guarantees } = useQuery({
     queryKey: ['guarantees'],
     queryFn: async () => {
@@ -148,13 +158,14 @@ export const RcTableGrid = () => {
   });
 
   const { data: rcRules, isLoading } = useQuery({
-    queryKey: ['rc-rules', selectedCompany],
+    queryKey: ['rc-rules', selectedCompany, selectedUsage],
     queryFn: async () => {
       if (!selectedCompany || !guarantees) return [];
       const params = new URLSearchParams({
         companyId: selectedCompany,
         guaranteeId: guarantees.id,
       });
+      if (selectedUsage) params.set('usageId', selectedUsage);
       const { data } = await api.get(`/pricing-rules?${params}`);
       return data;
     },
@@ -237,6 +248,7 @@ export const RcTableGrid = () => {
         id: existingRule?.id,
         companyId: selectedCompany,
         guaranteeId: guarantees.id,
+        usageId: selectedUsage || undefined,
         bonusMalusClass: classNum,
         minPower,
         maxPower,
@@ -254,27 +266,33 @@ export const RcTableGrid = () => {
       return;
     }
 
-    // Create CSV content
-    let csv = 'CLASSE,3-4 CV,5-6 CV,7-10 CV,11-14 CV,≥15 CV\n';
+    // Create CSV content with proper formatting for Excel
+    // Use semicolon as separator for better Excel compatibility in French locale
+    let csv = 'CLASSE;3-4 CV;5-6 CV;7-10 CV;11-14 CV;≥15 CV\n';
     
     CLASSES.forEach(classNum => {
       const row = [classNum.toString().padStart(2, '0')];
       POWER_RANGES.forEach(range => {
         const value = getCellValue(classNum, range);
-        // Export shows the display values (already multiplied by 1000)
-        row.push(value ? value.toString() : '');
+        // Format numbers properly for Excel (no commas in CSV)
+        row.push(value ? value.toString() : '0');
       });
-      csv += row.join(',') + '\n';
+      csv += row.join(';') + '\n';
     });
 
-    // Download
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    // Add BOM for UTF-8 encoding to ensure Excel opens it correctly
+    const BOM = '\uFEFF';
+    const csvWithBOM = BOM + csv;
+
+    // Download with proper MIME type
+    const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `RC_${companies?.find((c: any) => c.id === selectedCompany)?.name}_${new Date().toISOString().split('T')[0]}.csv`;
+    const companyName = companies?.find((c: any) => c.id === selectedCompany)?.name || 'Export';
+    link.download = `RC_${companyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     
-    toast.success('Export réussi');
+    toast.success('Export réussi - Ouvrez le fichier avec Excel');
   };
 
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -328,6 +346,19 @@ export const RcTableGrid = () => {
               <option value="">Sélectionner une compagnie</option>
               {companies.map((c: any) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <label className="ml-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Usage:
+            </label>
+            <select
+              value={selectedUsage}
+              onChange={(e) => setSelectedUsage(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+            >
+              <option value="">Tous</option>
+              {usageTypes?.map((u: any) => (
+                <option key={u.id} value={u.id}>{u.nameFr}</option>
               ))}
             </select>
           </div>

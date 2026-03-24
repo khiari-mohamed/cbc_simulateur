@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
-import { FormulaType, UsageType, ReductionMetric } from '@prisma/client';
+import { FormulaType, ReductionMetric } from '@prisma/client';
 
 @Injectable()
 export class ReductionRatesService {
@@ -18,7 +18,7 @@ export class ReductionRatesService {
     metricValue: Decimal,
     metric: ReductionMetric,
     formulaType?: FormulaType,
-    usageType?: UsageType,
+    usageId?: string,
   ): Promise<number> {
     if (!conventionId) return 0; // No convention = no reduction
 
@@ -46,8 +46,8 @@ export class ReductionRatesService {
           },
           {
             OR: [
-              { usageType },
-              { usageType: null }
+              { usageId },
+              { usageId: null }
             ]
           },
           {

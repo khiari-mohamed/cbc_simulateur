@@ -108,17 +108,19 @@ async function testParameterizedFormulas() {
   const dcTiers = await prisma.dcCapitalTier.findMany({
     where: { companyId: lloyd.id },
     orderBy: { minAmount: 'asc' },
+    include: { usage: true },
   });
   console.log(`  Found ${dcTiers.length} tiers:`);
   dcTiers.forEach(tier => {
-    console.log(`    ${tier.minAmount} - ${tier.maxAmount}: step ${tier.step} (${tier.usageType})`);
+    console.log(`    ${tier.minAmount} - ${tier.maxAmount}: step ${tier.step} (${tier.usage?.code})`);
   });
   console.log(`  ✅ ${dcTiers.length === 8 ? 'PASS' : 'FAIL'}\n`);
 
   // Test 6: DC Progressive Tiers
   console.log('📝 Test 6: DC Progressive Tiers');
+  const privateUsage = await prisma.usage.findUnique({ where: { code: 'PRIVATE_BUSINESS' } });
   const dcProgressiveTiers = await prisma.dcProgressiveTier.findMany({
-    where: { companyId: lloyd.id, usageType: 'PRIVATE_BUSINESS' },
+    where: { companyId: lloyd.id, usageId: privateUsage?.id },
     orderBy: { tierNumber: 'asc' },
   });
   console.log(`  Found ${dcProgressiveTiers.length} progressive tiers (PRIVATE_BUSINESS):`);
@@ -131,9 +133,9 @@ async function testParameterizedFormulas() {
   console.log('📝 Test 7: DC Config');
   const dcConfig = await prisma.dcConfig.findUnique({
     where: { 
-      companyId_usageType: {
+      companyId_usageId: {
         companyId: lloyd.id,
-        usageType: 'PRIVATE_BUSINESS',
+        usageId: privateUsage!.id,
       }
     },
   });

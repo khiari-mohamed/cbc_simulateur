@@ -4,6 +4,7 @@ import { PricingEngineService } from '../pricing-engine/pricing-engine.service';
 import { PdfService } from '../pdf/pdf.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { QuoteStatus } from '@prisma/client';
+
 import { calculateEffectiveDate } from '../src/common/utils/effective-date.util';
 
 @Injectable()
@@ -62,7 +63,7 @@ export class QuotesService {
       simulation.vehicle,
       {
         bonusMalus: simulation.bonusMalus,
-        usage: simulation.usage,
+        usageId: simulation.usageId,
         formulaType: simulation.formulaType,
         selectedGuarantees: allSelectedGuarantees,
         selectedCapitals: {

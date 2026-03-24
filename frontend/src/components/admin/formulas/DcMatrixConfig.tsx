@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 
 interface Props {
   companyId: string;
-  usageType: 'PRIVATE_BUSINESS' | 'COMMERCIAL';
+  usageType: string;
   config: any;
 }
 
@@ -20,6 +20,7 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
   const [generalParams, setGeneralParams] = useState({
     basePremium: config?.basePremium || 10,
     discountPercent: config?.discountPercent || 0,
+    referenceValue: config?.referenceValue || 'MARKET_VALUE' as 'MARKET_VALUE' | 'NEW_VALUE',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -47,8 +48,8 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
   };
 
   const validateVvRange = (minVv: number, maxVv: number | null, excludeId?: string): string | null => {
-    if (minVv <= 0) return 'Min VV doit être > 0';
-    if (maxVv !== null && maxVv <= minVv) return 'Max VV doit être > Min VV';
+    if (!minVv || minVv <= 0) return 'Min VV doit être > 0';
+    if (maxVv !== null && maxVv !== undefined && maxVv <= minVv) return 'Max VV doit être > Min VV';
     
     // Check for overlaps (exclude current range being edited)
     const overlaps = vvRanges?.some((range: any) => {
@@ -87,9 +88,10 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
       setGeneralParams({
         basePremium: config.basePremium || 10,
         discountPercent: config.discountPercent || 0,
+        referenceValue: config.referenceValue || 'MARKET_VALUE',
       });
     } else {
-      setGeneralParams({ basePremium: 10, discountPercent: 0 });
+      setGeneralParams({ basePremium: 10, discountPercent: 0, referenceValue: 'MARKET_VALUE' });
     }
   }, [config, companyId, usageType]);
 
@@ -144,13 +146,17 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
         const { data } = await api.patch(`/dc-config/matrix-vv-ranges/${range.id}`, range);
         return data;
       } else {
-        const { data } = await api.post('/dc-config/matrix-vv-ranges', { companyId, usageType, ...range });
+        const { data } = await api.post('/dc-config/matrix-vv-ranges', { companyId, usageId: usageType, ...range });
         return data;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['matrix-vv-ranges'] });
       toast.success('Tranche VV sauvegardée');
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Erreur lors de la sauvegarde';
+      toast.error(message);
     },
   });
 
@@ -168,13 +174,17 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
         const { data } = await api.patch(`/dc-config/matrix-capitals/${capital.id}`, capital);
         return data;
       } else {
-        const { data } = await api.post('/dc-config/matrix-capitals', { companyId, usageType, ...capital });
+        const { data } = await api.post('/dc-config/matrix-capitals', { companyId, usageId: usageType, ...capital });
         return data;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['matrix-capitals'] });
       toast.success('Capital sauvegardé');
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Erreur lors de la sauvegarde';
+      toast.error(message);
     },
   });
 
@@ -194,6 +204,9 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['matrix-prices'] });
       toast.success('Prix sauvegardé');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Erreur lors de la sauvegarde');
     },
   });
 
@@ -220,7 +233,7 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
           Paramètres Généraux
         </h3>
 
-        {/* VV Indicator */}
+        {/* VV Selector - Selectable */}
         <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-4">
           <div className="flex items-center gap-2 mb-3">
             <AlertCircle className="w-4 h-4 text-gray-600 dark:text-gray-400" />
@@ -228,37 +241,67 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
               Valeur Véhicule (VV) utilisée:
             </span>
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 p-2 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700">
-              <div className="w-5 h-5 rounded-full border-2 border-green-600 bg-green-600 flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  Valeur Vénale (VV)
+          
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label
+                className="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all hover:bg-gray-100 dark:hover:bg-gray-800"
+                style={{
+                  borderColor: generalParams.referenceValue === 'MARKET_VALUE' ? '#16a34a' : '#d1d5db',
+                  backgroundColor: generalParams.referenceValue === 'MARKET_VALUE' ? '#f0fdf4' : 'transparent',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="referenceValue"
+                  value="MARKET_VALUE"
+                  checked={generalParams.referenceValue === 'MARKET_VALUE'}
+                  onChange={(e) => setGeneralParams({ ...generalParams, referenceValue: e.target.value as 'MARKET_VALUE' })}
+                  className="w-5 h-5 text-green-600 focus:ring-green-500"
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    Valeur Vénale (VV)
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    Utilisée pour Dommages Collision (Méthode Matrice)
+                    <span className="ml-1 text-blue-600 dark:text-blue-400 font-medium">(Recommandé)</span>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400">
-                  Utilisée pour Dommages Collision (Méthode Matrice)
+              </label>
+
+              <label
+                className="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all hover:bg-gray-100 dark:hover:bg-gray-800"
+                style={{
+                  borderColor: generalParams.referenceValue === 'NEW_VALUE' ? '#16a34a' : '#d1d5db',
+                  backgroundColor: generalParams.referenceValue === 'NEW_VALUE' ? '#f0fdf4' : 'transparent',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="referenceValue"
+                  value="NEW_VALUE"
+                  checked={generalParams.referenceValue === 'NEW_VALUE'}
+                  onChange={(e) => setGeneralParams({ ...generalParams, referenceValue: e.target.value as 'NEW_VALUE' })}
+                  className="w-5 h-5 text-green-600 focus:ring-green-500"
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    Valeur à Neuf (VN)
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    Utilisée pour Tous Risques
+                  </div>
                 </div>
-              </div>
+              </label>
             </div>
-            <div className="flex items-center gap-3 p-2 rounded bg-gray-100 dark:bg-gray-800 opacity-60">
-              <div className="w-5 h-5 rounded-full border-2 border-gray-400 dark:border-gray-600 flex items-center justify-center">
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  Valeur à Neuf (VN)
-                </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400">
-                  Non utilisée pour cette garantie
-                </div>
-              </div>
+
+            <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+              <p>
+                Le système recommande automatiquement la valeur de référence selon la garantie, mais vous pouvez la modifier si nécessaire.
+              </p>
             </div>
-          </div>
-          <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 italic">
-            ℹ️ Le type de VV est automatiquement choisi selon la garantie. Cette sélection ne peut pas être modifiée.
           </div>
         </div>
 
@@ -546,7 +589,7 @@ export const DcMatrixConfig = ({ companyId, usageType, config }: Props) => {
                             if (!isNaN(value)) {
                               savePriceMutation.mutate({
                                 companyId,
-                                usageType,
+                                usageId: usageType,
                                 vvRangeId: range.id,
                                 capitalId: capital.id,
                                 prime: value,

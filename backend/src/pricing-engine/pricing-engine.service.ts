@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { FormulaType, UsageType, ReductionMetric } from '@prisma/client';
+import { FormulaType, ReductionMetric } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { ReductionRatesService } from './reduction-rates.service';
 import { FormulaEvaluatorService } from './formula-evaluator.service';
@@ -15,7 +15,7 @@ interface VehicleData {
 
 interface SimulationData {
   bonusMalus: Decimal;
-  usage: UsageType;
+  usageId: string;
   formulaType: FormulaType;
   selectedGuarantees: string[];
   selectedCapitals?: Record<string, Decimal>;
@@ -152,7 +152,7 @@ export class PricingEngineService {
       }
     }
 
-    // 9. BG (Bris de Glaces) - FREE if TOUS_RISQUES_0, otherwise Capital * 0.08
+    // 9. BG (Bris de Glaces) - FREE if TOUS_RISQUES_0, otherwise Capital * rate
     if (simulation.selectedGuarantees.includes('BG') || simulation.formulaType === FormulaType.TOUS_RISQUES_0) {
       const selectedCapital = simulation.selectedCapitals?.['BG'];
       const bgResult = await this.calculateBG(
@@ -161,6 +161,7 @@ export class PricingEngineService {
         simulation.formulaType === FormulaType.TOUS_RISQUES_0,
         selectedCapital,
         conventionId,
+        simulation.selectedGuarantees.includes('BG'),  // Pass flag: is BG explicitly selected?
       );
       if (bgResult) {
         items.push(bgResult);
@@ -180,7 +181,7 @@ export class PricingEngineService {
       }
     }
 
-    // 11. CATASTROPHES_NATURELLES (Optional - AMANA only for Tous Risques)
+    // 11. CATASTROPHES_NATURELLES (Optional - Only for Tous Risques 0% with pricing rule)
     if (simulation.selectedGuarantees.includes('CATASTROPHES_NATURELLES')) {
       const catnatResult = await this.calculateCATNAT(companyId, vehicle, simulation.formulaType, conventionId);
       if (catnatResult) {
@@ -188,7 +189,7 @@ export class PricingEngineService {
         items.push(catnatResult);
         primeNette = primeNette.add(catnatResult.prime);
       } else {
-        console.log('❌ CATASTROPHES_NATURELLES NOT calculated - no pricing rule found or not AMANA');
+        console.log('❌ CATASTROPHES_NATURELLES NOT calculated - no pricing rule found or not Tous Risques 0%');
       }
     }
 
@@ -445,12 +446,17 @@ export class PricingEngineService {
       throw new BadRequestException(`VOL pricing rule not found for company and vehicle market value ${vehicle.marketValue} DT`);
     }
 
+    // Determine which value to use based on referenceValue field
+    const useNewValue = rule.referenceValue === 'NEW_VALUE';
+    const referenceValue = useNewValue ? vehicle.newValue : vehicle.marketValue;
+
     let prime: Decimal;
 
     // Use custom formula if provided
     if (rule.formula) {
       const variables = {
         VV: vehicle.marketValue.toNumber(),
+        VN: vehicle.newValue.toNumber(),
         rate: rule.ratePercentage?.toNumber() || 0,
         fixed: rule.fixedPremium?.toNumber() || 0,
         reduction: rule.reductionRate ? (1 - rule.reductionRate.toNumber() / 100) : 1,
@@ -461,7 +467,7 @@ export class PricingEngineService {
       if (rule.ratePercentage === null || rule.fixedPremium === null) {
         throw new BadRequestException('VOL pricing rule is missing required fields (ratePercentage or fixedPremium)');
       }
-      prime = vehicle.marketValue.mul(rule.ratePercentage).add(rule.fixedPremium);
+      prime = referenceValue.mul(rule.ratePercentage).add(rule.fixedPremium);
       
       if (rule.reductionRate && rule.reductionRate.gt(0)) {
         const multiplier = new Decimal(1).sub(rule.reductionRate.div(100));
@@ -484,7 +490,7 @@ export class PricingEngineService {
     return {
       guaranteeCode: 'VOL',
       guaranteeId: guarantee.id,
-      capital: vehicle.marketValue,
+      capital: referenceValue,
       prime,
     };
   }
@@ -554,12 +560,17 @@ export class PricingEngineService {
       throw new BadRequestException(`INCENDIE pricing rule not found for company and vehicle market value ${vehicle.marketValue} DT`);
     }
 
+    // Determine which value to use based on referenceValue field
+    const useNewValue = rule.referenceValue === 'NEW_VALUE';
+    const referenceValue = useNewValue ? vehicle.newValue : vehicle.marketValue;
+
     let prime: Decimal;
 
     // Use custom formula if provided
     if (rule.formula) {
       const variables = {
         VV: vehicle.marketValue.toNumber(),
+        VN: vehicle.newValue.toNumber(),
         rate: rule.ratePercentage?.toNumber() || 0,
         fixed: rule.fixedPremium?.toNumber() || 0,
         reduction: rule.reductionRate ? (1 - rule.reductionRate.toNumber() / 100) : 1,
@@ -570,7 +581,7 @@ export class PricingEngineService {
       if (rule.ratePercentage === null || rule.fixedPremium === null) {
         throw new BadRequestException('INCENDIE pricing rule is missing required fields (ratePercentage or fixedPremium)');
       }
-      prime = vehicle.marketValue.mul(rule.ratePercentage).add(rule.fixedPremium);
+      prime = referenceValue.mul(rule.ratePercentage).add(rule.fixedPremium);
       
       if (rule.reductionRate && rule.reductionRate.gt(0)) {
         const multiplier = new Decimal(1).sub(rule.reductionRate.div(100));
@@ -593,7 +604,7 @@ export class PricingEngineService {
     return {
       guaranteeCode: 'INCENDIE',
       guaranteeId: guarantee.id,
-      capital: vehicle.marketValue,
+      capital: referenceValue,
       prime,
     };
   }
@@ -805,7 +816,7 @@ export class PricingEngineService {
     const dcConfig = await this.prisma.dcConfig.findFirst({
       where: { 
         companyId,
-        usageType: simulation.usage,
+        usageId: simulation.usageId,
         isActive: true,
       },
     });
@@ -834,7 +845,7 @@ export class PricingEngineService {
     }
 
     // Validate capital steps
-    const isValidStep = await this.validateCapitalStep(companyId, simulation.usage, requestedCapital);
+    const isValidStep = await this.validateCapitalStep(companyId, simulation.usageId, requestedCapital);
     if (!isValidStep) {
       throw new BadRequestException('Capital does not match allowed increments');
     }
@@ -842,15 +853,15 @@ export class PricingEngineService {
     const capital = requestedCapital;
 
     if (dcConfig.useMatrix) {
-      return await this.calculateDC_Matrix(companyId, guarantee.id, vv, capital, dcConfig, simulation.usage, conventionId);
+      return await this.calculateDC_Matrix(companyId, guarantee.id, vv, capital, dcConfig, simulation.usageId, conventionId);
     } else {
-      return await this.calculateDC_Progressive(companyId, guarantee.id, vv, capital, dcConfig, simulation.usage, conventionId);
+      return await this.calculateDC_Progressive(companyId, guarantee.id, vv, capital, dcConfig, simulation.usageId, conventionId);
     }
   }
 
-  private async validateCapitalStep(companyId: string, usageType: UsageType, capital: Decimal): Promise<boolean> {
+  private async validateCapitalStep(companyId: string, usageId: string, capital: Decimal): Promise<boolean> {
     const tiers = await this.prisma.dcCapitalTier.findMany({
-      where: { companyId, usageType, isActive: true },
+      where: { companyId, usageId, isActive: true },
       orderBy: { minAmount: 'asc' },
     });
 
@@ -865,12 +876,12 @@ export class PricingEngineService {
     return false;
   }
 
-  private async calculateDC_Matrix(companyId: string, guaranteeId: string, vv: Decimal, capital: Decimal, dcConfig: any, usageType: UsageType, conventionId?: string) {
+  private async calculateDC_Matrix(companyId: string, guaranteeId: string, vv: Decimal, capital: Decimal, dcConfig: any, usageId: string, conventionId?: string) {
     // Find matching VV range for this usage type
     const vvRange = await this.prisma.dcMatrixVvRange.findFirst({
       where: {
         companyId,
-        usageType,
+        usageId,
         minVv: { lte: vv },
         OR: [
           { maxVv: { gte: vv } },
@@ -881,21 +892,21 @@ export class PricingEngineService {
     });
 
     if (!vvRange) {
-      throw new BadRequestException(`No matrix VV range found for usage ${usageType} and VV ${vv}`);
+      throw new BadRequestException(`No matrix VV range found for usage ${usageId} and VV ${vv}`);
     }
 
     // Find matching capital for this usage type
     const capitalEntry = await this.prisma.dcMatrixCapital.findFirst({
       where: {
         companyId,
-        usageType,
+        usageId,
         amount: capital,
         isActive: true,
       },
     });
 
     if (!capitalEntry) {
-      throw new BadRequestException(`No matrix capital found for usage ${usageType} and capital ${capital}`);
+      throw new BadRequestException(`No matrix capital found for usage ${usageId} and capital ${capital}`);
     }
 
     // Get price from matrix
@@ -934,7 +945,7 @@ export class PricingEngineService {
         capital,
         'DC_CAPITAL' as ReductionMetric,
         FormulaType.DOMMAGES_COLLISIONS,
-        usageType,
+        usageId,
       );
       prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
     }
@@ -947,14 +958,14 @@ export class PricingEngineService {
     };
   }
 
-  private async calculateDC_CommercialLegacy(companyId: string, guaranteeId: string, vv: Decimal, capital: Decimal, dcConfig: any, conventionId?: string) {
+  private async calculateDC_CommercialLegacy(companyId: string, guaranteeId: string, vv: Decimal, capital: Decimal, dcConfig: any, usageId: string, conventionId?: string) {
     const conventionScope = conventionId ? { conventionId } : { conventionId: null };
 
     let rule = await this.prisma.pricingRule.findFirst({
       where: {
         companyId,
         guaranteeId,
-        usageType: 'COMMERCIAL',
+        usageId,
         minMarketValue: { lte: vv },
         OR: [
           { maxMarketValue: { gte: vv } },
@@ -973,7 +984,7 @@ export class PricingEngineService {
         where: {
           companyId,
           guaranteeId,
-          usageType: 'COMMERCIAL',
+          usageId,
           minMarketValue: { lte: vv },
           OR: [
             { maxMarketValue: { gte: vv } },
@@ -1007,7 +1018,7 @@ export class PricingEngineService {
         capital,
         'DC_CAPITAL' as ReductionMetric,
         FormulaType.DOMMAGES_COLLISIONS,
-        UsageType.COMMERCIAL,
+        usageId,
       );
       prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
     }
@@ -1020,12 +1031,12 @@ export class PricingEngineService {
     };
   }
 
-  private async calculateDC_Progressive(companyId: string, guaranteeId: string, vv: Decimal, capital: Decimal, dcConfig: any, usageType: UsageType, conventionId?: string) {
+  private async calculateDC_Progressive(companyId: string, guaranteeId: string, vv: Decimal, capital: Decimal, dcConfig: any, usageId: string, conventionId?: string) {
     // Get progressive tiers for this usage type
     const tiers = await this.prisma.dcProgressiveTier.findMany({
       where: {
         companyId,
-        usageType,
+        usageId,
         isActive: true,
       },
       orderBy: { tierNumber: 'asc' },
@@ -1081,7 +1092,7 @@ export class PricingEngineService {
         capital,
         'DC_CAPITAL' as ReductionMetric,
         FormulaType.DOMMAGES_COLLISIONS,
-        usageType,
+        usageId,
       );
       prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
     }
@@ -1094,23 +1105,43 @@ export class PricingEngineService {
     };
   }
 
-  private async calculateBG(companyId: string, vehicle: VehicleData, isTousRisques: boolean, selectedCapital?: Decimal, conventionId?: string) {
+  private async calculateBG(
+    companyId: string,
+    vehicle: VehicleData,
+    isTousRisques: boolean,
+    selectedCapital?: Decimal,
+    conventionId?: string,
+    isBGExplicitlySelected?: boolean,
+  ) {
     const guarantee = await this.prisma.guarantee.findUnique({ where: { code: 'BG' } });
     if (!guarantee) return null;
 
-    const capital = selectedCapital ?? vehicle.marketValue;
+    // If BG is explicitly selected by user but no capital provided → ERROR (user mistake)
+    if (isBGExplicitlySelected && (!selectedCapital || selectedCapital.eq(0))) {
+      throw new BadRequestException(
+        'Bris de Glaces (BG) est sélectionné mais aucun capital n\'a été choisi. Veuillez sélectionner un capital BG (1000 / 2000 / 3000 DT).',
+      );
+    }
+
+    // If BG not selected or capital is 0, skip it gracefully
+    if (!selectedCapital || selectedCapital.eq(0)) {
+      return null;
+    }
+
+    const capital = selectedCapital;
 
     if (isTousRisques) {
       return {
         guaranteeCode: 'BG',
         guaranteeId: guarantee.id,
         capital,
-        prime: new Decimal(0),
+        prime: new Decimal(0),  // FREE for Tous Risques
       };
     }
 
     const conventionScope = conventionId ? { conventionId } : { conventionId: null };
 
+    // Find rule based on CAPITAL range
     let rule = await this.prisma.pricingRule.findFirst({
       where: {
         companyId,
@@ -1120,18 +1151,19 @@ export class PricingEngineService {
         AND: [
           {
             OR: [
-              { minMarketValue: null },
-              { minMarketValue: { lte: vehicle.marketValue } },
+              { minCapital: null },
+              { minCapital: { lte: capital } },
             ],
           },
           {
             OR: [
-              { maxMarketValue: null },
-              { maxMarketValue: { gte: vehicle.marketValue } },
+              { maxCapital: null },
+              { maxCapital: { gte: capital } },
             ],
           },
         ],
       },
+      orderBy: { minCapital: 'desc' },  // Get most specific range
     });
 
     if (!rule && conventionId) {
@@ -1144,30 +1176,44 @@ export class PricingEngineService {
           AND: [
             {
               OR: [
-                { minMarketValue: null },
-                { minMarketValue: { lte: vehicle.marketValue } },
+                { minCapital: null },
+                { minCapital: { lte: capital } },
               ],
             },
             {
               OR: [
-                { maxMarketValue: null },
-                { maxMarketValue: { gte: vehicle.marketValue } },
+                { maxCapital: null },
+                { maxCapital: { gte: capital } },
               ],
             },
           ],
         },
+        orderBy: { minCapital: 'desc' },
       });
     }
 
-    if (!rule || rule.ratePercentage === null) return null;
+    if (!rule || rule.ratePercentage === null) {
+      throw new BadRequestException(`BG pricing rule not found for capital ${capital} DT`);
+    }
 
-    // FORMULA: (capital * ratePercentage) * (1 - discountPercent/100)
+    // FORMULA: capital * ratePercentage * (1 - discount)
     let prime = capital.mul(rule.ratePercentage);
     
-    // Apply formula discount
     if (rule.reductionRate && rule.reductionRate.gt(0)) {
       const multiplier = new Decimal(1).sub(rule.reductionRate.div(100));
       prime = prime.mul(multiplier);
+    }
+
+    // Apply convention reduction if exists
+    if (conventionId) {
+      const discountPercent = await this.reductionRatesService.getReductionPercent(
+        companyId,
+        'BG',
+        conventionId,
+        capital,
+        'DC_CAPITAL' as ReductionMetric,  // Use DC_CAPITAL metric for BG capital
+      );
+      prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
     }
 
     return {
@@ -1277,11 +1323,9 @@ export class PricingEngineService {
       return null;
     }
 
-    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
-    if (!company || company.code !== 'AMANA') {
-      console.log('❌ CATNAT: Company is not AMANA:', company?.code);
-      return null;
-    }
+    // ✅ REMOVED HARDCODED COMPANY CHECK - Pricing rule determines availability
+    // If a company has a pricing rule for CATNAT, it's available. Otherwise, it's not.
+    // This makes the system flexible: admin can configure CATNAT for any company via pricing rules.
 
     const conventionScope = conventionId ? { conventionId } : { conventionId: null };
 

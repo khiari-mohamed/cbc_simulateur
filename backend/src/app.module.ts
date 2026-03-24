@@ -13,6 +13,7 @@ import { PricingEngineModule } from './pricing-engine/pricing-engine.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { GuaranteesModule } from './guarantees/guarantees.module';
+import { GuaranteeBundlingsModule } from './guarantee-bundlings/guarantee-bundlings.module';
 import { DocumentsModule } from './documents/documents.module';
 import { PaymentsModule } from './payments/payments.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -22,8 +23,11 @@ import { QuoteComparisonsModule } from './quote-comparisons/quote-comparisons.mo
 import { PdfModule } from './pdf/pdf.module';
 import { ReportingModule } from './reporting/reporting.module';
 import { PricingRulesModule } from './pricing-rules/pricing-rules.module';
+import { UsageTypesModule } from './usage-types/usage-types.module';
 import { SystemModule } from './system/system.module';
 import { SeedModule } from './seed/seed.module';
+import { FranchiseValuesModule } from './franchise-values/franchise-values.module';
+import { BgCapitalLimitsModule } from './bg-capital-limits/bg-capital-limits.module';
 
 @Module({
   imports: [
@@ -41,6 +45,7 @@ import { SeedModule } from './seed/seed.module';
     QuotesModule,
     ContractsModule,
     GuaranteesModule,
+    GuaranteeBundlingsModule,
     DocumentsModule,
     PaymentsModule,
     NotificationsModule,
@@ -50,8 +55,11 @@ import { SeedModule } from './seed/seed.module';
     PdfModule,
     ReportingModule,
     PricingRulesModule,
+    UsageTypesModule,
     SystemModule,
     SeedModule,
+    FranchiseValuesModule,
+    BgCapitalLimitsModule,
   ],
 })
 export class AppModule {}

@@ -10,7 +10,7 @@ import { DcMatrixConfig } from '../../../components/admin/formulas/DcMatrixConfi
 export const DcConfigTab = () => {
   const queryClient = useQueryClient();
   const [selectedCompany, setSelectedCompany] = useState('');
-  const [selectedUsage, setSelectedUsage] = useState<'PRIVATE_BUSINESS' | 'COMMERCIAL'>('PRIVATE_BUSINESS');
+  const [selectedUsage, setSelectedUsage] = useState('');
   const [method, setMethod] = useState<'progressive' | 'matrix'>('progressive');
 
   const { data: companies, isLoading: companiesLoading, error: companiesError } = useQuery({
@@ -21,14 +21,22 @@ export const DcConfigTab = () => {
     },
   });
 
+  const { data: usageTypes, isLoading: usageTypesLoading } = useQuery({
+    queryKey: ['usage-types'],
+    queryFn: async () => {
+      const { data } = await api.get('/usage-types');
+      return data;
+    },
+  });
+
   const { data: dcConfig, isLoading } = useQuery({
     queryKey: ['dc-config', selectedCompany, selectedUsage],
     queryFn: async () => {
-      if (!selectedCompany) return null;
-      const { data } = await api.get(`/dc-config?companyId=${selectedCompany}&usageType=${selectedUsage}`);
+      if (!selectedCompany || !selectedUsage) return null;
+      const { data } = await api.get(`/dc-config?companyId=${selectedCompany}&usageId=${selectedUsage}`);
       return data[0] || null;
     },
-    enabled: !!selectedCompany,
+    enabled: !!selectedCompany && !!selectedUsage,
   });
 
   useEffect(() => {
@@ -39,10 +47,16 @@ export const DcConfigTab = () => {
 
   const updateMethodMutation = useMutation({
     mutationFn: async (useMatrix: boolean) => {
+      if (!selectedCompany) {
+        throw new Error('Veuillez sélectionner une compagnie');
+      }
+      if (!selectedUsage) {
+        throw new Error('Veuillez sélectionner un type d\'usage');
+      }
       if (!dcConfig) {
         const { data } = await api.post('/dc-config', {
           companyId: selectedCompany,
-          usageType: selectedUsage,
+          usageId: selectedUsage,
           useMatrix,
         });
         return data;
@@ -55,7 +69,9 @@ export const DcConfigTab = () => {
       queryClient.invalidateQueries({ queryKey: ['dc-config'] });
       toast.success('Méthode mise à jour');
     },
-    onError: () => toast.error('Erreur lors de la mise à jour'),
+    onError: (error: any) => {
+      toast.error(error?.message || 'Erreur lors de la mise à jour');
+    },
   });
 
   const handleMethodChange = (newMethod: 'progressive' | 'matrix') => {
@@ -107,17 +123,20 @@ export const DcConfigTab = () => {
             </label>
             <select
               value={selectedUsage}
-              onChange={(e) => setSelectedUsage(e.target.value as any)}
+              onChange={(e) => setSelectedUsage(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              disabled={usageTypesLoading}
             >
-              <option value="PRIVATE_BUSINESS">Promenade et Affaire</option>
-              <option value="COMMERCIAL">Commercial</option>
+              <option value="">Sélectionner un usage</option>
+              {usageTypes?.map((usage: any) => (
+                <option key={usage.id} value={usage.id}>{usage.nameFr}</option>
+              ))}
             </select>
           </div>
         </div>
       </Card>
 
-      {selectedCompany && (
+      {selectedCompany && selectedUsage && (
         <>
           <Card className="p-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">

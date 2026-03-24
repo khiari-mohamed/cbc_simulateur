@@ -425,6 +425,33 @@ async function main() {
   }
   console.log('✅ DOMMAGES COLLISION pricing rules created');
 
+  // 16. GUARANTEE BUNDLINGS - Lloyd's DOMMAGES_EMEUTES includes CATASTROPHES_NATURELLES
+  console.log('\n🔗 Creating guarantee bundlings...');
+  
+  // Check if bundling already exists
+  const existingBundling = await prisma.guaranteeBundling.findFirst({
+    where: {
+      companyId: lloyd.id,
+      parentGuaranteeId: dommagesEmeutesGuarantee!.id,
+      includedGuaranteeId: catnatGuarantee!.id,
+    },
+  });
+
+  if (!existingBundling) {
+    await prisma.guaranteeBundling.create({
+      data: {
+        companyId: lloyd.id,
+        parentGuaranteeId: dommagesEmeutesGuarantee!.id,
+        includedGuaranteeId: catnatGuarantee!.id,
+        formulaType: null, // Applies to all formulas
+        isActive: true,
+      },
+    });
+    console.log('✅ LLOYD bundling created: DOMMAGES_EMEUTES includes CATASTROPHES_NATURELLES');
+  } else {
+    console.log('⏭️  LLOYD bundling already exists');
+  }
+
   console.log('🎉 Seeding completed with CORRECT client specifications!');
 }
 

@@ -15,6 +15,7 @@ interface GeneralParams {
   maxCapitalAbsolute: number;
   basePremium: number;
   discountPercent: number;
+  referenceValue: 'MARKET_VALUE' | 'NEW_VALUE';
 }
 
 interface CapitalTier {
@@ -36,7 +37,7 @@ interface ProgressiveTier {
 
 interface Props {
   companyId: string;
-  usageType: 'PRIVATE_BUSINESS' | 'COMMERCIAL';
+  usageType: string;
   config: any;
 }
 
@@ -52,6 +53,7 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
     maxCapitalAbsolute: config?.maxCapitalAbsolute || 100000,
     basePremium: config?.basePremium || 10,
     discountPercent: config?.discountPercent || 0,
+    referenceValue: config?.referenceValue || 'MARKET_VALUE',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -111,9 +113,10 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
         maxCapitalAbsolute: config.maxCapitalAbsolute || 100000,
         basePremium: config.basePremium || 10,
         discountPercent: config.discountPercent || 0,
+        referenceValue: config.referenceValue || 'MARKET_VALUE',
       });
     } else {
-      setGeneralParams({ franchise: 0, minCapital: 1000, maxCapitalPercent: 50, maxCapitalAbsolute: 100000, basePremium: 10, discountPercent: 0 });
+      setGeneralParams({ franchise: 0, minCapital: 1000, maxCapitalPercent: 50, maxCapitalAbsolute: 100000, basePremium: 10, discountPercent: 0, referenceValue: 'MARKET_VALUE' });
     }
   }, [config, companyId, usageType]);
 
@@ -143,7 +146,7 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
       } else {
         const { data } = await api.post('/dc-config', {
           companyId,
-          usageType,
+          usageId: usageType,
           useMatrix: false,
           ...values,
         });
@@ -155,7 +158,10 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
       setHasUnsavedChanges(false);
       toast.success('Configuration sauvegardée');
     },
-    onError: () => toast.error('Erreur lors de la sauvegarde'),
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Erreur lors de la sauvegarde';
+      toast.error(message);
+    },
   });
 
   const saveCapitalTierMutation = useMutation({
@@ -166,7 +172,7 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
       } else {
         const { data } = await api.post('/dc-config/capital-tiers', {
           companyId,
-          usageType,
+          usageId: usageType,
           ...tier,
         });
         return data;
@@ -176,7 +182,10 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
       queryClient.invalidateQueries({ queryKey: ['capital-tiers', companyId, usageType] });
       toast.success('Palier sauvegardé');
     },
-    onError: () => toast.error('Erreur'),
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Erreur lors de la sauvegarde';
+      toast.error(message);
+    },
   });
 
   const deleteCapitalTierMutation = useMutation({
@@ -195,7 +204,7 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
       } else {
         const { data } = await api.post('/dc-config/progressive-tiers', {
           companyId,
-          usageType,
+          usageId: usageType,
           ...tier,
         });
         return data;
@@ -205,7 +214,10 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
       queryClient.invalidateQueries({ queryKey: ['progressive-tiers', companyId, usageType] });
       toast.success('Taux sauvegardé');
     },
-    onError: () => toast.error('Erreur'),
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Erreur lors de la sauvegarde';
+      toast.error(message);
+    },
   });
 
   const deleteProgressiveTierMutation = useMutation({
@@ -253,7 +265,7 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
           Configuration des limites et paramètres de calcul pour la garantie Dommages Collision (Méthode Progressive)
         </p>
 
-        {/* VV Indicator */}
+        {/* VV Selector - Selectable */}
         <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-4">
           <div className="flex items-center gap-2 mb-3">
             <AlertCircle className="w-4 h-4 text-gray-600 dark:text-gray-400" />
@@ -261,37 +273,73 @@ export const DcProgressiveConfig = ({ companyId, usageType, config }: Props) => 
               Valeur Véhicule (VV) utilisée:
             </span>
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 p-2 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700">
-              <div className="w-5 h-5 rounded-full border-2 border-green-600 bg-green-600 flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  Valeur Vénale (VV)
+          
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label
+                className="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all hover:bg-gray-100 dark:hover:bg-gray-800"
+                style={{
+                  borderColor: generalParams.referenceValue === 'MARKET_VALUE' ? '#16a34a' : '#d1d5db',
+                  backgroundColor: generalParams.referenceValue === 'MARKET_VALUE' ? '#f0fdf4' : 'transparent',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="referenceValue"
+                  value="MARKET_VALUE"
+                  checked={generalParams.referenceValue === 'MARKET_VALUE'}
+                  onChange={(e) => {
+                    setGeneralParams({ ...generalParams, referenceValue: e.target.value as 'MARKET_VALUE' });
+                    setHasUnsavedChanges(true);
+                  }}
+                  className="w-5 h-5 text-green-600 focus:ring-green-500"
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    Valeur Vénale (VV)
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    Utilisée pour Dommages Collision
+                    <span className="ml-1 text-blue-600 dark:text-blue-400 font-medium">(Recommandé)</span>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400">
-                  Utilisée pour Dommages Collision
+              </label>
+
+              <label
+                className="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all hover:bg-gray-100 dark:hover:bg-gray-800"
+                style={{
+                  borderColor: generalParams.referenceValue === 'NEW_VALUE' ? '#16a34a' : '#d1d5db',
+                  backgroundColor: generalParams.referenceValue === 'NEW_VALUE' ? '#f0fdf4' : 'transparent',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="referenceValue"
+                  value="NEW_VALUE"
+                  checked={generalParams.referenceValue === 'NEW_VALUE'}
+                  onChange={(e) => {
+                    setGeneralParams({ ...generalParams, referenceValue: e.target.value as 'NEW_VALUE' });
+                    setHasUnsavedChanges(true);
+                  }}
+                  className="w-5 h-5 text-green-600 focus:ring-green-500"
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    Valeur à Neuf (VN)
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    Utilisée pour Tous Risques
+                  </div>
                 </div>
-              </div>
+              </label>
             </div>
-            <div className="flex items-center gap-3 p-2 rounded bg-gray-100 dark:bg-gray-800 opacity-60">
-              <div className="w-5 h-5 rounded-full border-2 border-gray-400 dark:border-gray-600 flex items-center justify-center">
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  Valeur à Neuf (VN)
-                </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400">
-                  Non utilisée pour cette garantie
-                </div>
-              </div>
+
+            <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+              <p>
+                Le système recommande automatiquement la valeur de référence selon la garantie, mais vous pouvez la modifier si nécessaire.
+              </p>
             </div>
-          </div>
-          <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 italic">
-            ℹ️ Le type de VV est automatiquement choisi selon la garantie. Cette sélection ne peut pas être modifiée.
           </div>
         </div>
 

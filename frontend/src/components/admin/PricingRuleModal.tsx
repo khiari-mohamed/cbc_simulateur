@@ -5,7 +5,7 @@ import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
 import api from '../../lib/api/client';
 import toast from 'react-hot-toast';
-import { FormulaType, UsageType } from '../../types';
+import { BgCapitalLimitModal } from './BgCapitalLimitModal';
 
 interface PricingRuleModalProps {
   rule: any;
@@ -24,6 +24,7 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
     minPower: rule?.minPower || '',
     maxPower: rule?.maxPower || '',
     minCapital: rule?.minCapital || '',
+    maxCapital: rule?.maxCapital || '',
     franchiseRate: rule?.franchiseRate || '',
     ratePercentage: rule?.ratePercentage || '',
     minAge: rule?.minAge || '',
@@ -36,6 +37,7 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
   });
 
   const [selectedGuarantee, setSelectedGuarantee] = useState<any>(null);
+  const [isBgLimitModalOpen, setIsBgLimitModalOpen] = useState(false);
 
   const { data: companies } = useQuery({
     queryKey: ['companies'],
@@ -57,6 +59,7 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
     if (formData.guaranteeId && guarantees) {
       const guarantee = guarantees.find((g: any) => g.id === formData.guaranteeId);
       setSelectedGuarantee(guarantee);
+      console.log('Selected guarantee:', guarantee); // Debug log
     }
   }, [formData.guaranteeId, guarantees]);
 
@@ -67,6 +70,29 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
       return data;
     },
   });
+
+  const { data: usageTypes } = useQuery({
+    queryKey: ['usage-types'],
+    queryFn: async () => {
+      const { data } = await api.get('/usage-types');
+      return data;
+    },
+  });
+
+  const { data: franchiseValues } = useQuery({
+    queryKey: ['franchise-values'],
+    queryFn: async () => {
+      const { data } = await api.get('/franchise-values');
+      return data;
+    },
+  });
+
+  // Formula types are enum values - hardcoded since they're not in a table
+  const formulaTypes = [
+    { code: 'STANDARD', nameFr: 'Standard' },
+    { code: 'DOMMAGES_COLLISIONS', nameFr: 'Dommages Collision' },
+    { code: 'TOUS_RISQUES_0', nameFr: 'Tous Risques 0%' },
+  ];
 
   const mutation = useMutation({
     mutationFn: (data: any) =>
@@ -86,7 +112,7 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
       Object.entries(formData)
         .filter(([_, v]) => v !== '')
         .map(([k, v]) => {
-          if (['minPower', 'maxPower', 'bonusMalusClass', 'minCapital', 'franchiseRate', 'minAge', 'maxAge', 'baseRate', 'fixedPremium', 'multiplier', 'reductionRate', 'ratePercentage'].includes(k)) {
+          if (['minPower', 'maxPower', 'bonusMalusClass', 'minCapital', 'maxCapital', 'franchiseRate', 'minAge', 'maxAge', 'baseRate', 'fixedPremium', 'multiplier', 'reductionRate', 'ratePercentage'].includes(k)) {
             return [k, parseFloat(v as string)];
           }
           return [k, v];
@@ -105,7 +131,7 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
       'CAS': 'Prime fixe par compagnie | LLOYD: 45 DT | AMANA: 20 DT',
       'ASSISTANCE': 'Prime fixe par compagnie | LLOYD: 115 DT | AMANA: 90 DT',
       'PERSONNES_TRANSPORTEES': 'Capital et prime par compagnie | LLOYD: 5k=25 DT, 10k=42 DT | AMANA: 4k=32 DT, 8k=64 DT',
-      'BG': 'Formule: capital × taux | LLOYD: 8% | AMANA: 7%',
+      'BG': 'Formule: capital × taux × réduction. LLOYD: 6.5% | AMANA: 7%. Vous pouvez définir des limites de capital.',
       'INCENDIE_EMEUTES': 'Prime fixe | LLOYD: 15 DT | AMANA: NC (non disponible)',
       'DOMMAGES_EMEUTES': 'Prime fixe: 30 DT (LLOYD et AMANA)',
       'CATASTROPHES_NATURELLES': 'AMANA uniquement: 40 DT (Tous Risques seulement)',
@@ -127,7 +153,7 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
       'CAS': ['fixedPremium'],
       'ASSISTANCE': ['fixedPremium'],
       'PERSONNES_TRANSPORTEES': ['minCapital', 'fixedPremium'],
-      'BG': ['ratePercentage'],
+      'BG': ['minCapital', 'maxCapital', 'ratePercentage', 'reductionRate'],
       'INCENDIE_EMEUTES': ['fixedPremium'],
       'DOMMAGES_EMEUTES': ['fixedPremium'],
       'CATASTROPHES_NATURELLES': ['fixedPremium', 'formulaType'],
@@ -257,13 +283,41 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
                   )}
                   {showField('minCapital') && (
                     <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <td className="px-4 py-2 bg-gray-50 dark:bg-gray-900 font-medium border-r border-gray-200 dark:border-gray-700">Capital (DT)</td>
+                      <td className="px-4 py-2 bg-gray-50 dark:bg-gray-900 font-medium border-r border-gray-200 dark:border-gray-700">Capital Minimum (DT)</td>
+                      <td className="px-4 py-2">
+                        <div className="space-y-2">
+                          {selectedGuarantee?.code === 'BG' && (
+                            <div className="mb-2">
+                              <button
+                                type="button"
+                                onClick={() => setIsBgLimitModalOpen(true)}
+                                className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                              >
+                                Gérer les limites BG
+                              </button>
+                            </div>
+                          )}
+                          <input
+                            type="number"
+                            value={formData.minCapital}
+                            onChange={(e) => setFormData({ ...formData, minCapital: e.target.value })}
+                            className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800"
+                            placeholder="Limite minimale de capital pour Bris de Glaces (optionnel)"
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  {showField('maxCapital') && (
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <td className="px-4 py-2 bg-gray-50 dark:bg-gray-900 font-medium border-r border-gray-200 dark:border-gray-700">Capital Maximum (DT)</td>
                       <td className="px-4 py-2">
                         <input
                           type="number"
-                          value={formData.minCapital}
-                          onChange={(e) => setFormData({ ...formData, minCapital: e.target.value })}
+                          value={formData.maxCapital}
+                          onChange={(e) => setFormData({ ...formData, maxCapital: e.target.value })}
                           className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800"
+                          placeholder="Limite maximale de capital pour Bris de Glaces (optionnel)"
                         />
                       </td>
                     </tr>
@@ -278,10 +332,9 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
                           className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800"
                         >
                           <option value="">Sélectionner</option>
-                          <option value="0">0%</option>
-                          <option value="1">1%</option>
-                          <option value="2">2%</option>
-                          <option value="4">4%</option>
+                          {franchiseValues?.map((fv: any) => (
+                            <option key={fv.id} value={fv.value}>{fv.value}%</option>
+                          ))}
                         </select>
                       </td>
                     </tr>
@@ -339,7 +392,9 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
                           className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800"
                         >
                           <option value="">Toutes</option>
-                          <option value={FormulaType.TOUS_RISQUES_0}>Tous Risques 0%</option>
+                          {formulaTypes.map((type: any) => (
+                            <option key={type.code} value={type.code}>{type.nameFr}</option>
+                          ))}
                         </select>
                       </td>
                     </tr>
@@ -354,8 +409,9 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
                           className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800"
                         >
                           <option value="">Tous</option>
-                          <option value={UsageType.PRIVATE_BUSINESS}>Privé et affaires</option>
-                          <option value={UsageType.COMMERCIAL}>Commercial</option>
+                          {usageTypes?.map((usage: any) => (
+                            <option key={usage.id} value={usage.id}>{usage.nameFr}</option>
+                          ))}
                         </select>
                       </td>
                     </tr>
@@ -375,6 +431,17 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
           </div>
         </form>
       </div>
+
+      {isBgLimitModalOpen && (
+        <BgCapitalLimitModal
+          limit={null}
+          onClose={() => setIsBgLimitModalOpen(false)}
+          onSuccess={() => {
+            setIsBgLimitModalOpen(false);
+            toast.success('Limites BG mises à jour');
+          }}
+        />
+      )}
     </div>
   );
 };

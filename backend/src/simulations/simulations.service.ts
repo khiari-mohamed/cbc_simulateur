@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { FormulaType, UsageType, SimulationStatus } from '@prisma/client';
+import { FormulaType, SimulationStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
@@ -18,7 +18,7 @@ export class SimulationsService {
   async create(userId: string, data: {
     vehicle: any;
     bonusMalus: number | Decimal;
-    usage: UsageType;
+    usageId: string;
     formulaType: FormulaType;
     conventionId?: string;
     selectedGuarantees?: string[];
@@ -43,7 +43,7 @@ export class SimulationsService {
         vehicleId: vehicle.id,
         conventionId: data.conventionId,
         bonusMalus: new Decimal(data.bonusMalus),
-        usage: data.usage,
+        usageId: data.usageId,
         formulaType: data.formulaType,
         franchiseRate: data.franchiseRate ?? null,
         bgLimit: data.bgLimit,
@@ -63,7 +63,7 @@ export class SimulationsService {
       'Simulation',
       simulation.id,
       null,
-      { formulaType: data.formulaType, usage: data.usage },
+      { formulaType: data.formulaType, usageId: data.usageId },
     );
 
     return this.findById(simulation.id);
@@ -110,7 +110,7 @@ export class SimulationsService {
 
   async update(id: string, userId: string, data: {
     bonusMalus?: number | Decimal;
-    usage?: UsageType;
+    usageId?: string;
     formulaType?: FormulaType;
     conventionId?: string;
     selectedGuarantees?: string[];
@@ -141,7 +141,7 @@ export class SimulationsService {
 
     const updateData: any = {};
     if (data.bonusMalus !== undefined) updateData.bonusMalus = new Decimal(data.bonusMalus);
-    if (data.usage !== undefined) updateData.usage = data.usage;
+    if (data.usageId !== undefined) updateData.usageId = data.usageId;
     if (data.formulaType !== undefined) updateData.formulaType = data.formulaType;
     if (data.conventionId !== undefined) updateData.conventionId = data.conventionId;
     if (data.franchiseRate !== undefined) updateData.franchiseRate = data.franchiseRate ?? null;

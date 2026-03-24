@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { FormulaType, UsageType } from '@prisma/client';
+import { FormulaType, ReferenceValue } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
@@ -11,28 +11,30 @@ export class PricingRulesService {
     private auditService: AuditService,
   ) {}
 
-  async findAll(companyId?: string, guaranteeId?: string, bonusMalusClass?: string) {
-    console.log('🔍 Filtering pricing rules:', { companyId, guaranteeId, bonusMalusClass });
-    
+  async findAll(companyId?: string, guaranteeId?: string, bonusMalusClass?: string, usageId?: string) {
+    console.log('🔍 Filtering pricing rules:', { companyId, guaranteeId, bonusMalusClass, usageId });
+
     const where: any = {
       ...(companyId && { companyId }),
       ...(guaranteeId && { guaranteeId }),
-      ...(bonusMalusClass && { bonusMalusClass: parseInt(bonusMalusClass) }),
+      ...(bonusMalusClass !== undefined && { bonusMalusClass: Number(bonusMalusClass) }),
+      ...(usageId && { usageId }),
       isActive: true,
     };
-    
+
     console.log('📋 Where clause:', JSON.stringify(where, null, 2));
-    
+
     const results = await this.prisma.pricingRule.findMany({
       where,
       include: {
         company: { select: { id: true, name: true, code: true } },
         guarantee: { select: { id: true, code: true, nameFr: true } },
         convention: { select: { id: true, name: true } },
+        usage: { select: { id: true, code: true, nameFr: true, isActive: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
-    
+
     console.log(`✅ Found ${results.length} pricing rules`);
     return results;
   }
@@ -44,6 +46,7 @@ export class PricingRulesService {
         company: true,
         guarantee: true,
         convention: true,
+        usage: true,
       },
     });
     if (!rule) {
@@ -72,7 +75,8 @@ export class PricingRulesService {
       maxCapital?: number;
       minMarketValue?: number;
       maxMarketValue?: number;
-      usageType?: UsageType;
+      usageId?: string;
+      referenceValue?: ReferenceValue;
       validFrom?: Date;
       validTo?: Date;
     },
@@ -98,7 +102,8 @@ export class PricingRulesService {
         maxCapital: data.maxCapital !== undefined ? new Decimal(data.maxCapital) : null,
         minMarketValue: data.minMarketValue !== undefined ? new Decimal(data.minMarketValue) : null,
         maxMarketValue: data.maxMarketValue !== undefined ? new Decimal(data.maxMarketValue) : null,
-        usageType: data.usageType,
+        usageId: data.usageId,
+        referenceValue: data.referenceValue,
         validFrom: data.validFrom || new Date(),
         validTo: data.validTo,
       },
@@ -106,6 +111,7 @@ export class PricingRulesService {
         company: true,
         guarantee: true,
         convention: true,
+        usage: true,
       },
     });
 
@@ -134,6 +140,8 @@ export class PricingRulesService {
       minMarketValue?: number;
       maxMarketValue?: number;
       franchiseRate?: number;
+      usageId?: string;
+      referenceValue?: ReferenceValue;
       validTo?: Date;
     },
     userId: string,
@@ -153,12 +161,15 @@ export class PricingRulesService {
         ...(data.minMarketValue !== undefined && { minMarketValue: new Decimal(data.minMarketValue) }),
         ...(data.maxMarketValue !== undefined && { maxMarketValue: new Decimal(data.maxMarketValue) }),
         ...(data.franchiseRate !== undefined && { franchiseRate: data.franchiseRate }),
+        ...(data.usageId !== undefined && { usageId: data.usageId }),
+        ...(data.referenceValue !== undefined && { referenceValue: data.referenceValue }),
         ...(data.validTo !== undefined && { validTo: data.validTo }),
       },
       include: {
         company: true,
         guarantee: true,
         convention: true,
+        usage: true,
       },
     });
 
@@ -167,8 +178,8 @@ export class PricingRulesService {
       'PRICING_RULE_UPDATED',
       'PricingRule',
       id,
-      { ratePercentage: existing.ratePercentage, baseRate: existing.baseRate, fixedPremium: existing.fixedPremium, minCapital: existing.minCapital },
-      { ratePercentage: updated.ratePercentage, baseRate: updated.baseRate, fixedPremium: updated.fixedPremium, minCapital: updated.minCapital },
+      { ratePercentage: existing.ratePercentage, baseRate: existing.baseRate, fixedPremium: existing.fixedPremium, minCapital: existing.minCapital, usageId: existing.usageId, referenceValue: existing.referenceValue },
+      { ratePercentage: updated.ratePercentage, baseRate: updated.baseRate, fixedPremium: updated.fixedPremium, minCapital: updated.minCapital, usageId: updated.usageId, referenceValue: updated.referenceValue },
     );
 
     return updated;
@@ -180,6 +191,12 @@ export class PricingRulesService {
     const updated = await this.prisma.pricingRule.update({
       where: { id },
       data: { isActive: false },
+      include: {
+        company: true,
+        guarantee: true,
+        convention: true,
+        usage: true,
+      },
     });
 
     await this.auditService.log(
@@ -204,6 +221,7 @@ export class PricingRulesService {
         company: true,
         guarantee: true,
         convention: true,
+        usage: true,
       },
     });
 
@@ -220,10 +238,9 @@ export class PricingRulesService {
   }
 
   async getOptionalGuaranteesRules(companyId?: string) {
-    const optionalGuarantees = ['VOL', 'INCENDIE', 'TOUS_RISQUES_ZERO', 'DOMMAGES_COLLISIONS'];
-    
+    // Dynamically fetch all optional guarantees instead of hardcoding
     const guarantees = await this.prisma.guarantee.findMany({
-      where: { code: { in: optionalGuarantees } },
+      where: { isOptional: true },
     });
 
     const guaranteeIds = guarantees.map(g => g.id);
@@ -238,8 +255,63 @@ export class PricingRulesService {
         company: { select: { id: true, name: true, code: true } },
         guarantee: { select: { id: true, code: true, nameFr: true } },
         convention: { select: { id: true, name: true } },
+        usage: { select: { id: true, code: true, nameFr: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [
+        { company: { name: 'asc' } },
+        { guarantee: { nameFr: 'asc' } },
+        { usage: { nameFr: 'asc' } },
+      ],
     });
+  }
+
+  async bulkCopy(ruleIds: string[], targetCompanyIds: string[], userId: string) {
+    const rules = await this.prisma.pricingRule.findMany({
+      where: { id: { in: ruleIds }, isActive: true },
+    });
+
+    const createdRules = [];
+    for (const rule of rules) {
+      for (const targetCompanyId of targetCompanyIds) {
+        const newRule = await this.prisma.pricingRule.create({
+          data: {
+            companyId: targetCompanyId,
+            guaranteeId: rule.guaranteeId,
+            conventionId: rule.conventionId,
+            formulaType: rule.formulaType,
+            minPower: rule.minPower,
+            maxPower: rule.maxPower,
+            minAge: rule.minAge,
+            maxAge: rule.maxAge,
+            baseRate: rule.baseRate,
+            fixedPremium: rule.fixedPremium,
+            multiplier: rule.multiplier,
+            reductionRate: rule.reductionRate,
+            ratePercentage: rule.ratePercentage,
+            franchiseRate: rule.franchiseRate,
+            minCapital: rule.minCapital,
+            maxCapital: rule.maxCapital,
+            minMarketValue: rule.minMarketValue,
+            maxMarketValue: rule.maxMarketValue,
+            usageId: rule.usageId,
+            referenceValue: rule.referenceValue,
+            validFrom: new Date(),
+            validTo: rule.validTo,
+          },
+        });
+        createdRules.push(newRule);
+        
+        await this.auditService.log(
+          userId,
+          'PRICING_RULE_COPIED',
+          'PricingRule',
+          newRule.id,
+          null,
+          { sourceRuleId: rule.id, targetCompanyId },
+        );
+      }
+    }
+
+    return { success: true, count: createdRules.length };
   }
 }

@@ -70,18 +70,41 @@
     REFUNDED
   }
 
-  enum UsageType {
-    PRIVATE_BUSINESS
-    COMMERCIAL
-    TAXI
-    RENTAL
+
+
+  // Admin-manageable usage types (allow CRUD from UI)
+  model Usage {
+    id        String   @id @default(uuid())
+    code      String   @unique
+    nameFr    String
+    nameAr    String?
+    nameEn    String?
+    isActive  Boolean  @default(true)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    pricingRules             PricingRule[]
+    dcConfigs                DcConfig[]
+    dcMatrixVvRanges         DcMatrixVvRange[]
+    dcMatrixCapitals         DcMatrixCapital[]
+    dcMatrixPrices           DcMatrixPrice[]
+    dcCapitalTiers           DcCapitalTier[]
+    dcProgressiveTiers       DcProgressiveTier[]
+    simulations              Simulation[]
+    conventionReductionRules ConventionReductionRule[]
+
+    @@map("usage_types")
   }
 
   enum ReductionMetric {
     NEW_VALUE
     MARKET_VALUE
     DC_CAPITAL
-    CAPITAL_OVER_VV_PERCENT
+  }
+
+  enum ReferenceValue {
+    NEW_VALUE
+    MARKET_VALUE
   }
 
   model User {
@@ -136,6 +159,7 @@
     dcMatrixCapitals         DcMatrixCapital[]
     dcMatrixPrices           DcMatrixPrice[]
     dcConfigs                DcConfig[]
+    guaranteeBundlings        GuaranteeBundling[]
 
     @@map("companies")
   }
@@ -144,7 +168,7 @@
     id             String             @id @default(uuid())
     name           String
     organizationId String
-    organization   ClientOrganization @relation(fields: [organizationId], references: [id])
+    organization   ClientOrganization @relation("PrimaryOrganization", fields: [organizationId], references: [id])
     startDate      DateTime           @default(now())
     endDate        DateTime?
     status         ConventionStatus   @default(ACTIVE)
@@ -152,10 +176,11 @@
     createdAt      DateTime           @default(now())
     updatedAt      DateTime           @updatedAt
 
-    companies      ConventionCompany[]
-    reductionRules ConventionReductionRule[]
-    simulations    Simulation[]
-    pricingRules   PricingRule[]
+    companies               ConventionCompany[]
+    reductionRules          ConventionReductionRule[]
+    simulations             Simulation[]
+    pricingRules            PricingRule[]
+    sharedWithOrganizations ConventionOrganization[]
 
     @@map("conventions")
   }
@@ -169,8 +194,9 @@
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
-    users       User[]
-    conventions Convention[]
+    users              User[]
+    conventions        Convention[]           @relation("PrimaryOrganization")
+    sharedConventions  ConventionOrganization[]
 
     @@map("client_organizations")
   }
@@ -186,6 +212,23 @@
     @@map("convention_companies")
   }
 
+  model ConventionOrganization {
+    id             String             @id @default(uuid())
+    conventionId   String
+    convention     Convention         @relation(fields: [conventionId], references: [id], onDelete: Cascade)
+    organizationId String
+    organization   ClientOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    assignedAt     DateTime           @default(now())
+    assignedBy     String?
+    createdAt      DateTime           @default(now())
+    updatedAt      DateTime           @updatedAt
+
+    @@unique([conventionId, organizationId])
+    @@index([conventionId])
+    @@index([organizationId])
+    @@map("convention_organizations")
+  }
+
   model ConventionReductionRule {
     id              String          @id @default(uuid())
     conventionId    String
@@ -195,7 +238,8 @@
     guaranteeId     String
     guarantee       Guarantee       @relation(fields: [guaranteeId], references: [id])
     formulaType     FormulaType?
-    usageType       UsageType?
+    usageId         String?
+    usage           Usage? @relation(fields: [usageId], references: [id])
     metric          ReductionMetric
     minValue        Decimal?        @db.Decimal(12, 2)
     maxValue        Decimal?        @db.Decimal(12, 2)
@@ -209,7 +253,7 @@
     createdAt       DateTime        @default(now())
     updatedAt       DateTime        @updatedAt
 
-    @@index([conventionId, companyId, guaranteeId, formulaType, usageType, metric, isActive, validFrom, validTo])
+    @@index([conventionId, companyId, guaranteeId, formulaType, usageId, metric, isActive, validFrom, validTo])
     @@index([conventionId, priority, createdAt])
     @@map("convention_reduction_rules")
   }
@@ -252,10 +296,11 @@
     conventionId  String?
     convention    Convention?      @relation(fields: [conventionId], references: [id])
     bonusMalus    Decimal          @db.Decimal(5, 2)
-    usage         UsageType
+    usageId       String
+    usage         Usage            @relation(fields: [usageId], references: [id])
     formulaType   FormulaType
     franchiseRate Int?
-    bgLimit       Int?
+    bgLimit       Int?             // BG capital limit chosen by client (from bg_capital_limits table)
     dcCapital     Decimal?         @db.Decimal(15, 0)
     status        SimulationStatus @default(DRAFT)
     createdAt     DateTime         @default(now())
@@ -369,8 +414,36 @@
     simulationGuarantees     SimulationGuarantee[]
     quoteItems               QuoteItem[]
     conventionReductionRules ConventionReductionRule[]
+    parentBundlings          GuaranteeBundling[]     @relation("ParentGuarantee")
+    includedInBundlings      GuaranteeBundling[]     @relation("IncludedGuarantee")
 
     @@map("guarantees")
+  }
+
+  model FranchiseValue {
+    id          String   @id @default(uuid())
+    value       Decimal  @unique @db.Decimal(5, 2)
+    label       String?
+    description String?
+    isStandard  Boolean  @default(false)
+    isActive    Boolean  @default(true)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    @@map("franchise_values")
+  }
+
+  model BgCapitalLimit {
+    id          String   @id @default(uuid())
+    value       Decimal  @unique @db.Decimal(15, 0)
+    label       String?
+    description String?
+    isStandard  Boolean  @default(false)
+    isActive    Boolean  @default(true)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    @@map("bg_capital_limits")
   }
 
   model PricingRule {
@@ -401,7 +474,9 @@
     tierLevel       Int?
     tierRate        Decimal?     @db.Decimal(12, 6)
     basePremium     Decimal?     @db.Decimal(15, 0)
-    usageType       UsageType?
+    usageId         String?
+    usage           Usage? @relation(fields: [usageId], references: [id])
+    referenceValue  ReferenceValue?
     validFrom       DateTime     @default(now())
     validTo         DateTime?
     isActive        Boolean      @default(true)
@@ -415,7 +490,8 @@
     id         String    @id @default(uuid())
     companyId  String
     company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    usageType  UsageType
+    usageId    String
+    usage      Usage @relation(fields: [usageId], references: [id])
     minAmount  Decimal   @db.Decimal(15, 0)
     maxAmount  Decimal?  @db.Decimal(15, 0)
     step       Decimal   @db.Decimal(15, 0)
@@ -423,8 +499,8 @@
     createdAt  DateTime  @default(now())
     updatedAt  DateTime  @updatedAt
 
-    @@unique([companyId, usageType, minAmount])
-    @@index([companyId, usageType, isActive, minAmount])
+    @@unique([companyId, usageId, minAmount])
+    @@index([companyId, usageId, isActive, minAmount])
     @@map("dc_capital_tiers")
   }
 
@@ -432,15 +508,16 @@
     id         String    @id @default(uuid())
     companyId  String
     company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    usageType  UsageType
+    usageId    String
+    usage      Usage @relation(fields: [usageId], references: [id])
     tierNumber Int
     tierRate   Decimal   @db.Decimal(12, 6)
     isActive   Boolean   @default(true)
     createdAt  DateTime  @default(now())
     updatedAt  DateTime  @updatedAt
 
-    @@unique([companyId, usageType, tierNumber])
-    @@index([companyId, usageType, isActive, tierNumber])
+    @@unique([companyId, usageId, tierNumber])
+    @@index([companyId, usageId, isActive, tierNumber])
     @@map("dc_progressive_tiers")
   }
 
@@ -448,7 +525,8 @@
     id           String    @id @default(uuid())
     companyId    String
     company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    usageType    UsageType
+    usageId      String
+    usage        Usage @relation(fields: [usageId], references: [id])
     minVv        Decimal   @db.Decimal(15, 0)
     maxVv        Decimal?  @db.Decimal(15, 0)
     reductionRate Decimal? @db.Decimal(5, 2)
@@ -458,8 +536,8 @@
 
     matrixPrices DcMatrixPrice[]
 
-    @@unique([companyId, usageType, minVv])
-    @@index([companyId, usageType, isActive, minVv, maxVv])
+    @@unique([companyId, usageId, minVv])
+    @@index([companyId, usageId, isActive, minVv, maxVv])
     @@map("dc_matrix_vv_ranges")
   }
 
@@ -467,7 +545,8 @@
     id         String    @id @default(uuid())
     companyId  String
     company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    usageType  UsageType
+    usageId    String
+    usage      Usage @relation(fields: [usageId], references: [id])
     amount     Decimal   @db.Decimal(15, 0)
     order      Int
     isActive   Boolean   @default(true)
@@ -476,8 +555,8 @@
 
     matrixPrices DcMatrixPrice[]
 
-    @@unique([companyId, usageType, amount])
-    @@index([companyId, usageType, isActive, order])
+    @@unique([companyId, usageId, amount])
+    @@index([companyId, usageId, isActive, order])
     @@map("dc_matrix_capitals")
   }
 
@@ -485,7 +564,8 @@
     id         String          @id @default(uuid())
     companyId  String
     company    Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    usageType  UsageType
+    usageId    String
+    usage      Usage @relation(fields: [usageId], references: [id])
     vvRangeId  String
     vvRange    DcMatrixVvRange @relation(fields: [vvRangeId], references: [id], onDelete: Cascade)
     capitalId  String
@@ -495,7 +575,7 @@
     updatedAt  DateTime        @updatedAt
 
     @@unique([vvRangeId, capitalId])
-    @@index([companyId, usageType, vvRangeId, capitalId])
+    @@index([companyId, usageId, vvRangeId, capitalId])
     @@map("dc_matrix_prices")
   }
 
@@ -503,7 +583,8 @@
     id                String    @id @default(uuid())
     companyId         String
     company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    usageType         UsageType
+    usageId           String
+    usage             Usage @relation(fields: [usageId], references: [id])
     useMatrix         Boolean   @default(false)
     franchise         Decimal   @default(0) @db.Decimal(5, 2)
     minCapital        Decimal   @default(1000) @db.Decimal(15, 0)
@@ -511,12 +592,13 @@
     maxCapitalAbsolute Decimal  @default(100000) @db.Decimal(15, 0)
     basePremium       Decimal   @default(10) @db.Decimal(15, 0)
     discountPercent   Decimal   @default(0) @db.Decimal(5, 2)
+    referenceValue    ReferenceValue? @default(MARKET_VALUE)
     isActive          Boolean   @default(true)
     createdAt         DateTime  @default(now())
     updatedAt         DateTime  @updatedAt
 
-    @@unique([companyId, usageType])
-    @@index([companyId, usageType, isActive])
+    @@unique([companyId, usageId])
+    @@index([companyId, usageId, isActive])
     @@map("dc_configs")
   }
 
@@ -590,4 +672,22 @@
     createdAt DateTime            @default(now())
 
     @@map("notifications")
+  }
+
+  model GuaranteeBundling {
+    id                  String       @id @default(uuid())
+    companyId           String
+    company             Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    parentGuaranteeId   String
+    parentGuarantee     Guarantee    @relation("ParentGuarantee", fields: [parentGuaranteeId], references: [id], onDelete: Cascade)
+    includedGuaranteeId String
+    includedGuarantee   Guarantee    @relation("IncludedGuarantee", fields: [includedGuaranteeId], references: [id], onDelete: Cascade)
+    formulaType         FormulaType?
+    isActive            Boolean      @default(true)
+    createdAt           DateTime     @default(now())
+    updatedAt           DateTime     @updatedAt
+
+    @@unique([companyId, parentGuaranteeId, includedGuaranteeId, formulaType])
+    @@index([companyId, parentGuaranteeId, isActive])
+    @@map("guarantee_bundlings")
   }

@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsNumber, IsEnum, IsDateString } from 'class-validator';
-import { FormulaType, UsageType } from '@prisma/client';
+import { FormulaType, ReferenceValue } from '@prisma/client';
 
 export class CreatePricingRuleDto {
   @IsString()
@@ -69,8 +69,12 @@ export class CreatePricingRuleDto {
   maxCapital?: number;
 
   @IsOptional()
-  @IsEnum(UsageType)
-  usageType?: UsageType;
+  @IsString()
+  usageId?: string;
+
+  @IsOptional()
+  @IsEnum(ReferenceValue)
+  referenceValue?: ReferenceValue;
 
   @IsOptional()
   @IsDateString()

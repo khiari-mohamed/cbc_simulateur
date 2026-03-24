@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import toast from 'react-hot-toast';
 
 interface AddVvRangeModalProps {
   isOpen: boolean;
@@ -19,11 +20,19 @@ export const AddVvRangeModal = ({ isOpen, onClose, onSubmit }: AddVvRangeModalPr
     const minNum = parseFloat(formData.minVv);
     const maxNum = formData.maxVv ? parseFloat(formData.maxVv) : null;
     
-    if (!isNaN(minNum) && (maxNum === null || !isNaN(maxNum))) {
-      onSubmit({ minVv: minNum, maxVv: maxNum });
-      setFormData({ minVv: '', maxVv: '' });
-      onClose();
+    if (isNaN(minNum) || minNum <= 0) {
+      toast.error('Min VV doit être supérieur à 0');
+      return;
     }
+    
+    if (maxNum !== null && maxNum <= minNum) {
+      toast.error('Max VV doit être supérieur à Min VV');
+      return;
+    }
+    
+    onSubmit({ minVv: minNum, maxVv: maxNum });
+    setFormData({ minVv: '', maxVv: '' });
+    onClose();
   };
 
   return (
@@ -84,11 +93,14 @@ export const AddCapitalColumnModal = ({ isOpen, onClose, onSubmit, nextOrder }: 
     e.preventDefault();
     const amountNum = parseFloat(amount);
     
-    if (!isNaN(amountNum)) {
-      onSubmit({ amount: amountNum, order: nextOrder });
-      setAmount('');
-      onClose();
+    if (isNaN(amountNum) || amountNum <= 0) {
+      toast.error('Capital doit être supérieur à 0');
+      return;
     }
+    
+    onSubmit({ amount: amountNum, order: nextOrder });
+    setAmount('');
+    onClose();
   };
 
   return (

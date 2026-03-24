@@ -3,7 +3,7 @@ import { DcConfigService } from './dc-config.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/roles.guard';
 import { Roles } from '../common/roles.decorator';
-import { Role, UsageType } from '@prisma/client';
+import { Role } from '@prisma/client';
 
 @Controller('dc-config')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -13,8 +13,8 @@ export class DcConfigController {
 
   // DC Config endpoints
   @Get()
-  findAllConfigs(@Query('companyId') companyId?: string, @Query('usageType') usageType?: UsageType) {
-    return this.dcConfigService.findAll(companyId, usageType);
+  findAllConfigs(@Query('companyId') companyId?: string, @Query('usageId') usageId?: string) {
+    return this.dcConfigService.findAll(companyId, usageId);
   }
 
   @Get(':id')
@@ -38,9 +38,9 @@ export class DcConfigController {
   }
 
   // Capital Tiers endpoints
-  @Get('capital-tiers/:companyId/:usageType')
-  findCapitalTiers(@Param('companyId') companyId: string, @Param('usageType') usageType: UsageType) {
-    return this.dcConfigService.findCapitalTiers(companyId, usageType);
+  @Get('capital-tiers/:companyId/:usageId')
+  findCapitalTiers(@Param('companyId') companyId: string, @Param('usageId') usageId: string) {
+    return this.dcConfigService.findCapitalTiers(companyId, usageId);
   }
 
   @Post('capital-tiers')
@@ -59,9 +59,9 @@ export class DcConfigController {
   }
 
   // Progressive Tiers endpoints
-  @Get('progressive-tiers/:companyId/:usageType')
-  findProgressiveTiers(@Param('companyId') companyId: string, @Param('usageType') usageType: UsageType) {
-    return this.dcConfigService.findProgressiveTiers(companyId, usageType);
+  @Get('progressive-tiers/:companyId/:usageId')
+  findProgressiveTiers(@Param('companyId') companyId: string, @Param('usageId') usageId: string) {
+    return this.dcConfigService.findProgressiveTiers(companyId, usageId);
   }
 
   @Post('progressive-tiers')
@@ -80,9 +80,9 @@ export class DcConfigController {
   }
 
   // Matrix VV Ranges endpoints
-  @Get('matrix-vv-ranges/:companyId/:usageType')
-  findMatrixVvRanges(@Param('companyId') companyId: string, @Param('usageType') usageType: UsageType) {
-    return this.dcConfigService.findMatrixVvRanges(companyId, usageType);
+  @Get('matrix-vv-ranges/:companyId/:usageId')
+  findMatrixVvRanges(@Param('companyId') companyId: string, @Param('usageId') usageId: string) {
+    return this.dcConfigService.findMatrixVvRanges(companyId, usageId);
   }
 
   @Post('matrix-vv-ranges')
@@ -101,9 +101,9 @@ export class DcConfigController {
   }
 
   // Matrix Capitals endpoints
-  @Get('matrix-capitals/:companyId/:usageType')
-  findMatrixCapitals(@Param('companyId') companyId: string, @Param('usageType') usageType: UsageType) {
-    return this.dcConfigService.findMatrixCapitals(companyId, usageType);
+  @Get('matrix-capitals/:companyId/:usageId')
+  findMatrixCapitals(@Param('companyId') companyId: string, @Param('usageId') usageId: string) {
+    return this.dcConfigService.findMatrixCapitals(companyId, usageId);
   }
 
   @Post('matrix-capitals')
@@ -122,9 +122,9 @@ export class DcConfigController {
   }
 
   // Matrix Prices endpoints
-  @Get('matrix-prices/:companyId/:usageType')
-  findMatrixPrices(@Param('companyId') companyId: string, @Param('usageType') usageType: UsageType) {
-    return this.dcConfigService.findMatrixPrices(companyId, usageType);
+  @Get('matrix-prices/:companyId/:usageId')
+  findMatrixPrices(@Param('companyId') companyId: string, @Param('usageId') usageId: string) {
+    return this.dcConfigService.findMatrixPrices(companyId, usageId);
   }
 
   @Post('matrix-prices')

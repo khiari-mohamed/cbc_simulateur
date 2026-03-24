@@ -19,8 +19,9 @@ export class PricingRulesController {
     @Query('companyId') companyId?: string,
     @Query('guaranteeId') guaranteeId?: string,
     @Query('bonusMalusClass') bonusMalusClass?: string,
+    @Query('usageId') usageId?: string,
   ) {
-    return this.pricingRulesService.findAll(companyId, guaranteeId, bonusMalusClass);
+    return this.pricingRulesService.findAll(companyId, guaranteeId, bonusMalusClass, usageId);
   }
 
   @Get('optional-guarantees')
@@ -51,5 +52,10 @@ export class PricingRulesController {
   @Delete(':id')
   deactivate(@Param('id') id: string, @Request() req: any) {
     return this.pricingRulesService.deactivate(id, req.user.id);
+  }
+
+  @Post('bulk-copy')
+  bulkCopy(@Body() dto: { ruleIds: string[]; targetCompanyIds: string[] }, @Request() req: any) {
+    return this.pricingRulesService.bulkCopy(dto.ruleIds, dto.targetCompanyIds, req.user.id);
   }
 }

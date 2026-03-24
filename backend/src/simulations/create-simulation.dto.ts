@@ -1,6 +1,6 @@
-import { IsEnum, IsNumber, IsOptional, IsUUID, IsArray, ValidateNested, Min, Max } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsUUID, IsArray, ValidateNested, IsString, Min, Max } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import { FormulaType, UsageType } from '@prisma/client';
+import { FormulaType } from '@prisma/client';
 import { CreateVehicleDto } from '../vehicles/create-vehicle.dto';
 
 export class CreateSimulationDto {
@@ -14,8 +14,8 @@ export class CreateSimulationDto {
   @Max(8)
   bonusMalus: number;
 
-  @IsEnum(UsageType)
-  usage: UsageType;
+  @IsString()
+  usageId: string;
 
   @IsEnum(FormulaType)
   formulaType: FormulaType;

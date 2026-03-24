@@ -9,9 +9,16 @@ async function setupDommagesCollisions() {
 
   const dcGuarantee = await prisma.guarantee.findUnique({ where: { code: 'DOMMAGES_COLLISIONS' } });
   const companies = await prisma.company.findMany();
+  const privateUsage = await prisma.usage.findUnique({ where: { code: 'PRIVATE_BUSINESS' } });
+  const commercialUsage = await prisma.usage.findUnique({ where: { code: 'COMMERCIAL' } });
 
   if (!dcGuarantee) {
     console.log('❌ DOMMAGES_COLLISIONS guarantee not found');
+    return;
+  }
+
+  if (!privateUsage || !commercialUsage) {
+    console.log('❌ Usage types not found');
     return;
   }
 
@@ -40,7 +47,7 @@ async function setupDommagesCollisions() {
       data: {
         companyId: company.id,
         guaranteeId: dcGuarantee.id,
-        usageType: 'PRIVATE_BUSINESS',
+        usageId: privateUsage.id,
         basePremium: 10,
         isActive: true
       }
@@ -52,7 +59,7 @@ async function setupDommagesCollisions() {
         data: {
           companyId: company.id,
           guaranteeId: dcGuarantee.id,
-          usageType: 'PRIVATE_BUSINESS',
+          usageId: privateUsage.id,
           tierLevel: tier.level,
           tierRate: tier.rate,
           isActive: true
@@ -194,7 +201,7 @@ async function setupDommagesCollisions() {
         data: {
           companyId: company.id,
           guaranteeId: dcGuarantee.id,
-          usageType: 'COMMERCIAL',
+          usageId: commercialUsage.id,
           minMarketValue: new Decimal(entry.minVV),
           maxMarketValue: entry.maxVV ? new Decimal(entry.maxVV) : null,
           minCapital: new Decimal(entry.capital),
@@ -216,7 +223,7 @@ async function setupDommagesCollisions() {
   const test1 = await prisma.pricingRule.findFirst({
     where: {
       guaranteeId: dcGuarantee.id,
-      usageType: 'COMMERCIAL',
+      usageId: commercialUsage.id,
       minMarketValue: { lt: new Decimal(80000) },
       OR: [
         { maxMarketValue: { gte: new Decimal(80000) } },
@@ -235,7 +242,7 @@ async function setupDommagesCollisions() {
   const test1b = await prisma.pricingRule.findFirst({
     where: {
       guaranteeId: dcGuarantee.id,
-      usageType: 'COMMERCIAL',
+      usageId: commercialUsage.id,
       minMarketValue: { lt: new Decimal(80001) },
       OR: [
         { maxMarketValue: { gte: new Decimal(80001) } },
@@ -257,7 +264,7 @@ async function setupDommagesCollisions() {
   const baseRule = await prisma.pricingRule.findFirst({
     where: {
       guaranteeId: dcGuarantee.id,
-      usageType: 'PRIVATE_BUSINESS',
+      usageId: privateUsage.id,
       basePremium: { not: null }
     }
   });
@@ -265,7 +272,7 @@ async function setupDommagesCollisions() {
   const tierRulesTest = await prisma.pricingRule.findMany({
     where: {
       guaranteeId: dcGuarantee.id,
-      usageType: 'PRIVATE_BUSINESS',
+      usageId: privateUsage.id,
       tierLevel: { not: null }
     },
     orderBy: { tierLevel: 'asc' }

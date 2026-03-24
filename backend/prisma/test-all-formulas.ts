@@ -178,11 +178,12 @@ async function testAllFormulas() {
 
   // Test 7: DC Commercial Sample
   console.log('\n📋 Test 7: Dommages Collision Commercial (VV=30k, Capital=6k)');
+  const commercialUsage = await prisma.usage.findUnique({ where: { code: 'COMMERCIAL' } });
   const dcComm = await prisma.pricingRule.findFirst({
     where: {
       companyId: lloyd.id,
       guaranteeId: (await prisma.guarantee.findUnique({ where: { code: 'DOMMAGES_COLLISIONS' } }))!.id,
-      usageType: 'COMMERCIAL',
+      usageId: commercialUsage?.id,
       minMarketValue: { lte: 30000 },
       maxMarketValue: { gte: 30000 },
       minCapital: 6000,
@@ -199,11 +200,12 @@ async function testAllFormulas() {
 
   // Test 8: DC Private Business Tiers
   console.log('\n📋 Test 8: Dommages Collision Private Business Tiers');
+  const privateUsage = await prisma.usage.findUnique({ where: { code: 'PRIVATE_BUSINESS' } });
   const dcBase = await prisma.pricingRule.findFirst({
     where: {
       companyId: lloyd.id,
       guaranteeId: (await prisma.guarantee.findUnique({ where: { code: 'DOMMAGES_COLLISIONS' } }))!.id,
-      usageType: 'PRIVATE_BUSINESS',
+      usageId: privateUsage?.id,
       basePremium: { not: null },
     },
   });
@@ -211,7 +213,7 @@ async function testAllFormulas() {
     where: {
       companyId: lloyd.id,
       guaranteeId: (await prisma.guarantee.findUnique({ where: { code: 'DOMMAGES_COLLISIONS' } }))!.id,
-      usageType: 'PRIVATE_BUSINESS',
+      usageId: privateUsage?.id,
       tierLevel: { not: null },
     },
   });

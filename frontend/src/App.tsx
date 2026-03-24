@@ -12,7 +12,7 @@ import { CompaniesPage } from './pages/admin/companies/CompaniesPage';
 import { ConventionsPage } from './pages/admin/Conventions/ConventionsPage';
 import { GuaranteesPage } from './pages/admin/Guarantees/GuaranteesPage';
 import { OrganizationsPage } from './pages/admin/organizations/OrganizationsPage';
-import { ConventionReductionRulesPage } from './pages/admin/ConventionReductionRulesPage';
+import { ConventionReductionRulesPage } from './pages/admin/reduction-rules/ConventionReductionRulesPage';
 import { FormulaConfigPage } from './pages/admin/FormulaConfigPage';
 import { PricingManagementPage } from './pages/admin/PricingManagementPage';
 
@@ -41,6 +41,8 @@ import { SettingsPage } from './pages/SettingsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { DocumentsPage } from './pages/DocumentsPage';
 import { SystemGuidePage } from './pages/admin/SystemGuidePage';
+import UsageTypesPage from './pages/admin/UsageTypes/UsageTypesPage';
+import { BgCapitalLimitsPage } from './pages/admin/BgCapitalLimitsPage';
 import { Role } from './types/index';
 
 const queryClient = new QueryClient();
@@ -112,6 +114,8 @@ function App() {
                 <Route path="admin/settings" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><AdminSettingsPage /></ProtectedRoute>} />
                 <Route path="admin/convention-reports" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><ConventionReportsPage /></ProtectedRoute>} />
                 <Route path="admin/system-guide" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><SystemGuidePage /></ProtectedRoute>} />
+                <Route path="admin/usage-types" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><UsageTypesPage /></ProtectedRoute>} />
+                <Route path="admin/bg-capital-limits" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRATEUR_ARS]}><BgCapitalLimitsPage /></ProtectedRoute>} />
               </Route>
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

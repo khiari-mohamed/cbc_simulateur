@@ -22,6 +22,7 @@ import {
   Upload,
   BookOpenCheck,
   X,
+  Tags,
 } from 'lucide-react';
 
 
@@ -52,6 +53,8 @@ const getNavItems = (t: (key: string) => string): NavItem[] => [
   { icon: ShieldCheck, label: t('nav.conventions'), path: '/admin/conventions', roles: [Role.ADMINISTRATEUR_ARS] },
 
   { icon: ShieldHalf, label: t('nav.guarantees'), path: '/admin/guarantees', roles: [Role.ADMINISTRATEUR_ARS] },
+
+  { icon: Tags, label: 'Types d\'Usage', path: '/admin/usage-types', roles: [Role.ADMINISTRATEUR_ARS] },
 
   { icon: DollarSign, label: 'Gestion Tarification', path: '/admin/pricing-management', roles: [Role.ADMINISTRATEUR_ARS] },
 

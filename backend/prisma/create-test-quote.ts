@@ -22,12 +22,19 @@ async function createTestQuote() {
     },
   });
 
+  // Get PRIVATE_BUSINESS usage
+  const usage = await prisma.usage.findUnique({ where: { code: 'PRIVATE_BUSINESS' } });
+  if (!usage) {
+    console.log('❌ PRIVATE_BUSINESS usage not found');
+    return;
+  }
+
   const simulation = await prisma.simulation.create({
     data: {
       userId: 'b3326181-4ded-45b5-95b7-e54a6ffb111c',
       vehicleId: vehicle.id,
       bonusMalus: 1.0,
-      usage: 'PRIVATE_BUSINESS',
+      usageId: usage.id,
       formulaType: 'STANDARD',
     },
   });

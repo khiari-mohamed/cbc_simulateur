@@ -1,20 +1,67 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, FileText, Edit, Trash2, CheckCircle, XCircle, Shield, Calendar, Building2, Sliders } from 'lucide-react';
+import { Plus, FileText, Edit, Trash2, CheckCircle, XCircle, Shield, Calendar, Building2, Sliders, Users, HelpCircle } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { ConventionModal } from '../../../components/admin/ConventionModal';
+import { ShareOrganizationsModal } from '../../../components/admin/ShareOrganizationsModal';
+import { ConventionSharingHelpModal } from '../../../components/admin/ConventionSharingHelpModal';
 import { useNavigate } from 'react-router-dom';
 import api from '../../../lib/api/client';
 import toast from 'react-hot-toast';
 
+interface Organization {
+  id: string;
+  name: string;
+  code: string;
+  isActive: boolean;
+}
+
+interface Company {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface ConventionCompany {
+  companyId: string;
+  company: Company;
+}
+
+interface SharedOrganization {
+  id: string;
+  organizationId: string;
+  organization: Organization;
+}
+
+interface Convention {
+  id: string;
+  name: string;
+  organizationId: string;
+  organization: Organization;
+  status: 'ACTIVE' | 'INACTIVE' | 'EXPIRED';
+  isActive: boolean;
+  startDate?: string;
+  endDate?: string;
+  companies: ConventionCompany[];
+  sharedWithOrganizations?: SharedOrganization[];
+  _count?: {
+    companies: number;
+    reductionRules: number;
+    sharedWithOrganizations: number;
+  };
+}
+
 export const ConventionsPage = () => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingConvention, setEditingConvention] = useState<any | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [editingConvention, setEditingConvention] = useState<Convention | null>(null);
+  const [sharingConvention, setSharingConvention] = useState<Convention | null>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: conventions, isLoading } = useQuery({
+  const { data: conventions, isLoading } = useQuery<Convention[]>({
     queryKey: ['conventions', includeInactive],
     queryFn: async () => {
       const { data } = await api.get(`/conventions?includeInactive=${includeInactive}`);
@@ -31,14 +78,24 @@ export const ConventionsPage = () => {
     onError: () => toast.error('Erreur lors de la désactivation'),
   });
 
-  const handleEdit = (convention: any) => {
+  const handleEdit = (convention: Convention) => {
     setEditingConvention(convention);
     setIsModalOpen(true);
+  };
+
+  const handleShare = (convention: Convention) => {
+    setSharingConvention(convention);
+    setIsShareModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingConvention(null);
+  };
+
+  const handleCloseShareModal = () => {
+    setIsShareModalOpen(false);
+    setSharingConvention(null);
   };
 
   if (isLoading) {
@@ -64,10 +121,21 @@ export const ConventionsPage = () => {
             Conventions exclusives par organisation cliente
           </p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          Nouvelle Convention
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => setIsHelpModalOpen(true)} 
+            variant="outline"
+            className="flex items-center gap-2"
+            title="Guide d'utilisation du partage de conventions"
+          >
+            <HelpCircle className="w-4 h-4" />
+            Guide
+          </Button>
+          <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            Nouvelle Convention
+          </Button>
+        </div>
       </div>
 
       <div className="mb-4">
@@ -83,7 +151,7 @@ export const ConventionsPage = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {conventions?.map((convention: any) => (
+        {conventions?.map((convention) => (
           <div
             key={convention.id}
             className={`bg-white dark:bg-gray-800 rounded-lg border-2 p-4 ${
@@ -123,11 +191,34 @@ export const ConventionsPage = () => {
                   <p className="text-xs font-semibold text-blue-900 dark:text-blue-200">Compagnies</p>
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {convention.companies.map((cc: any) => (
+                  {convention.companies.map((cc) => (
                     <span key={cc.companyId} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded text-xs">
                       {cc.company.name}
                     </span>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {convention.sharedWithOrganizations && convention.sharedWithOrganizations.length > 0 && (
+              <div className="mb-3 p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-1 mb-1">
+                  <Users className="w-3 h-3 text-green-900 dark:text-green-200" />
+                  <p className="text-xs font-semibold text-green-900 dark:text-green-200">
+                    Partagée avec {convention.sharedWithOrganizations.length} org(s)
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {convention.sharedWithOrganizations.slice(0, 3).map((shared) => (
+                    <span key={shared.id} className="px-2 py-0.5 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 rounded text-xs">
+                      {shared.organization.name}
+                    </span>
+                  ))}
+                  {convention.sharedWithOrganizations.length > 3 && (
+                    <span className="px-2 py-0.5 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 rounded text-xs">
+                      +{convention.sharedWithOrganizations.length - 3}
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -149,7 +240,7 @@ export const ConventionsPage = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
+            <div className="grid grid-cols-3 gap-2 mb-3 text-sm">
               <div className="bg-gray-50 dark:bg-gray-900 rounded p-2">
                 <p className="text-xs text-gray-500 dark:text-gray-400">Compagnies</p>
                 <p className="font-semibold text-gray-900 dark:text-white">
@@ -157,14 +248,30 @@ export const ConventionsPage = () => {
                 </p>
               </div>
               <div className="bg-gray-50 dark:bg-gray-900 rounded p-2">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Règles réduction</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Règles</p>
                 <p className="font-semibold text-gray-900 dark:text-white">
                   {convention._count?.reductionRules || 0}
+                </p>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-900 rounded p-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Orgs</p>
+                <p className="font-semibold text-gray-900 dark:text-white">
+                  {convention._count?.sharedWithOrganizations || 0}
                 </p>
               </div>
             </div>
 
             <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleShare(convention)}
+                className="flex-1"
+                title="Partager avec d'autres organisations"
+              >
+                <Users className="w-3 h-3 mr-1" />
+                Partager
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -216,6 +323,17 @@ export const ConventionsPage = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         convention={editingConvention}
+      />
+
+      <ShareOrganizationsModal
+        isOpen={isShareModalOpen}
+        onClose={handleCloseShareModal}
+        convention={sharingConvention}
+      />
+
+      <ConventionSharingHelpModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
       />
     </div>
   );

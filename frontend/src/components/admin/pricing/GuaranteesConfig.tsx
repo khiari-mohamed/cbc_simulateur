@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Download,  ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, Download, ChevronDown, ChevronRight, Copy } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
 import api from '../../../lib/api/client';
 import toast from 'react-hot-toast';
 import { GuaranteeRuleModal } from './GuaranteeRuleModal';
+import { BulkApplyModal } from './BulkApplyModal';
 
 interface PricingRule {
   id: string
@@ -27,16 +28,16 @@ interface GuaranteeGroup {
   rules: PricingRule[];
 }
 
-
-
 export const GuaranteesConfig = () => {
   const queryClient = useQueryClient();
   const [selectedCompany, setSelectedCompany] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
- const [selectedRule, setSelectedRule] = useState<PricingRule | null>(null);
-
+  const [selectedRule, setSelectedRule] = useState<PricingRule | null>(null);
   const [selectedGuarantee, setSelectedGuarantee] = useState<GuaranteeGroup | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [filterUsage, setFilterUsage] = useState('');
+  const [filterFormula, setFilterFormula] = useState('');
+  const [showBulkModal, setShowBulkModal] = useState(false);
 
   const { data: companies, isLoading: companiesLoading } = useQuery({
     queryKey: ['companies'],
@@ -46,15 +47,13 @@ export const GuaranteesConfig = () => {
     },
   });
 
- const { data: guarantees, isLoading: guaranteesLoading } = useQuery<GuaranteeGroup[]>({
-  queryKey: ['guarantees'],
-  queryFn: async () => {
-    const { data } = await api.get('/guarantees');
-    // Exclude RC as it has its own table
-    return data.filter((g: GuaranteeGroup) => g.code !== 'RC');
-  },
-});
-
+  const { data: guarantees, isLoading: guaranteesLoading } = useQuery<GuaranteeGroup[]>({
+    queryKey: ['guarantees'],
+    queryFn: async () => {
+      const { data } = await api.get('/guarantees');
+      return data.filter((g: GuaranteeGroup) => g.code !== 'RC');
+    },
+  });
 
   const { data: allRules, isLoading: rulesLoading } = useQuery({
     queryKey: ['pricing-rules-all', selectedCompany],
@@ -65,6 +64,14 @@ export const GuaranteesConfig = () => {
       return data;
     },
     enabled: !!selectedCompany,
+  });
+
+  const { data: usages } = useQuery({
+    queryKey: ['usage-types'],
+    queryFn: async () => {
+      const { data } = await api.get('/usage-types');
+      return data;
+    },
   });
 
   const deleteMutation = useMutation({
@@ -110,7 +117,6 @@ export const GuaranteesConfig = () => {
       return;
     }
 
-    // Create CSV
     const headers = [
       'Garantie',
       'Formule',
@@ -149,14 +155,42 @@ export const GuaranteesConfig = () => {
     toast.success('Export réussi');
   };
 
-  // Group rules by guarantee
- const groupedRules = useMemo<GuaranteeGroup[]>(() => {
-  if (!guarantees || !Array.isArray(guarantees)) return [];
-  return guarantees.map((guarantee) => ({
-    ...guarantee,
-    rules: allRules?.filter((r: PricingRule) => r.guaranteeId === guarantee.id) || [],
-  }));
-}, [guarantees, allRules]);
+  const groupedRules = useMemo<GuaranteeGroup[]>(() => {
+    if (!guarantees || !Array.isArray(guarantees)) return [];
+    return guarantees.map((guarantee) => {
+      let rules = allRules?.filter((r: PricingRule) => r.guaranteeId === guarantee.id) || [];
+      if (filterUsage) {
+        rules = rules.filter((r: any) => r.usageId === filterUsage);
+      }
+      if (filterFormula) {
+        if (filterFormula === 'STANDARD') {
+          rules = rules.filter((r: PricingRule) => !r.formulaType || r.formulaType === 'STANDARD');
+        } else if (filterFormula === 'DOMMAGES_COLLISION') {
+          rules = rules.filter((r: PricingRule) => r.formulaType?.includes('DC'));
+        } else if (filterFormula === 'TOUS_RISQUES') {
+          rules = rules.filter((r: PricingRule) => r.formulaType?.includes('TOUS_RISQUES'));
+        }
+      }
+      return { ...guarantee, rules };
+    }).filter(g => g.rules.length > 0 || (!filterUsage && !filterFormula));
+  }, [guarantees, allRules, filterUsage, filterFormula]);
+
+  const availableRulesForBulk = useMemo(() => {
+    return groupedRules
+      .filter(g => g.code !== 'DOMMAGES_COLLISIONS') // Exclude DC rules (managed in DC tab)
+      .flatMap(g => 
+        g.rules.map((r: any) => ({
+          id: r.id,
+          guaranteeName: g.nameFr,
+          guaranteeCode: g.code,
+          formulaType: r.formulaType,
+          franchiseRate: r.franchiseRate,
+          ratePercentage: r.ratePercentage,
+          fixedPremium: r.fixedPremium,
+          usageId: r.usageId,
+        }))
+      );
+  }, [groupedRules]);
 
   const getGuaranteeHint = (code: string) => {
     const hints: Record<string, string> = {
@@ -175,33 +209,85 @@ export const GuaranteesConfig = () => {
   return (
     <div className="space-y-4">
       <Card className="p-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center gap-4 w-full sm:w-auto">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Compagnie:
-            </label>
-            <select
-              value={selectedCompany}
-              onChange={(e) => setSelectedCompany(e.target.value)}
-              className="flex-1 sm:flex-none px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-            >
-              <option value="">Sélectionner une compagnie</option>
-              {companies?.map((c: { id: string; name: string }) => (
-  <option key={c.id} value={c.id}>{c.name}</option>
-))}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                  Compagnie:
+                </label>
+                <select
+                  value={selectedCompany}
+                  onChange={(e) => setSelectedCompany(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="">Sélectionner une compagnie</option>
+                  {companies?.map((c: { id: string; name: string }) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
 
-            </select>
+              {selectedCompany && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      Usage:
+                    </label>
+                    <select
+                      value={filterUsage}
+                      onChange={(e) => setFilterUsage(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    >
+                      <option value="">Tous</option>
+                      {usages?.map((u: { id: string; nameFr: string }) => (
+                        <option key={u.id} value={u.id}>{u.nameFr}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      Formule:
+                    </label>
+                    <select
+                      value={filterFormula}
+                      onChange={(e) => setFilterFormula(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    >
+                      <option value="">Toutes</option>
+                      <option value="STANDARD">Standard</option>
+                      <option value="DOMMAGES_COLLISION">Dommages Collision</option>
+                      <option value="TOUS_RISQUES">Tous Risques</option>
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              {selectedCompany && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowBulkModal(true)}
+                  disabled={!allRules || allRules.length === 0}
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  Appliquer à d'autres compagnies
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportAll}
+                disabled={!selectedCompany || !allRules || allRules.length === 0}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Exporter tout
+              </Button>
+            </div>
           </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportAll}
-            disabled={!selectedCompany || !allRules || allRules.length === 0}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Exporter tout
-          </Button>
         </div>
       </Card>
 
@@ -269,7 +355,6 @@ export const GuaranteesConfig = () => {
                         ) : (
                           <div className="divide-y divide-gray-200 dark:divide-gray-700">
                             {group.rules.map((rule: PricingRule) => (
-
                               <div key={rule.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/30">
                                 <div className="flex justify-between items-start gap-4">
                                   <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
@@ -380,12 +465,21 @@ export const GuaranteesConfig = () => {
             setSelectedGuarantee(null);
           }}
           onSuccess={() => {
-  queryClient.invalidateQueries({ queryKey: ['pricing-rules-all', selectedCompany] });
-  setIsModalOpen(false);
-  setSelectedRule(null);
-  setSelectedGuarantee(null);
-}}
-  
+            queryClient.invalidateQueries({ queryKey: ['pricing-rules-all', selectedCompany] });
+            setIsModalOpen(false);
+            setSelectedRule(null);
+            setSelectedGuarantee(null);
+          }}
+        />
+      )}
+
+      {showBulkModal && (
+        <BulkApplyModal
+          sourceCompanyId={selectedCompany}
+          sourceCompanyName={companies?.find((c: { id: string; name: string }) => c.id === selectedCompany)?.name || ''}
+          availableRules={availableRulesForBulk}
+          availableCompanies={companies || []}
+          onClose={() => setShowBulkModal(false)}
         />
       )}
     </div>

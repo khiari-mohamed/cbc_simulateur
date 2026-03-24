@@ -22,12 +22,16 @@ export class ConventionsService {
           where: { isActive: true },
           include: { company: { select: { id: true, name: true } } },
         },
+        sharedWithOrganizations: {
+          include: { organization: { select: { id: true, name: true, code: true, isActive: true } } },
+        },
         _count: {
           select: {
             companies: true,
             reductionRules: true,
             simulations: true,
             pricingRules: true,
+            sharedWithOrganizations: true,
           },
         },
       },
@@ -54,6 +58,9 @@ export class ConventionsService {
         pricingRules: {
           where: { isActive: true },
         },
+        sharedWithOrganizations: {
+          include: { organization: true },
+        },
       },
     });
     if (!convention) {
@@ -69,7 +76,10 @@ export class ConventionsService {
         companies: {
           include: { company: true },
         },
-        _count: { select: { reductionRules: true } },
+        sharedWithOrganizations: {
+          include: { organization: true },
+        },
+        _count: { select: { reductionRules: true, sharedWithOrganizations: true } },
       },
     });
   }
@@ -202,20 +212,172 @@ export class ConventionsService {
   async findByUser(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      select: { organizationId: true },
+    });
+
+    if (!user?.organizationId) {
+      return [];
+    }
+
+    // Get conventions where user's org is primary owner
+    const primaryConventions = await this.prisma.convention.findMany({
+      where: {
+        organizationId: user.organizationId,
+        isActive: true,
+      },
       include: {
-        organization: {
-          include: {
-            conventions: {
-              where: { isActive: true },
-              include: {
-                companies: { include: { company: true } },
-              },
-            },
+        organization: true,
+        companies: { include: { company: true } },
+        sharedWithOrganizations: { include: { organization: true } },
+      },
+    });
+
+    // Get conventions shared with user's org
+    const sharedConventions = await this.prisma.convention.findMany({
+      where: {
+        sharedWithOrganizations: {
+          some: {
+            organizationId: user.organizationId,
           },
+        },
+        isActive: true,
+      },
+      include: {
+        organization: true,
+        companies: { include: { company: true } },
+        sharedWithOrganizations: { include: { organization: true } },
+      },
+    });
+
+    // Combine and deduplicate
+    const allConventions = [...primaryConventions, ...sharedConventions];
+    const uniqueConventions = Array.from(
+      new Map(allConventions.map(c => [c.id, c])).values()
+    );
+
+    return uniqueConventions;
+  }
+
+  async shareConventionWithOrganizations(
+    conventionId: string,
+    organizationIds: string[],
+    userId: string,
+  ) {
+    // Validate convention exists
+    const convention = await this.findById(conventionId);
+
+    // Validate all organizations exist and are active
+    const organizations = await this.prisma.clientOrganization.findMany({
+      where: { id: { in: organizationIds }, isActive: true },
+    });
+
+    if (organizations.length !== organizationIds.length) {
+      throw new BadRequestException('One or more organizations not found or inactive');
+    }
+
+    // Filter out primary organization (can't share with itself)
+    const validOrgIds = organizationIds.filter(orgId => orgId !== convention.organizationId);
+
+    if (validOrgIds.length === 0) {
+      throw new BadRequestException('Cannot share convention with its primary organization');
+    }
+
+    // Get existing shared organizations
+    const existing = await this.prisma.conventionOrganization.findMany({
+      where: { conventionId },
+      select: { organizationId: true },
+    });
+
+    const existingOrgIds = existing.map(e => e.organizationId);
+    const newOrgIds = validOrgIds.filter(id => !existingOrgIds.includes(id));
+
+    if (newOrgIds.length === 0) {
+      return { message: 'All organizations are already shared with this convention' };
+    }
+
+    // Create new shared relationships
+    await this.prisma.conventionOrganization.createMany({
+      data: newOrgIds.map(organizationId => ({
+        conventionId,
+        organizationId,
+        assignedBy: userId,
+      })),
+    });
+
+    await this.auditService.log(
+      userId,
+      'CONVENTION_SHARED',
+      'Convention',
+      conventionId,
+      { sharedWith: existingOrgIds },
+      { sharedWith: [...existingOrgIds, ...newOrgIds] },
+    );
+
+    return this.findById(conventionId);
+  }
+
+  async removeOrganizationFromConvention(
+    conventionId: string,
+    organizationId: string,
+    userId: string,
+  ) {
+    // Validate convention exists
+    await this.findById(conventionId);
+
+    // Check if sharing exists
+    const sharing = await this.prisma.conventionOrganization.findUnique({
+      where: {
+        conventionId_organizationId: {
+          conventionId,
+          organizationId,
         },
       },
     });
-    return user?.organization?.conventions || [];
+
+    if (!sharing) {
+      throw new NotFoundException('This organization is not shared with the convention');
+    }
+
+    // Remove sharing
+    await this.prisma.conventionOrganization.delete({
+      where: {
+        conventionId_organizationId: {
+          conventionId,
+          organizationId,
+        },
+      },
+    });
+
+    await this.auditService.log(
+      userId,
+      'CONVENTION_UNSHARED',
+      'Convention',
+      conventionId,
+      { organizationId },
+      null,
+    );
+
+    return { message: 'Organization removed from convention successfully' };
+  }
+
+  async getSharedOrganizations(conventionId: string) {
+    // Validate convention exists
+    await this.findById(conventionId);
+
+    return this.prisma.conventionOrganization.findMany({
+      where: { conventionId },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            isActive: true,
+          },
+        },
+      },
+      orderBy: { assignedAt: 'desc' },
+    });
   }
 
   async validateUserConventionAccess(userId: string, conventionId: string, companyId: string) {
@@ -232,6 +394,7 @@ export class ConventionsService {
       where: { id: conventionId },
       include: {
         companies: true,
+        sharedWithOrganizations: true,
       },
     });
 
@@ -239,9 +402,14 @@ export class ConventionsService {
       throw new NotFoundException('Convention not found');
     }
 
-    // Validate user's org matches convention's org
-    if (convention.organizationId !== user.organizationId) {
-      throw new ConflictException('User organization does not match convention organization');
+    // Check if user's org matches convention's primary org OR is in shared list
+    const isPrimaryOrg = convention.organizationId === user.organizationId;
+    const isSharedOrg = convention.sharedWithOrganizations.some(
+      shared => shared.organizationId === user.organizationId
+    );
+
+    if (!isPrimaryOrg && !isSharedOrg) {
+      throw new ConflictException('User organization does not have access to this convention');
     }
 
     // Validate selected company is in convention

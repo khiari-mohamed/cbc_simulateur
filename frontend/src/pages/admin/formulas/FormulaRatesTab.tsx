@@ -292,42 +292,82 @@ export const FormulaRatesTab = () => {
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
-            {getGuaranteeRules('BG').map((rule: any) => (
-              <div key={rule.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Taux (coefficient décimal)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    defaultValue={Number(rule.ratePercentage || 0)}
-                    onBlur={(e) => handleUpdate(rule.id, 'ratePercentage', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  />
+            <div className="space-y-4">
+              {getGuaranteeRules('BG').map((rule: any) => (
+                <div key={rule.id} className="border-b border-gray-200 dark:border-gray-700 pb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Capital Min (DT)
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        defaultValue={Number(rule.minCapital || 0)}
+                        onBlur={(e) => handleUpdate(rule.id, 'minCapital', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Capital Max (DT)
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        placeholder="Illimité si vide"
+                        defaultValue={rule.maxCapital ? Number(rule.maxCapital) : ''}
+                        onBlur={(e) => {
+                          const val = e.target.value;
+                          if (val === '') {
+                            // Set to null for unlimited
+                            updateMutation.mutate({ id: rule.id, values: { maxCapital: null } });
+                          } else {
+                            handleUpdate(rule.id, 'maxCapital', val);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Taux (coefficient décimal)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.001"
+                        defaultValue={Number(rule.ratePercentage || 0)}
+                        onBlur={(e) => handleUpdate(rule.id, 'ratePercentage', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Réduction (%)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        defaultValue={Number(rule.reductionRate || 0)}
+                        onBlur={(e) => handleUpdate(rule.id, 'reductionRate', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Actions
+                      </label>
+                      <Button size="sm" variant="outline" onClick={() => deleteMutation.mutate(rule.id)}>
+                        <Trash2 className="w-4 h-4 text-red-600" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    Plage: {Number(rule.minCapital || 0).toLocaleString()} DT → {rule.maxCapital ? Number(rule.maxCapital).toLocaleString() + ' DT' : '∞'} | Taux: {(Number(rule.ratePercentage || 0) * 100).toFixed(2)}%
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Réduction (%)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    defaultValue={Number(rule.reductionRate || 0)}
-                    onBlur={(e) => handleUpdate(rule.id, 'reductionRate', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Actions
-                  </label>
-                  <Button size="sm" variant="outline" onClick={() => deleteMutation.mutate(rule.id)}>
-                    <Trash2 className="w-4 h-4 text-red-600" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </Card>
 
           {/* TOUS_RISQUES */}

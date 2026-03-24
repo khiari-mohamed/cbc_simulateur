@@ -8,9 +8,15 @@ async function populateDommagesCollisionsCommercial() {
 
   const dcGuarantee = await prisma.guarantee.findUnique({ where: { code: 'DOMMAGES_COLLISIONS' } });
   const companies = await prisma.company.findMany();
+  const usage = await prisma.usage.findUnique({ where: { code: 'COMMERCIAL' } });
 
   if (!dcGuarantee) {
     console.log('❌ DOMMAGES_COLLISIONS guarantee not found');
+    return;
+  }
+
+  if (!usage) {
+    console.log('❌ COMMERCIAL usage not found');
     return;
   }
 
@@ -18,7 +24,7 @@ async function populateDommagesCollisionsCommercial() {
   await prisma.pricingRule.deleteMany({
     where: {
       guaranteeId: dcGuarantee.id,
-      usageType: 'COMMERCIAL'
+      usageId: usage.id
     }
   });
 
@@ -151,7 +157,7 @@ async function populateDommagesCollisionsCommercial() {
         data: {
           companyId: company.id,
           guaranteeId: dcGuarantee.id,
-          usageType: 'COMMERCIAL',
+          usageId: usage.id,
           minMarketValue: new Decimal(entry.minVV),
           maxMarketValue: entry.maxVV ? new Decimal(entry.maxVV) : null,
           minCapital: new Decimal(entry.capital),

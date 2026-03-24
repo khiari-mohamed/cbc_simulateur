@@ -75,6 +75,15 @@ export const CoverageSelectionStep = ({
     },
   });
 
+  // Fetch BG capital limits from API (admin-configurable)
+  const { data: bgCapitalLimits } = useQuery({
+    queryKey: ['bg-capital-limits'],
+    queryFn: async () => {
+      const { data } = await api.get('/bg-capital-limits');
+      return data as Array<{ id: string; value: number; label: string; isActive: boolean }>;
+    },
+  });
+
   // Calculate vehicle age
   const calculateAge = (date: Date): number => {
     const now = new Date();
@@ -538,15 +547,20 @@ export const CoverageSelectionStep = ({
                 dcCapital: localDcCapital,
               });
             }}
-            options={[
-              { value: '500', label: '500 DT' },
-              { value: '700', label: '700 DT' },
-              { value: '1000', label: '1 000 DT' },
-              { value: '1500', label: '1 500 DT' },
-              { value: '2000', label: '2 000 DT' },
-              { value: '2500', label: '2 500 DT' },
-              { value: '3000', label: '3 000 DT' },
-            ]}
+            options={
+              bgCapitalLimits && bgCapitalLimits.length > 0
+                ? bgCapitalLimits
+                    .filter(limit => limit.isActive)
+                    .map(limit => ({
+                      value: limit.value.toString(),
+                      label: limit.label || `${limit.value.toLocaleString('fr-FR')} DT`,
+                    }))
+                : [
+                    { value: '1000', label: '1 000 DT' },
+                    { value: '2000', label: '2 000 DT' },
+                    { value: '3000', label: '3 000 DT' },
+                  ]
+            }
           />
         ) : null;
       })()}
@@ -570,15 +584,20 @@ export const CoverageSelectionStep = ({
                 dcCapital: localDcCapital,
               });
             }}
-            options={[
-              { value: '500', label: '500 DT' },
-              { value: '700', label: '700 DT' },
-              { value: '1000', label: '1 000 DT' },
-              { value: '1500', label: '1 500 DT' },
-              { value: '2000', label: '2 000 DT' },
-              { value: '2500', label: '2 500 DT' },
-              { value: '3000', label: '3 000 DT' },
-            ]}
+            options={
+              bgCapitalLimits && bgCapitalLimits.length > 0
+                ? bgCapitalLimits
+                    .filter(limit => limit.isActive)
+                    .map(limit => ({
+                      value: limit.value.toString(),
+                      label: limit.label || `${limit.value.toLocaleString('fr-FR')} DT`,
+                    }))
+                : [
+                    { value: '1000', label: '1 000 DT' },
+                    { value: '2000', label: '2 000 DT' },
+                    { value: '3000', label: '3 000 DT' },
+                  ]
+            }
           />
         ) : null;
       })()}

@@ -44,6 +44,12 @@ async function testQuoteGeneration() {
   });
   console.log(`  ✅ Vehicle created: ${vehicle.id}`);
 
+  // Get PRIVATE_BUSINESS usage
+  const usage = await prisma.usage.findUnique({ where: { code: 'PRIVATE_BUSINESS' } });
+  if (!usage) {
+    throw new Error('PRIVATE_BUSINESS usage not found');
+  }
+
   // Create test simulation (STANDARD formula)
   console.log('\n📝 Creating test simulation (STANDARD)...');
   const simulation = await prisma.simulation.create({
@@ -51,7 +57,7 @@ async function testQuoteGeneration() {
       userId: testUser.id,
       vehicleId: vehicle.id,
       bonusMalus: 4, // Class 4 = 100%
-      usage: 'PRIVATE_BUSINESS',
+      usageId: usage.id,
       formulaType: 'STANDARD',
       status: 'DRAFT',
     },

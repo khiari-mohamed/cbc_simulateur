@@ -80,7 +80,7 @@ async function main() {
         await prisma.dcCapitalTier.create({
           data: {
             companyId: company.id,
-            usageType: usageType as any,
+            usageId: usageType as any,
             minAmount: tier.minAmount,
             maxAmount: tier.maxAmount,
             step: tier.step,
@@ -105,7 +105,7 @@ async function main() {
       await prisma.dcProgressiveTier.create({
         data: {
           companyId: company.id,
-          usageType: 'PRIVATE_BUSINESS',
+          usageId: 'PRIVATE_BUSINESS',
           tierNumber: tier.tierNumber,
           tierRate: tier.tierRate,
         },
@@ -120,7 +120,7 @@ async function main() {
     await prisma.dcConfig.create({
       data: {
         companyId: company.id,
-        usageType: 'PRIVATE_BUSINESS',
+        usageId: 'PRIVATE_BUSINESS',
         useMatrix: false,
         franchise: 0,
         minCapital: 1000,
@@ -135,7 +135,7 @@ async function main() {
     await prisma.dcConfig.create({
       data: {
         companyId: company.id,
-        usageType: 'COMMERCIAL',
+        usageId: 'COMMERCIAL',
         useMatrix: false, // Will use legacy matrix from PricingRule
         franchise: 0,
         minCapital: 1000,
@@ -156,7 +156,7 @@ async function main() {
     const existingRules = await prisma.pricingRule.findMany({
       where: {
         guaranteeId: dcGuarantee.id,
-        usageType: 'COMMERCIAL',
+        usageId: 'COMMERCIAL',
         companyId: lloyd.id, // Just get from one company
       },
       orderBy: [{ minMarketValue: 'asc' }, { minCapital: 'asc' }],
@@ -189,7 +189,7 @@ async function main() {
         const vvRange = await prisma.dcMatrixVvRange.create({
           data: {
             companyId: company.id,
-            usageType: 'COMMERCIAL',
+            usageId: 'COMMERCIAL',
             minVv: data.minVv,
             maxVv: data.maxVv,
           },
@@ -203,7 +203,7 @@ async function main() {
         const capital = await prisma.dcMatrixCapital.create({
           data: {
             companyId: company.id,
-            usageType: 'COMMERCIAL',
+            usageId: 'COMMERCIAL',
             amount: sortedCapitals[i],
             order: i + 1,
           },
@@ -227,7 +227,7 @@ async function main() {
           await prisma.dcMatrixPrice.create({
             data: {
               companyId: company.id,
-              usageType: 'COMMERCIAL',
+              usageId: 'COMMERCIAL',
               vvRangeId,
               capitalId,
               prime: rule.fixedPremium,

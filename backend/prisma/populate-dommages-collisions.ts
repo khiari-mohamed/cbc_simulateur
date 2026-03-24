@@ -7,9 +7,15 @@ async function populateDommagesCollisions() {
 
   const dcGuarantee = await prisma.guarantee.findUnique({ where: { code: 'DOMMAGES_COLLISIONS' } });
   const companies = await prisma.company.findMany();
+  const usage = await prisma.usage.findUnique({ where: { code: 'PRIVATE_BUSINESS' } });
 
   if (!dcGuarantee) {
     console.log('❌ DOMMAGES_COLLISIONS guarantee not found');
+    return;
+  }
+
+  if (!usage) {
+    console.log('❌ PRIVATE_BUSINESS usage not found');
     return;
   }
 
@@ -17,7 +23,7 @@ async function populateDommagesCollisions() {
   await prisma.pricingRule.deleteMany({
     where: {
       guaranteeId: dcGuarantee.id,
-      usageType: 'PRIVATE_BUSINESS'
+      usageId: usage.id
     }
   });
 
@@ -43,7 +49,7 @@ async function populateDommagesCollisions() {
       data: {
         companyId: company.id,
         guaranteeId: dcGuarantee.id,
-        usageType: 'PRIVATE_BUSINESS',
+        usageId: usage.id,
         basePremium: 10,
         isActive: true
       }
@@ -56,7 +62,7 @@ async function populateDommagesCollisions() {
         data: {
           companyId: company.id,
           guaranteeId: dcGuarantee.id,
-          usageType: 'PRIVATE_BUSINESS',
+          usageId: usage.id,
           tierLevel: tier.level,
           tierRate: tier.rate,
           isActive: true
