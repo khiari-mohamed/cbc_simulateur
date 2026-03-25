@@ -30,6 +30,10 @@ export class CreatePricingRuleDto {
 
   @IsOptional()
   @IsNumber()
+  bonusMalusClass?: number;
+
+  @IsOptional()
+  @IsNumber()
   minAge?: number;
 
   @IsOptional()

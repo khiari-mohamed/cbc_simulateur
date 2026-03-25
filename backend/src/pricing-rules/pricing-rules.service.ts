@@ -63,6 +63,7 @@ export class PricingRulesService {
       formulaType?: FormulaType;
       minPower?: number;
       maxPower?: number;
+      bonusMalusClass?: number;
       minAge?: number;
       maxAge?: number;
       baseRate?: number;
@@ -90,6 +91,7 @@ export class PricingRulesService {
         formulaType: data.formulaType,
         minPower: data.minPower,
         maxPower: data.maxPower,
+        bonusMalusClass: data.bonusMalusClass,
         minAge: data.minAge,
         maxAge: data.maxAge,
         baseRate: data.baseRate !== undefined ? new Decimal(data.baseRate) : null,
