@@ -166,6 +166,12 @@ export const QuoteGenerationStep = ({
                 {simulationData.formulaType.replace(/_/g, ' ')}
               </span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Fractionnement</span>
+              <span className="font-medium text-gray-900 dark:text-white">
+                {simulationData.fractionnement === 'SEMESTRIEL' ? 'Semestriel' : 'Annuel'}
+              </span>
+            </div>
             {simulationData.selectedGuarantees.length > 0 && (
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Garanties optionnelles</span>
@@ -242,7 +248,9 @@ export const QuoteGenerationStep = ({
                     <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                       {quote.totalAPayer.toLocaleString()} DT
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">TTC</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {simulationData.fractionnement === 'SEMESTRIEL' ? 'TTC / semestre' : 'TTC / an'}
+                    </p>
                   </div>
                 </div>
 

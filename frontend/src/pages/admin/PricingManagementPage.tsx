@@ -5,6 +5,7 @@ import { RcTableGrid } from '../../components/admin/pricing/RcTableGrid';
 import { GuaranteesConfig } from '../../components/admin/pricing/GuaranteesConfig';
 import { DcConfigTab } from './formulas/DcConfigTab';
 import { GuaranteeBundlingsTab } from './formulas/GuaranteeBundlingsTab';
+import { GuaranteeAvailabilityTab } from './formulas/GuaranteeAvailabilityTab';
 import { Button } from '../../components/ui/Button';
 
 export const PricingManagementPage = () => {
@@ -39,7 +40,7 @@ export const PricingManagementPage = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-6">
+        <TabsList className="grid w-full grid-cols-5 mb-6">
           <TabsTrigger value="rc-table" className="flex items-center gap-2">
             <Table className="w-4 h-4" />
             Tableau RC
@@ -55,6 +56,10 @@ export const PricingManagementPage = () => {
           <TabsTrigger value="bundlings" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
             Garanties Groupées
+          </TabsTrigger>
+          <TabsTrigger value="availability" className="flex items-center gap-2">
+            <Shield className="w-4 h-4" />
+            Disponibilité
           </TabsTrigger>
         </TabsList>
 
@@ -72,6 +77,10 @@ export const PricingManagementPage = () => {
 
         <TabsContent value="bundlings">
           <GuaranteeBundlingsTab />
+        </TabsContent>
+
+        <TabsContent value="availability">
+          <GuaranteeAvailabilityTab />
         </TabsContent>
       </Tabs>
 

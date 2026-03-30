@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { AuthLayout } from './AuthLayout';
-import { ArrowLeft, Mail } from 'lucide-react';
+import { ArrowLeft, Mail, CheckCircle, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -63,14 +63,18 @@ export const ForgotPasswordPage = () => {
   if (step === 'success') {
     return (
       <AuthLayout title="Réinitialisation réussie" subtitle="Votre mot de passe a été modifié">
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full mb-3">
-            <Mail className="w-8 h-8 text-green-600" />
+        <div className="text-center space-y-5">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-50 dark:bg-green-900/30 rounded-2xl">
+            <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Mot de passe réinitialisé!</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">Vous pouvez maintenant vous connecter</p>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Mot de passe réinitialisé!</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.
+            </p>
+          </div>
           <Link to="/login">
-            <Button className="w-full">Se connecter</Button>
+            <Button className="w-full !py-2.5">Se connecter</Button>
           </Link>
         </div>
       </AuthLayout>
@@ -80,54 +84,80 @@ export const ForgotPasswordPage = () => {
   if (step === 'otp') {
     return (
       <AuthLayout title="Nouveau mot de passe" subtitle="Entrez le code OTP reçu par email">
-        <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-4">
-          <Input
-            label="Code OTP"
-            type="text"
-            {...otpForm.register('otp')}
-            error={otpForm.formState.errors.otp?.message}
-            placeholder="123456"
-            maxLength={6}
-          />
-          <Input
-            label="Nouveau mot de passe"
-            type="password"
-            {...otpForm.register('newPassword')}
-            error={otpForm.formState.errors.newPassword?.message}
-            placeholder="••••••••"
-          />
-          <Input
-            label="Confirmer le mot de passe"
-            type="password"
-            {...otpForm.register('confirmPassword')}
-            error={otpForm.formState.errors.confirmPassword?.message}
-            placeholder="••••••••"
-          />
-          <Button type="submit" loading={otpForm.formState.isSubmitting} className="w-full">
-            Réinitialiser
-          </Button>
-        </form>
+        <div className="space-y-5">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-50 dark:bg-blue-900/30 rounded-2xl mb-3">
+              <KeyRound className="w-7 h-7 text-primary-600" />
+            </div>
+          </div>
+
+          <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-4">
+            <Input
+              label="Code OTP"
+              type="text"
+              {...otpForm.register('otp')}
+              error={otpForm.formState.errors.otp?.message}
+              placeholder="000000"
+              maxLength={6}
+              className="text-center text-lg tracking-[0.4em] font-mono"
+            />
+            <Input
+              label="Nouveau mot de passe"
+              type="password"
+              {...otpForm.register('newPassword')}
+              error={otpForm.formState.errors.newPassword?.message}
+              placeholder="••••••••"
+            />
+            <Input
+              label="Confirmer le mot de passe"
+              type="password"
+              {...otpForm.register('confirmPassword')}
+              error={otpForm.formState.errors.confirmPassword?.message}
+              placeholder="••••••••"
+            />
+            <Button type="submit" loading={otpForm.formState.isSubmitting} className="w-full !py-2.5">
+              Réinitialiser
+            </Button>
+            <button
+              type="button"
+              onClick={() => setStep('email')}
+              className="w-full flex items-center justify-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 transition-colors py-2"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Retour
+            </button>
+          </form>
+        </div>
       </AuthLayout>
     );
   }
 
   return (
-    <AuthLayout title="Mot de passe oublié" subtitle="Entrez votre email pour recevoir un code OTP">
-      <div>
-        <Link to="/login" className="inline-flex items-center text-xs text-gray-600 dark:text-gray-400 hover:text-primary-600 mb-4">
-          <ArrowLeft className="w-3 h-3 mr-1" />
+    <AuthLayout title="Mot de passe oublié" subtitle="Entrez votre email pour recevoir un code de réinitialisation">
+      <div className="space-y-5">
+        <Link
+          to="/login"
+          className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-primary-600 transition-colors font-medium"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
           Retour à la connexion
         </Link>
 
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-50 dark:bg-blue-900/30 rounded-2xl mb-3">
+            <Mail className="w-7 h-7 text-primary-600" />
+          </div>
+        </div>
+
         <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4">
           <Input
-            label="Email"
+            label="Adresse email"
             type="email"
             {...emailForm.register('email')}
             error={emailForm.formState.errors.email?.message}
             placeholder="jean.dupont@email.com"
           />
-          <Button type="submit" loading={emailForm.formState.isSubmitting} className="w-full">
+          <Button type="submit" loading={emailForm.formState.isSubmitting} className="w-full !py-2.5">
             Envoyer le code OTP
           </Button>
         </form>

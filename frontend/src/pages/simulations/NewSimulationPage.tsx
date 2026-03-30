@@ -4,7 +4,7 @@ import { CoverageSelectionStep } from '../../components/simulations/CoverageSele
 import { QuoteGenerationStep } from '../../components/simulations/QuoteGenerationStep';
 import { ConfirmationStep } from '../../components/simulations/ConfirmationStep';
 import { useLanguage } from '../../contexts/LanguageContext';
-import type { FormulaType, UsageType } from '../../types';
+import type { FormulaType, FractionnementType, UsageType } from '../../types';
 
 export type VehicleData = {
   registration?: string;
@@ -20,11 +20,13 @@ export type SimulationData = {
   bonusMalus: number;
   usage: UsageType;
   formulaType: FormulaType;
+  fractionnement?: FractionnementType;
   conventionId?: string;
   selectedGuarantees: string[];
   franchiseRate?: number;
   bgLimit?: number;
   dcCapital?: number;
+  companyIds?: string[];
 };
 
 export const NewSimulationPage = () => {
@@ -37,7 +39,7 @@ export const NewSimulationPage = () => {
   
   const [simulationData, setSimulationData] = useState<Partial<SimulationData>>(() => {
     const saved = localStorage.getItem('simulationData');
-    return saved ? JSON.parse(saved) : { selectedGuarantees: [] };
+    return saved ? JSON.parse(saved) : { selectedGuarantees: [], fractionnement: 'ANNUEL' };
   });
   
   const [simulationId, setSimulationId] = useState<string | null>(() => {

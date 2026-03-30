@@ -354,9 +354,9 @@ export const RcTableGrid = () => {
             <select
               value={selectedUsage}
               onChange={(e) => setSelectedUsage(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white max-w-[220px]"
             >
-              <option value="">Tous</option>
+              <option value="">Tous les usages · affichage uniquement</option>
               {usageTypes?.map((u: any) => (
                 <option key={u.id} value={u.id}>{u.nameFr}</option>
               ))}

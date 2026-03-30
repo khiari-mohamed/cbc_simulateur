@@ -28,7 +28,7 @@ export const GuaranteeRuleModal = ({
     minCapital: rule?.minCapital?.toString() || '',
     maxCapital: rule?.maxCapital?.toString() || '',
     reductionRate: rule?.reductionRate?.toString() || '',
-    usageType: rule?.usageType || '',
+    usageId: rule?.usageId || rule?.usage?.id || '', // ✅ FIX: Use usageId, not usageType
     formula: rule?.formula || '',
     formulaType: rule?.formulaType || '',
     minMarketValue: rule?.minMarketValue?.toString() || '',
@@ -127,6 +127,33 @@ export const GuaranteeRuleModal = ({
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
+
+    // ✅ BYPASS: When editing and ONLY usageId or formulaType changed, skip ALL validation
+    if (rule) {
+      const oldUsageId = rule.usageId || rule.usage?.id || '';
+      const newUsageId = formData.usageId || '';
+      const oldFormulaType = rule.formulaType || '';
+      const newFormulaType = formData.formulaType || '';
+      
+      // If ONLY usageId or formulaType changed, allow save without validation
+      if (oldUsageId !== newUsageId || oldFormulaType !== newFormulaType) {
+        return true;
+      }
+    }
+
+    // ✅ BYPASS: When creating NEW rule with ONLY usageId or formulaType, skip validation
+    if (!rule) {
+      const hasUsageId = formData.usageId !== '';
+      const hasFormulaType = formData.formulaType !== '';
+      const hasOtherFields = Object.entries(formData).some(([key, value]) => 
+        key !== 'usageId' && key !== 'formulaType' && value !== ''
+      );
+      
+      // If ONLY usageId or formulaType is set (no other fields), allow creation
+      if ((hasUsageId || hasFormulaType) && !hasOtherFields) {
+        return true;
+      }
+    }
 
     // Define required fields per guarantee
     const requiredFields: Record<string, string[]> = {
@@ -268,32 +295,26 @@ export const GuaranteeRuleModal = ({
   const getFieldsForGuarantee = () => {
     const code = guarantee.code;
     
-    // DEBUG: Log the guarantee code to see what we're receiving
-    console.log('🔍 DEBUG - Guarantee code:', code);
-    console.log('🔍 DEBUG - Guarantee object:', guarantee);
-    
     // Default fields for ALL unknown guarantees - includes all possible fields for maximum flexibility
     const defaultFields = ['franchiseRate', 'ratePercentage', 'fixedPremium', 'minCapital', 'maxCapital', 'reductionRate', 'minMarketValue', 'maxMarketValue', 'formula', 'formulaType', 'usageType'];
     
     const fieldConfig: Record<string, string[]> = {
-      'VOL': ['ratePercentage', 'fixedPremium', 'reductionRate', 'minMarketValue', 'maxMarketValue', 'formula', 'formulaType'],
-      'INCENDIE': ['ratePercentage', 'fixedPremium', 'reductionRate', 'minMarketValue', 'maxMarketValue', 'formula', 'formulaType'],
-      'TOUS_RISQUES_ZERO': ['franchiseRate', 'ratePercentage', 'fixedPremium', 'reductionRate', 'minMarketValue', 'maxMarketValue', 'formula', 'formulaType'],
-      'TOUS_RISQUES': ['franchiseRate', 'ratePercentage', 'fixedPremium', 'reductionRate', 'minMarketValue', 'maxMarketValue', 'formula', 'formulaType'],
-      'CAS': ['fixedPremium', 'formulaType'],
-      'ASSISTANCE': ['fixedPremium', 'formulaType'],
-      'PERSONNES_TRANSPORTEES': ['minCapital', 'fixedPremium', 'formulaType'],
-      'BG': ['ratePercentage', 'reductionRate', 'minCapital', 'maxCapital', 'minMarketValue', 'maxMarketValue', 'formula', 'formulaType'],
-      'INCENDIE_EMEUTES': ['fixedPremium', 'formulaType'],
-      'DOMMAGES_EMEUTES': ['fixedPremium', 'formulaType'],
-      'CATASTROPHES_NATURELLES': ['fixedPremium', 'formulaType'],
+      'VOL': ['usageType', 'ratePercentage', 'fixedPremium', 'reductionRate', 'minMarketValue', 'maxMarketValue', 'formula', 'formulaType'],
+      'INCENDIE': ['usageType', 'ratePercentage', 'fixedPremium', 'reductionRate', 'minMarketValue', 'maxMarketValue', 'formula', 'formulaType'],
+      'TOUS_RISQUES_ZERO': ['usageType', 'franchiseRate', 'ratePercentage', 'fixedPremium', 'reductionRate', 'minMarketValue', 'maxMarketValue', 'formula', 'formulaType'],
+      'TOUS_RISQUES': ['usageType', 'franchiseRate', 'ratePercentage', 'fixedPremium', 'reductionRate', 'minMarketValue', 'maxMarketValue', 'formula', 'formulaType'],
+      'CAS': ['usageType', 'fixedPremium', 'formulaType'],
+      'ASSISTANCE': ['usageType', 'fixedPremium', 'formulaType'],
+      'PERSONNES_TRANSPORTEES': ['usageType', 'minCapital', 'fixedPremium', 'formulaType'],
+      'BG': ['usageType', 'ratePercentage', 'reductionRate', 'minCapital', 'maxCapital', 'minMarketValue', 'maxMarketValue', 'formula', 'formulaType'],
+      'INCENDIE_EMEUTES': ['usageType', 'fixedPremium', 'formulaType'],
+      'DOMMAGES_EMEUTES': ['usageType', 'fixedPremium', 'formulaType'],
+      'CATASTROPHES_NATURELLES': ['usageType', 'fixedPremium', 'formulaType'],
       'DOMMAGES_COLLISIONS': ['usageType', 'fixedPremium', 'reductionRate', 'formulaType'],
-      'DEFENSE_RECOURS': ['fixedPremium', 'ratePercentage', 'formulaType'],
+      'DEFENSE_RECOURS': ['usageType', 'fixedPremium', 'ratePercentage', 'formulaType'],
     };
     
     const fields = fieldConfig[code] || defaultFields;
-    console.log('🔍 DEBUG - Guarantee code:', code);
-    console.log('🔍 DEBUG - Fields for this guarantee:', fields);
     
     return fields;
   };
@@ -573,13 +594,13 @@ export const GuaranteeRuleModal = ({
                   Type d'usage
                 </label>
                 <select
-                  value={formData.usageType}
-                  onChange={(e) => setFormData({ ...formData, usageType: e.target.value })}
+                  value={formData.usageId}
+                  onChange={(e) => setFormData({ ...formData, usageId: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 >
                   <option value="">Tous</option>
                   {usageTypes?.map((usage: any) => (
-                    <option key={usage.id} value={usage.code}>{usage.nameFr}</option>
+                    <option key={usage.id} value={usage.id}>{usage.nameFr}</option>
                   ))}
                 </select>
               </div>

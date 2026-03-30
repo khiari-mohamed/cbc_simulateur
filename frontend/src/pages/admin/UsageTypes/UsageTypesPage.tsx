@@ -16,6 +16,18 @@ interface UsageType {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  usageFeeConfigs?: Array<{
+    id: string;
+    contractFees: number;
+    fpac: number;
+    fssr: number;
+    fg: number;
+    company: {
+      id: string;
+      name: string;
+      code: string;
+    };
+  }>;
 }
 
 interface UsageTypePayload {
@@ -24,6 +36,13 @@ interface UsageTypePayload {
   nameAr?: string;
   nameEn?: string;
   isActive?: boolean;
+  feeConfigs?: Array<{
+    companyId: string;
+    contractFees: number;
+    fpac: number;
+    fssr: number;
+    fg: number;
+  }>;
 }
 
 interface UpdateMutationParams {
@@ -200,6 +219,7 @@ const UsageTypesPage = () => {
               <tr className="border-b">
                 <th className="text-left py-2 px-2">Code</th>
                 <th className="text-left py-2 px-2">Nom (FR)</th>
+                <th className="text-left py-2 px-2">Compagnies configurées</th>
                 <th className="text-left py-2 px-2">Statut</th>
                 <th className="text-left py-2 px-2">Actions</th>
               </tr>
@@ -209,6 +229,23 @@ const UsageTypesPage = () => {
                 <tr key={usage.id} className="border-t hover:bg-gray-50">
                   <td className="py-2 px-2 font-mono text-sm">{usage.code}</td>
                   <td className="py-2 px-2">{usage.nameFr}</td>
+                  <td className="py-2 px-2">
+                    <div className="flex flex-wrap gap-1">
+                      {usage.usageFeeConfigs && usage.usageFeeConfigs.length > 0 ? (
+                        usage.usageFeeConfigs.map((config) => (
+                          <span
+                            key={config.id}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                            title={`Frais: ${config.contractFees} DT | FPAC: ${config.fpac}% | FSSR: ${config.fssr}% | FG: ${config.fg} DT`}
+                          >
+                            {config.company.name} · {config.contractFees} DT
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-gray-400">Non configuré</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="py-2 px-2">
                     <button
                       onClick={() => handleToggleActive(usage)}

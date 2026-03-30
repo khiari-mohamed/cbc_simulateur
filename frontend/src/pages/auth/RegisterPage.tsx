@@ -8,7 +8,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { GoogleButton } from '../../components/ui/GoogleButton';
 import { AuthLayout } from './AuthLayout';
-import {  ArrowLeft, Shield } from 'lucide-react';
+import { ArrowLeft, Shield, Lock as LockIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/api/client';
 
@@ -92,14 +92,15 @@ export const RegisterPage = () => {
   if (step === 'verify') {
     return (
       <AuthLayout title="Vérification OTP" subtitle="Entrez le code reçu par email">
-        <div>
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full mb-3">
-              <Shield className="w-8 h-8 text-blue-600" />
+        <div className="space-y-6">
+          {/* OTP Icon + Message */}
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-2xl mb-4">
+              <Shield className="w-8 h-8 text-primary-600" />
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               Un code de vérification a été envoyé à<br />
-              <strong>{email}</strong>
+              <span className="font-semibold text-gray-900 dark:text-white">{email}</span>
             </p>
           </div>
 
@@ -109,20 +110,21 @@ export const RegisterPage = () => {
               type="text"
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="123456"
+              placeholder="000000"
               maxLength={6}
-              className="text-center text-2xl tracking-widest"
+              className="text-center text-2xl tracking-[0.5em] font-mono"
             />
 
-            <Button type="submit" loading={verifying} className="w-full">
+            <Button type="submit" loading={verifying} className="w-full !py-2.5">
               Vérifier le code
             </Button>
 
             <button
               type="button"
               onClick={() => setStep('register')}
-              className="w-full text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600"
+              className="w-full flex items-center justify-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-primary-600 transition-colors py-2"
             >
+              <ArrowLeft className="w-3.5 h-3.5" />
               Retour à l'inscription
             </button>
           </form>
@@ -133,25 +135,30 @@ export const RegisterPage = () => {
 
   return (
     <AuthLayout title="Créer un compte" subtitle="Rejoignez ARS Assurance">
-      <div>
-        <Link to="/login" className="inline-flex items-center text-xs text-gray-600 dark:text-gray-400 hover:text-primary-600 mb-2">
-          <ArrowLeft className="w-3 h-3 mr-1" />
+      <div className="space-y-5">
+        <Link
+          to="/login"
+          className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-primary-600 transition-colors font-medium"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
           Retour à la connexion
         </Link>
 
         <GoogleButton />
 
-        <div className="relative my-2">
+        <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+            <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
           </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white dark:bg-gray-900 text-gray-500">Ou avec votre email</span>
+          <div className="relative flex justify-center">
+            <span className="px-3 bg-white dark:bg-gray-950 text-xs text-gray-400 uppercase tracking-wider">
+              Ou avec votre email
+            </span>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-1.5">
-          <div className="grid grid-cols-2 gap-2">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
             <Input
               label="Prénom"
               type="text"
@@ -192,13 +199,16 @@ export const RegisterPage = () => {
           />
 
           {selectedRole === 'CLIENT_ADHERENT' && (
-            <div className="border border-blue-200 dark:border-blue-800 rounded-lg p-3 bg-blue-50 dark:bg-blue-900/20">
-              <p className="text-xs font-semibold text-blue-900 dark:text-blue-200 mb-2">
-                🔐 Accès Organisation (optionnel)
-              </p>
-              <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
-                Si vous appartenez à une organisation (ATB Bank, etc.), entrez le code et la clé d'accès fournis par votre organisation.
-              </p>
+            <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/20 p-4 space-y-3">
+              <div>
+                <p className="text-xs font-semibold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                  <LockIcon className="w-3.5 h-3.5" />
+                  Accès Organisation (optionnel)
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1 leading-relaxed">
+                  Si vous appartenez à une organisation (ATB Bank, etc.), entrez le code et la clé d'accès fournis par votre organisation.
+                </p>
+              </div>
               <Input
                 label="Code Organisation"
                 type="text"
@@ -217,30 +227,34 @@ export const RegisterPage = () => {
             </div>
           )}
 
-          <Input
-            label="Mot de passe"
-            type="password"
-            {...register('password')}
-            error={errors.password?.message}
-            placeholder="••••••••"
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Mot de passe"
+              type="password"
+              {...register('password')}
+              error={errors.password?.message}
+              placeholder="••••••••"
+            />
+            <Input
+              label="Confirmer"
+              type="password"
+              {...register('confirmPassword')}
+              error={errors.confirmPassword?.message}
+              placeholder="••••••••"
+            />
+          </div>
 
-          <Input
-            label="Confirmer le mot de passe"
-            type="password"
-            {...register('confirmPassword')}
-            error={errors.confirmPassword?.message}
-            placeholder="••••••••"
-          />
-
-          <Button type="submit" loading={isSubmitting} className="w-full mt-2" size="md">
+          <Button type="submit" loading={isSubmitting} className="w-full !py-2.5" size="md">
             S'inscrire
           </Button>
         </form>
 
-        <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-2.5">
+        <p className="text-center text-sm text-gray-500 dark:text-gray-400">
           Déjà un compte?{' '}
-          <Link to="/login" className="text-primary-600 hover:text-primary-700 font-semibold">
+          <Link
+            to="/login"
+            className="text-primary-600 hover:text-primary-700 font-semibold transition-colors"
+          >
             Se connecter
           </Link>
         </p>

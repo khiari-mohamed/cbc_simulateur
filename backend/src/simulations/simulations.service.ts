@@ -25,6 +25,7 @@ export class SimulationsService {
     franchiseRate?: number;
     bgLimit?: number;
     dcCapital?: number;
+    fractionnement?: 'ANNUEL' | 'SEMESTRIEL';
   }) {
     const vehicle = await this.vehiclesService.create(data.vehicle);
     const vehicleAge = this.vehiclesService.calculateVehicleAge(vehicle.firstCirculationDate);
@@ -63,7 +64,7 @@ export class SimulationsService {
       'Simulation',
       simulation.id,
       null,
-      { formulaType: data.formulaType, usageId: data.usageId },
+      { formulaType: data.formulaType, usageId: data.usageId, fractionnement: data.fractionnement ?? 'ANNUEL' },
     );
 
     return this.findById(simulation.id);
@@ -117,6 +118,7 @@ export class SimulationsService {
     franchiseRate?: number;
     bgLimit?: number;
     dcCapital?: number;
+    fractionnement?: 'ANNUEL' | 'SEMESTRIEL';
   }) {
     const simulation = await this.findById(id);
 

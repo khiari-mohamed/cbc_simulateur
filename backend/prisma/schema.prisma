@@ -70,6 +70,12 @@
     REFUNDED
   }
 
+  enum GuaranteeAvailabilityStatus {
+    GRATUIT
+    NON_ACCORDEE
+    DEFAULT
+  }
+
 
 
   // Admin-manageable usage types (allow CRUD from UI)
@@ -92,6 +98,7 @@
     dcProgressiveTiers       DcProgressiveTier[]
     simulations              Simulation[]
     conventionReductionRules ConventionReductionRule[]
+    usageFeeConfigs          UsageFeeConfig[]
 
     @@map("usage_types")
   }
@@ -160,6 +167,8 @@
     dcMatrixPrices           DcMatrixPrice[]
     dcConfigs                DcConfig[]
     guaranteeBundlings        GuaranteeBundling[]
+    guaranteeAvailabilities    GuaranteeAvailability[]
+    usageFeeConfigs          UsageFeeConfig[]
 
     @@map("companies")
   }
@@ -416,6 +425,7 @@
     conventionReductionRules ConventionReductionRule[]
     parentBundlings          GuaranteeBundling[]     @relation("ParentGuarantee")
     includedInBundlings      GuaranteeBundling[]     @relation("IncludedGuarantee")
+    availabilityConfigs      GuaranteeAvailability[]
 
     @@map("guarantees")
   }
@@ -690,4 +700,43 @@
     @@unique([companyId, parentGuaranteeId, includedGuaranteeId, formulaType])
     @@index([companyId, parentGuaranteeId, isActive])
     @@map("guarantee_bundlings")
+  }
+
+  model GuaranteeAvailability {
+    id          String                        @id @default(uuid())
+    companyId   String
+    company     Company                       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    guaranteeId String
+    guarantee   Guarantee                     @relation(fields: [guaranteeId], references: [id], onDelete: Cascade)
+    formulaType FormulaType?
+    status      GuaranteeAvailabilityStatus   @default(DEFAULT)
+    isActive    Boolean                       @default(true)
+    createdAt   DateTime                      @default(now())
+    updatedAt   DateTime                      @updatedAt
+
+    @@unique([companyId, guaranteeId, formulaType])
+    @@index([companyId, guaranteeId, isActive])
+    @@map("guarantee_availabilities")
+  }
+
+  model UsageFeeConfig {
+    id           String   @id @default(uuid())
+    usageId      String
+    companyId    String
+
+    contractFees Decimal  @db.Decimal(15, 0)
+    fpac         Decimal  @db.Decimal(12, 2)
+    fssr         Decimal  @db.Decimal(12, 2)
+    fg           Decimal  @db.Decimal(12, 2)
+
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    usage        Usage    @relation(fields: [usageId], references: [id], onDelete: Cascade)
+    company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+    @@unique([usageId, companyId])
+    @@index([usageId])
+    @@index([companyId])
+    @@map("usage_fee_configs")
   }

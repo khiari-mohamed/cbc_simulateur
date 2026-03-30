@@ -42,6 +42,13 @@ export const UsageType = {
 
 export type UsageType = typeof UsageType[keyof typeof UsageType];
 
+export const FractionnementType = {
+  ANNUEL: 'ANNUEL',
+  SEMESTRIEL: 'SEMESTRIEL',
+} as const;
+
+export type FractionnementType = typeof FractionnementType[keyof typeof FractionnementType];
+
 export type User = {
   id: string;
   email: string;
@@ -77,6 +84,7 @@ export type Simulation = {
   bonusMalus: number;
   usage: UsageType;
   formulaType: FormulaType;
+  fractionnement?: FractionnementType;
   status: SimulationStatus;
   createdAt: string;
   updatedAt: string;

@@ -1,4 +1,4 @@
-import { IsOptional, IsNumber, IsDateString, IsEnum } from 'class-validator';
+import { IsOptional, IsNumber, IsDateString, IsEnum, IsString } from 'class-validator';
 import { ReferenceValue } from '@prisma/client';
 
 export class UpdatePricingRuleDto {
@@ -32,7 +32,19 @@ export class UpdatePricingRuleDto {
 
   @IsOptional()
   @IsNumber()
+  minMarketValue?: number;
+
+  @IsOptional()
+  @IsNumber()
+  maxMarketValue?: number;
+
+  @IsOptional()
+  @IsNumber()
   franchiseRate?: number;
+
+  @IsOptional()
+  @IsString()
+  usageId?: string;
 
   @IsOptional()
   @IsEnum(ReferenceValue)

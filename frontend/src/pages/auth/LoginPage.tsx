@@ -36,63 +36,68 @@ export const LoginPage = () => {
   };
 
   return (
-    <AuthLayout title="Connexion" subtitle="Accédez à votre espace client">
-      <div>
-
+    <AuthLayout title="Connexion" subtitle="Accédez à votre espace de courtage">
+      <div className="space-y-5">
         <GoogleButton />
 
-        <div className="relative my-2">
+        <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+            <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
           </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white dark:bg-gray-900 text-gray-500">Ou continuer avec</span>
+          <div className="relative flex justify-center">
+            <span className="px-3 bg-white dark:bg-gray-950 text-xs text-gray-400 uppercase tracking-wider">
+              Ou continuer avec
+            </span>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-1.5">
-            <div className="relative">
-              <Mail className="absolute left-2.5 top-6 w-4 h-4 text-gray-400" />
-              <Input
-                label="Adresse email"
-                type="email"
-                {...register('email')}
-                error={errors.email?.message}
-                placeholder="votre@email.com"
-                className="pl-8"
-              />
-            </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="relative">
+            <Mail className="absolute left-3 top-[34px] w-4 h-4 text-gray-400 pointer-events-none" />
+            <Input
+              label="Adresse email"
+              type="email"
+              {...register('email')}
+              error={errors.email?.message}
+              placeholder="votre@email.com"
+              className="pl-9"
+            />
+          </div>
 
-            <div className="relative">
-              <Lock className="absolute left-2.5 top-6 w-4 h-4 text-gray-400" />
-              <Input
-                label="Mot de passe"
-                type="password"
-                {...register('password')}
-                error={errors.password?.message}
-                placeholder="••••••••"
-                className="pl-8"
-              />
-              <div className="text-right mt-0.5">
-                <Link to="/forgot-password" className="text-xs text-primary-600 hover:text-primary-700">
-                  Mot de passe oublié?
-                </Link>
-              </div>
+          <div className="relative">
+            <Lock className="absolute left-3 top-[34px] w-4 h-4 text-gray-400 pointer-events-none" />
+            <Input
+              label="Mot de passe"
+              type="password"
+              {...register('password')}
+              error={errors.password?.message}
+              placeholder="••••••••"
+              className="pl-9"
+            />
+            <div className="text-right mt-1">
+              <Link
+                to="/forgot-password"
+                className="text-xs text-primary-600 hover:text-primary-700 font-medium transition-colors"
+              >
+                Mot de passe oublié?
+              </Link>
             </div>
+          </div>
 
-            <Button type="submit" loading={isSubmitting} className="w-full mt-2" size="md">
-              Se connecter
-            </Button>
+          <Button type="submit" loading={isSubmitting} className="w-full !py-2.5" size="md">
+            Se connecter
+          </Button>
         </form>
 
-        <div className="mt-2.5 text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Pas encore de compte?{' '}
-            <Link to="/register" className="text-primary-600 hover:text-primary-700 font-semibold">
-              Créer un compte
-            </Link>
-          </p>
-        </div>
+        <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+          Pas encore de compte?{' '}
+          <Link
+            to="/register"
+            className="text-primary-600 hover:text-primary-700 font-semibold transition-colors"
+          >
+            Créer un compte
+          </Link>
+        </p>
       </div>
     </AuthLayout>
   );

@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Shield, } from 'lucide-react';
 import { Select } from '../ui/Select';
 import api from '../../lib/api/client';
-import { FormulaType, type Guarantee } from '../../types';
+import { FormulaType, FractionnementType, type Guarantee } from '../../types';
+import { useGuaranteeAvailability } from '../../hooks/useGuaranteeAvailability';
 
 interface CoverageSelectionStepProps {
   vehicleAge: number;
@@ -13,6 +14,7 @@ interface CoverageSelectionStepProps {
   franchiseRate?: number;
   bgLimit?: number;
   dcCapital?: number;
+  fractionnement?: FractionnementType;
   firstCirculationDate: Date;
   onUpdate: (data: { 
     formulaType: FormulaType; 
@@ -21,6 +23,7 @@ interface CoverageSelectionStepProps {
     franchiseRate?: number;
     bgLimit?: number;
     dcCapital?: number;
+    fractionnement?: FractionnementType;
     companyIds?: string[];
   }) => void;
   onNext: () => void;
@@ -34,6 +37,7 @@ export const CoverageSelectionStep = ({
   franchiseRate,
   bgLimit,
   dcCapital,
+  fractionnement,
   firstCirculationDate,
   onUpdate,
   onNext,
@@ -44,6 +48,7 @@ export const CoverageSelectionStep = ({
   const [localFranchiseRate, setLocalFranchiseRate] = useState<number>(franchiseRate || 0);
   const [localBgLimit, setLocalBgLimit] = useState<number>(bgLimit || 1000);
   const [localDcCapital, setLocalDcCapital] = useState<number>(dcCapital || 1000);
+  const [localFractionnement, setLocalFractionnement] = useState<FractionnementType>(fractionnement || FractionnementType.ANNUEL);
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
   const [showFormulaModal, setShowFormulaModal] = useState(false);
   const [pendingFormula, setPendingFormula] = useState<FormulaType | null>(null);
@@ -74,6 +79,17 @@ export const CoverageSelectionStep = ({
       return data.filter((c: any) => c.isActive);
     },
   });
+
+  // Get first selected company for availability check
+  const firstSelectedCompanyId = selectedCompanies.length > 0 ? selectedCompanies[0] : undefined;
+  
+  // Fetch availability for all optional guarantees
+  const allOptionalCodes = optionalGuarantees.map(g => g.code);
+  const { data: availabilityMap } = useGuaranteeAvailability(
+    firstSelectedCompanyId,
+    allOptionalCodes,
+    localFormula as FormulaType | undefined,
+  );
 
   // Fetch BG capital limits from API (admin-configurable)
   const { data: bgCapitalLimits } = useQuery({
@@ -135,6 +151,7 @@ export const CoverageSelectionStep = ({
       franchiseRate: localFranchiseRate,
       bgLimit: localBgLimit,
       dcCapital: localDcCapital,
+      fractionnement: localFractionnement,
     });
   };
 
@@ -160,6 +177,7 @@ export const CoverageSelectionStep = ({
       franchiseRate: localFranchiseRate,
       bgLimit: localBgLimit,
       dcCapital: localDcCapital,
+      fractionnement: localFractionnement,
     });
 
     setShowFormulaModal(false);
@@ -181,6 +199,7 @@ export const CoverageSelectionStep = ({
         franchiseRate: localFranchiseRate,
         bgLimit: localBgLimit,
         dcCapital: localDcCapital,
+        fractionnement: localFractionnement,
       });
     }
   };
@@ -195,13 +214,38 @@ export const CoverageSelectionStep = ({
         franchiseRate: localFranchiseRate,
         bgLimit: localBgLimit,
         dcCapital: localDcCapital,
+        fractionnement: localFractionnement,
         companyIds: selectedCompanies,
       });
       onNext();
     }
   };
 
-  const isBrisDeGlacesFree = localFormula === FormulaType.TOUS_RISQUES_0;
+  // Helper: Check if guarantee is available (uses new system with fallback)
+  const isGuaranteeAvailable = (code: string): boolean => {
+    if (!availabilityMap) return true; // Fallback: available
+    const availability = availabilityMap[code];
+    if (!availability) return true; // Fallback: available
+    return availability.isAvailable;
+  };
+
+  // Helper: Check if guarantee is free (uses new system with fallback)
+  const isGuaranteeFree = (code: string): boolean => {
+    if (!availabilityMap) {
+      // Fallback to old hardcoded logic
+      if (code === 'BG' && localFormula === FormulaType.TOUS_RISQUES_0) return true;
+      return false;
+    }
+    const availability = availabilityMap[code];
+    if (!availability) {
+      // Fallback to old hardcoded logic
+      if (code === 'BG' && localFormula === FormulaType.TOUS_RISQUES_0) return true;
+      return false;
+    }
+    return availability.isFree;
+  };
+
+  const isBrisDeGlacesFree = isGuaranteeFree('BG');
 
   return (
     <>
@@ -231,6 +275,85 @@ export const CoverageSelectionStep = ({
           ]}
         />
       )}
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Fractionnement
+        </label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label
+            className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${
+              localFractionnement === FractionnementType.ANNUEL
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'
+            }`}
+          >
+            <input
+              type="radio"
+              value={FractionnementType.ANNUEL}
+              checked={localFractionnement === FractionnementType.ANNUEL}
+              onChange={() => {
+                setLocalFractionnement(FractionnementType.ANNUEL);
+                if (localFormula) {
+                  onUpdate({
+                    formulaType: localFormula as FormulaType,
+                    selectedGuarantees: localGuarantees,
+                    conventionId: localConvention || undefined,
+                    franchiseRate: localFranchiseRate,
+                    bgLimit: localBgLimit,
+                    dcCapital: localDcCapital,
+                    fractionnement: FractionnementType.ANNUEL,
+                    companyIds: selectedCompanies,
+                  });
+                }
+              }}
+              className="mt-1"
+            />
+            <div className="ml-3 flex-1">
+              <div className="font-semibold text-gray-900 dark:text-white">Annuel</div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Prime annuelle complète
+              </p>
+            </div>
+          </label>
+
+          <label
+            className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${
+              localFractionnement === FractionnementType.SEMESTRIEL
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'
+            }`}
+          >
+            <input
+              type="radio"
+              value={FractionnementType.SEMESTRIEL}
+              checked={localFractionnement === FractionnementType.SEMESTRIEL}
+              onChange={() => {
+                setLocalFractionnement(FractionnementType.SEMESTRIEL);
+                if (localFormula) {
+                  onUpdate({
+                    formulaType: localFormula as FormulaType,
+                    selectedGuarantees: localGuarantees,
+                    conventionId: localConvention || undefined,
+                    franchiseRate: localFranchiseRate,
+                    bgLimit: localBgLimit,
+                    dcCapital: localDcCapital,
+                    fractionnement: FractionnementType.SEMESTRIEL,
+                    companyIds: selectedCompanies,
+                  });
+                }
+              }}
+              className="mt-1"
+            />
+            <div className="ml-3 flex-1">
+              <div className="font-semibold text-gray-900 dark:text-white">Semestriel</div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Prime nette divisée par 2, frais et taxes recalculés sur la base semestrielle
+              </p>
+            </div>
+          </label>
+        </div>
+      </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -353,6 +476,7 @@ export const CoverageSelectionStep = ({
                             franchiseRate: localFranchiseRate,
                             bgLimit: localBgLimit,
                             dcCapital: localDcCapital,
+                            fractionnement: localFractionnement,
                             companyIds: next,
                           });
                         }
@@ -383,6 +507,12 @@ export const CoverageSelectionStep = ({
                 if (guarantee.code === 'TOUS_RISQUES_ZERO') return false;
                 if (guarantee.code === 'DEFENSE_RECOURS') return false;
                 
+                // ✅ NEW: Check availability from backend (with fallback to old logic)
+                if (!isGuaranteeAvailable(guarantee.code)) {
+                  return false; // Hide if not available
+                }
+                
+                // OLD LOGIC (kept as fallback for Lloyd bundling UI)
                 // Only hide CAT NAT and DOMMAGES_EMEUTES if Lloyd is the ONLY company selected
                 const hasLloyd = companies?.some((c: any) => c.code === 'LLOYD' && selectedCompanies.includes(c.id));
                 const hasOnlyLloyd = hasLloyd && selectedCompanies.length === 1;
@@ -395,6 +525,7 @@ export const CoverageSelectionStep = ({
               })
               .map((guarantee) => {
                 const isDisabled = guarantee.code === 'BG' && isBrisDeGlacesFree;
+                const isFree = isGuaranteeFree(guarantee.code);
 
                 return (
                   <label
@@ -420,7 +551,7 @@ export const CoverageSelectionStep = ({
                       <div className="font-medium text-gray-900 dark:text-white">
                         {guarantee.nameFr}
                       </div>
-                      {guarantee.code === 'BG' && isBrisDeGlacesFree && (
+                      {isFree && (
                         <span className="text-xs text-green-600 dark:text-green-400">
                           Inclus gratuitement
                         </span>
@@ -467,6 +598,7 @@ export const CoverageSelectionStep = ({
                             franchiseRate: localFranchiseRate,
                             bgLimit: localBgLimit,
                             dcCapital: localDcCapital,
+                            fractionnement: localFractionnement,
                           });
                         }
                       } else {
@@ -480,6 +612,7 @@ export const CoverageSelectionStep = ({
                             franchiseRate: localFranchiseRate,
                             bgLimit: localBgLimit,
                             dcCapital: localDcCapital,
+                            fractionnement: localFractionnement,
                           });
                         }
                       }
@@ -545,6 +678,7 @@ export const CoverageSelectionStep = ({
                 franchiseRate: localFranchiseRate,
                 bgLimit: limit,
                 dcCapital: localDcCapital,
+                fractionnement: localFractionnement,
               });
             }}
             options={
@@ -582,6 +716,7 @@ export const CoverageSelectionStep = ({
                 franchiseRate: localFranchiseRate,
                 bgLimit: limit,
                 dcCapital: localDcCapital,
+                fractionnement: localFractionnement,
               });
             }}
             options={

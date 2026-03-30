@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { UsageFeeConfigService } from '../usage-fee-config/usage-fee-config.service';
 
 @Injectable()
 export class CompaniesService {
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
+    private usageFeeConfigService: UsageFeeConfigService,
   ) {}
 
   async findAll(includeInactive = false) {
@@ -55,6 +57,9 @@ export class CompaniesService {
     }
 
     const company = await this.prisma.company.create({ data });
+
+    // Auto-create fee configs for all existing usages
+    await this.usageFeeConfigService.autoCreateForNewCompany(company.id);
 
     await this.auditService.log(
       userId,

@@ -1,9 +1,11 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { FormulaType, ReductionMetric } from '@prisma/client';
+import { FormulaType, ReductionMetric, GuaranteeAvailabilityStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { ReductionRatesService } from './reduction-rates.service';
 import { FormulaEvaluatorService } from './formula-evaluator.service';
+import { GuaranteeAvailabilityService } from '../guarantee-availability/guarantee-availability.service';
+import { UsageFeeConfigService } from '../usage-fee-config/usage-fee-config.service';
 
 interface VehicleData {
   fiscalHorsepower: number;
@@ -20,6 +22,7 @@ interface SimulationData {
   selectedGuarantees: string[];
   selectedCapitals?: Record<string, Decimal>;
   franchiseRate?: number;
+  fractionnement?: 'ANNUEL' | 'SEMESTRIEL';
 }
 
 interface PricingResult {
@@ -51,6 +54,8 @@ export class PricingEngineService {
     private prisma: PrismaService,
     private reductionRatesService: ReductionRatesService,
     private formulaEvaluator: FormulaEvaluatorService,
+    private guaranteeAvailabilityService: GuaranteeAvailabilityService,
+    private usageFeeConfigService: UsageFeeConfigService,
   ) {}
 
   async calculatePremium(
@@ -152,82 +157,164 @@ export class PricingEngineService {
       }
     }
 
-    // 9. BG (Bris de Glaces) - FREE if TOUS_RISQUES_0, otherwise Capital * rate
+    // 9. BG (Bris de Glaces) - Check availability config
     if (simulation.selectedGuarantees.includes('BG') || simulation.formulaType === FormulaType.TOUS_RISQUES_0) {
-      const selectedCapital = simulation.selectedCapitals?.['BG'];
-      const bgResult = await this.calculateBG(
-        companyId,
-        vehicle,
-        simulation.formulaType === FormulaType.TOUS_RISQUES_0,
-        selectedCapital,
-        conventionId,
-        simulation.selectedGuarantees.includes('BG'),  // Pass flag: is BG explicitly selected?
-      );
-      if (bgResult) {
-        items.push(bgResult);
-        primeNette = primeNette.add(bgResult.prime);
+      const bgAvailability = await this.checkGuaranteeAvailability(companyId, 'BG', simulation.formulaType);
+      
+      if (bgAvailability.isAvailable) {
+        const selectedCapital = simulation.selectedCapitals?.['BG'];
+        
+        // Determine if BG should be free:
+        // 1. If config says GRATUIT → free
+        // 2. If config says DEFAULT and TR0% → free (backward compatible)
+        const isFree = bgAvailability.isFree || 
+                       (bgAvailability.useDefault && simulation.formulaType === FormulaType.TOUS_RISQUES_0);
+        
+        const bgResult = await this.calculateBG(
+          companyId,
+          vehicle,
+          isFree,
+          selectedCapital,
+          conventionId,
+          simulation.selectedGuarantees.includes('BG'),
+        );
+        if (bgResult) {
+          items.push(bgResult);
+          primeNette = primeNette.add(bgResult.prime);
+        }
       }
     }
 
-    // 10. INCENDIE_EMEUTES (Optional)
+    // 10. INCENDIE_EMEUTES (Optional) - Check availability
     if (simulation.selectedGuarantees.includes('INCENDIE_EMEUTES')) {
-      const incendieEmeutesResult = await this.calculateINCENDIE_EMEUTES(companyId, vehicle, conventionId);
-      if (incendieEmeutesResult) {
-        console.log('✅ INCENDIE_EMEUTES calculated:', incendieEmeutesResult.prime.toString());
-        items.push(incendieEmeutesResult);
-        primeNette = primeNette.add(incendieEmeutesResult.prime);
+      const availability = await this.checkGuaranteeAvailability(companyId, 'INCENDIE_EMEUTES', simulation.formulaType);
+      
+      if (availability.isAvailable) {
+        const incendieEmeutesResult = await this.calculateINCENDIE_EMEUTES(companyId, vehicle, conventionId);
+        if (incendieEmeutesResult) {
+          // Override price if configured as GRATUIT
+          if (availability.isFree) {
+            incendieEmeutesResult.prime = new Decimal(0);
+          }
+          console.log('✅ INCENDIE_EMEUTES calculated:', incendieEmeutesResult.prime.toString());
+          items.push(incendieEmeutesResult);
+          primeNette = primeNette.add(incendieEmeutesResult.prime);
+        } else {
+          console.log('❌ INCENDIE_EMEUTES NOT calculated - no pricing rule found');
+        }
       } else {
-        console.log('❌ INCENDIE_EMEUTES NOT calculated - no pricing rule found');
+        console.log('❌ INCENDIE_EMEUTES NOT available - blocked by availability config');
       }
     }
 
-    // 11. CATASTROPHES_NATURELLES (Optional - Only for Tous Risques 0% with pricing rule)
+    // 11. CATASTROPHES_NATURELLES (Optional) - Check availability
     if (simulation.selectedGuarantees.includes('CATASTROPHES_NATURELLES')) {
-      const catnatResult = await this.calculateCATNAT(companyId, vehicle, simulation.formulaType, conventionId);
-      if (catnatResult) {
-        console.log('✅ CATASTROPHES_NATURELLES calculated:', catnatResult.prime.toString());
-        items.push(catnatResult);
-        primeNette = primeNette.add(catnatResult.prime);
+      const availability = await this.checkGuaranteeAvailability(companyId, 'CATASTROPHES_NATURELLES', simulation.formulaType);
+      
+      if (availability.isAvailable) {
+        const catnatResult = await this.calculateCATNAT(companyId, vehicle, simulation.formulaType, conventionId);
+        if (catnatResult) {
+          // Override price if configured as GRATUIT
+          if (availability.isFree) {
+            catnatResult.prime = new Decimal(0);
+          }
+          console.log('✅ CATASTROPHES_NATURELLES calculated:', catnatResult.prime.toString());
+          items.push(catnatResult);
+          primeNette = primeNette.add(catnatResult.prime);
+        } else {
+          console.log('❌ CATASTROPHES_NATURELLES NOT calculated - no pricing rule found or not Tous Risques 0%');
+        }
       } else {
-        console.log('❌ CATASTROPHES_NATURELLES NOT calculated - no pricing rule found or not Tous Risques 0%');
+        console.log('❌ CATASTROPHES_NATURELLES NOT available - blocked by availability config');
       }
     }
 
-    // 12. DOMMAGES_EMEUTES (Optional)
+    // 12. DOMMAGES_EMEUTES (Optional) - Check availability
     if (simulation.selectedGuarantees.includes('DOMMAGES_EMEUTES')) {
-      const dommagesEmeutesResult = await this.calculateDOMMAGES_EMEUTES(companyId, vehicle, conventionId);
-      if (dommagesEmeutesResult) {
-        console.log('✅ DOMMAGES_EMEUTES calculated:', dommagesEmeutesResult.prime.toString());
-        items.push(dommagesEmeutesResult);
-        primeNette = primeNette.add(dommagesEmeutesResult.prime);
+      const availability = await this.checkGuaranteeAvailability(companyId, 'DOMMAGES_EMEUTES', simulation.formulaType);
+      
+      if (availability.isAvailable) {
+        const dommagesEmeutesResult = await this.calculateDOMMAGES_EMEUTES(companyId, vehicle, conventionId);
+        if (dommagesEmeutesResult) {
+          // Override price if configured as GRATUIT
+          if (availability.isFree) {
+            dommagesEmeutesResult.prime = new Decimal(0);
+          }
+          console.log('✅ DOMMAGES_EMEUTES calculated:', dommagesEmeutesResult.prime.toString());
+          items.push(dommagesEmeutesResult);
+          primeNette = primeNette.add(dommagesEmeutesResult.prime);
+        } else {
+          console.log('❌ DOMMAGES_EMEUTES NOT calculated - no pricing rule found');
+        }
       } else {
-        console.log('❌ DOMMAGES_EMEUTES NOT calculated - no pricing rule found');
+        console.log('❌ DOMMAGES_EMEUTES NOT available - blocked by availability config');
       }
     }
 
-    // 13. DEFENSE_RECOURS (Optional - FREE for AMANA with Tous Risques 0%)
+    // 13. DEFENSE_RECOURS (Optional) - Check availability
     if (simulation.selectedGuarantees.includes('DEFENSE_RECOURS')) {
-      const defenseRecoursResult = await this.calculateDEFENSE_RECOURS(companyId, simulation.formulaType, conventionId);
-      if (defenseRecoursResult) {
-        items.push(defenseRecoursResult);
-        primeNette = primeNette.add(defenseRecoursResult.prime);
+      const availability = await this.checkGuaranteeAvailability(companyId, 'DEFENSE_RECOURS', simulation.formulaType);
+      
+      if (availability.isAvailable) {
+        const defenseRecoursResult = await this.calculateDEFENSE_RECOURS(companyId, simulation.formulaType, conventionId);
+        if (defenseRecoursResult) {
+          // Override price if configured as GRATUIT
+          if (availability.isFree) {
+            defenseRecoursResult.prime = new Decimal(0);
+          }
+          items.push(defenseRecoursResult);
+          primeNette = primeNette.add(defenseRecoursResult.prime);
+        }
+      } else {
+        console.log('❌ DEFENSE_RECOURS NOT available - blocked by availability config');
       }
+    }
+
+    const fractionnement = simulation.fractionnement ?? 'ANNUEL';
+    const pricingItems = fractionnement === 'SEMESTRIEL'
+      ? items.map((item) => ({
+          ...item,
+          prime: item.prime.div(2),
+        }))
+      : items;
+
+    if (fractionnement === 'SEMESTRIEL') {
+      primeNette = pricingItems.reduce((sum, item) => sum.add(item.prime), new Decimal(0));
+
+      const rcItem = pricingItems.find((item) => item.guaranteeCode === 'RC');
+      primeRC = rcItem?.prime ?? new Decimal(0);
     }
 
     // CDC EXACT CALCULATION
     const company = await this.prisma.company.findUnique({ where: { id: companyId } });
     if (!company) throw new BadRequestException('Company not found');
     
-    // Get all values from company settings - NO FALLBACKS
-    if (company.contractFees === null) throw new BadRequestException('Contract fees not configured');
-    if (company.fpac === null) throw new BadRequestException('FPAC not configured');
-    if (company.fssr === null) throw new BadRequestException('FSSR not configured');
-    if (company.fg === null) throw new BadRequestException('FG not configured');
+    // Try to get usage-specific fees first, fallback to company fees
+    const usageFeeConfig = await this.usageFeeConfigService.getByUsageAndCompany(
+      simulation.usageId,
+      companyId,
+    );
+
+    // Use usage-specific fees if configured, otherwise fall back to company fees
+    const feeSource = usageFeeConfig ?? company;
+
+    // Log when fallback is used (for monitoring)
+    if (!usageFeeConfig) {
+      console.warn(
+        `⚠️  No UsageFeeConfig found for usage ${simulation.usageId} and company ${companyId}. Falling back to company fees.`,
+      );
+    }
     
-    const frais = new Decimal(company.contractFees);
-    const fpac = new Decimal(company.fpac);
-    const fssr = new Decimal(company.fssr);
-    const fg = new Decimal(company.fg);
+    // Get all values from fee source - NO FALLBACKS
+    if (feeSource.contractFees === null) throw new BadRequestException('Contract fees not configured');
+    if (feeSource.fpac === null) throw new BadRequestException('FPAC not configured');
+    if (feeSource.fssr === null) throw new BadRequestException('FSSR not configured');
+    if (feeSource.fg === null) throw new BadRequestException('FG not configured');
+    
+    const frais = new Decimal(feeSource.contractFees);
+    const fpac = new Decimal(feeSource.fpac);
+    const fssr = new Decimal(feeSource.fssr);
+    const fg = new Decimal(feeSource.fg);
     
     const taxe12Percent = primeNette.add(frais).mul(0.12);
     const taxe2Percent = primeRC.add(frais).mul(0.02);
@@ -243,7 +330,7 @@ export class PricingEngineService {
       fssr,
       fg,
       totalAPayer,
-      items,
+      items: pricingItems,
       breakdown: {
         primeRC,
         taxesDetail: {
@@ -1271,6 +1358,41 @@ export class PricingEngineService {
     const age = now.getFullYear() - circulation.getFullYear();
     const hasNotReachedBirthday = now < new Date(now.getFullYear(), circulation.getMonth(), circulation.getDate());
     return hasNotReachedBirthday ? age - 1 : age;
+  }
+
+  /**
+   * Check guarantee availability status using the new configurable system
+   * Returns: { isAvailable: boolean, isFree: boolean }
+   */
+  private async checkGuaranteeAvailability(
+    companyId: string,
+    guaranteeCode: string,
+    formulaType: FormulaType,
+  ): Promise<{ isAvailable: boolean; isFree: boolean; useDefault: boolean }> {
+    // Get guarantee ID from code
+    const guarantee = await this.prisma.guarantee.findUnique({ where: { code: guaranteeCode } });
+    if (!guarantee) {
+      return { isAvailable: false, isFree: false, useDefault: false };
+    }
+
+    // Resolve availability status
+    const availability = await this.guaranteeAvailabilityService.resolveAvailability(
+      companyId,
+      guarantee.id,
+      formulaType,
+    );
+
+    // Interpret status
+    switch (availability.status) {
+      case GuaranteeAvailabilityStatus.NON_ACCORDEE:
+        return { isAvailable: false, isFree: false, useDefault: false };
+      case GuaranteeAvailabilityStatus.GRATUIT:
+        return { isAvailable: true, isFree: true, useDefault: false };
+      case GuaranteeAvailabilityStatus.DEFAULT:
+      default:
+        // DEFAULT means: use existing logic (backward compatible)
+        return { isAvailable: true, isFree: false, useDefault: true };
+    }
   }
 
   private async calculateINCENDIE_EMEUTES(companyId: string, vehicle: VehicleData, conventionId?: string) {

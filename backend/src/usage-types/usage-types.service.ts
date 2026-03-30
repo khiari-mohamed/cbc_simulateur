@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { UsageFeeConfigService } from '../usage-fee-config/usage-fee-config.service';
 import { CreateUsageTypeDto } from './dto/create-usage-type.dto';
 import { UpdateUsageTypeDto } from './dto/update-usage-type.dto';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
@@ -10,17 +11,34 @@ export class UsageTypesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly usageFeeConfigService: UsageFeeConfigService,
   ) {}
 
   async findAll(includeInactive = false) {
     return this.prisma.usage.findMany({
       where: includeInactive ? {} : { isActive: true },
+      include: {
+        usageFeeConfigs: {
+          include: {
+            company: { select: { id: true, name: true, code: true } },
+          },
+        },
+      },
       orderBy: { code: 'asc' },
     });
   }
 
   async findById(id: string) {
-    const u = await this.prisma.usage.findUnique({ where: { id } });
+    const u = await this.prisma.usage.findUnique({
+      where: { id },
+      include: {
+        usageFeeConfigs: {
+          include: {
+            company: { select: { id: true, name: true, code: true } },
+          },
+        },
+      },
+    });
     if (!u) throw new NotFoundException('Usage not found');
     return u;
   }
@@ -36,6 +54,14 @@ export class UsageTypesService {
         },
       });
 
+      // Sync fee configs if provided
+      if (dto.feeConfigs && dto.feeConfigs.length > 0) {
+        await this.usageFeeConfigService.syncForUsage(created.id, dto.feeConfigs);
+      } else {
+        // Auto-create configs from all companies if none provided
+        await this.usageFeeConfigService.autoCreateForNewUsage(created.id);
+      }
+
       await this.auditService.log(
         userId,
         'USAGE_CREATED',
@@ -47,6 +73,7 @@ export class UsageTypesService {
           nameFr: created.nameFr,
           nameAr: created.nameAr,
           nameEn: created.nameEn,
+          feeConfigsCount: dto.feeConfigs?.length ?? 0,
         },
       );
 
@@ -86,6 +113,11 @@ export class UsageTypesService {
         data: updateData,
       });
 
+      // Sync fee configs if provided
+      if (dto.feeConfigs !== undefined) {
+        await this.usageFeeConfigService.syncForUsage(id, dto.feeConfigs);
+      }
+
       // Prepare detailed changes for audit
       const changes: Record<string, any> = {};
       if (dto.nameFr !== undefined) {
@@ -99,6 +131,9 @@ export class UsageTypesService {
       }
       if (dto.isActive !== undefined) {
         changes.isActive = { old: existing.isActive, new: updated.isActive };
+      }
+      if (dto.feeConfigs !== undefined) {
+        changes.feeConfigsUpdated = true;
       }
 
       await this.auditService.log(

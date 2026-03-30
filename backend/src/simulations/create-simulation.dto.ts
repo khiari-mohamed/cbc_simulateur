@@ -3,6 +3,11 @@ import { Type, Transform } from 'class-transformer';
 import { FormulaType } from '@prisma/client';
 import { CreateVehicleDto } from '../vehicles/create-vehicle.dto';
 
+export enum FractionnementType {
+  ANNUEL = 'ANNUEL',
+  SEMESTRIEL = 'SEMESTRIEL',
+}
+
 export class CreateSimulationDto {
   @ValidateNested()
   @Type(() => CreateVehicleDto)
@@ -42,4 +47,8 @@ export class CreateSimulationDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(1000)
   dcCapital?: number;
+
+  @IsOptional()
+  @IsEnum(FractionnementType)
+  fractionnement?: FractionnementType;
 }

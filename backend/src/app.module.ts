@@ -28,6 +28,7 @@ import { SystemModule } from './system/system.module';
 import { SeedModule } from './seed/seed.module';
 import { FranchiseValuesModule } from './franchise-values/franchise-values.module';
 import { BgCapitalLimitsModule } from './bg-capital-limits/bg-capital-limits.module';
+import { GuaranteeAvailabilityModule } from './guarantee-availability/guarantee-availability.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { BgCapitalLimitsModule } from './bg-capital-limits/bg-capital-limits.mod
     SeedModule,
     FranchiseValuesModule,
     BgCapitalLimitsModule,
+    GuaranteeAvailabilityModule,
   ],
 })
 export class AppModule {}

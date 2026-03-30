@@ -72,6 +72,7 @@ export class QuotesService {
           PERSONNES_TRANSPORTEES: new (require('@prisma/client').Decimal)(5000), // Default PTA capital
         },
         franchiseRate: simulation.franchiseRate ? Number(simulation.franchiseRate) : 0,
+        fractionnement: (simulation as any).fractionnement ?? 'ANNUEL',
       },
       simulation.conventionId || undefined,
     );

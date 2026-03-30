@@ -157,22 +157,32 @@ export const GuaranteesConfig = () => {
 
   const groupedRules = useMemo<GuaranteeGroup[]>(() => {
     if (!guarantees || !Array.isArray(guarantees)) return [];
+    
     return guarantees.map((guarantee) => {
       let rules = allRules?.filter((r: PricingRule) => r.guaranteeId === guarantee.id) || [];
+      
+      // Filter by usage
       if (filterUsage) {
-        rules = rules.filter((r: any) => r.usageId === filterUsage);
+        rules = rules.filter((r: any) => {
+          const hasUsageId = r.usageId === filterUsage;
+          const hasNestedUsage = r.usage?.id === filterUsage;
+          return hasUsageId || hasNestedUsage;
+        });
       }
+      
+      // Filter by formula
       if (filterFormula) {
         if (filterFormula === 'STANDARD') {
           rules = rules.filter((r: PricingRule) => !r.formulaType || r.formulaType === 'STANDARD');
         } else if (filterFormula === 'DOMMAGES_COLLISION') {
-          rules = rules.filter((r: PricingRule) => r.formulaType?.includes('DC'));
+          rules = rules.filter((r: PricingRule) => r.formulaType === 'DOMMAGES_COLLISIONS');
         } else if (filterFormula === 'TOUS_RISQUES') {
-          rules = rules.filter((r: PricingRule) => r.formulaType?.includes('TOUS_RISQUES'));
+          rules = rules.filter((r: PricingRule) => r.formulaType === 'TOUS_RISQUES_0');
         }
       }
+      
       return { ...guarantee, rules };
-    }).filter(g => g.rules.length > 0 || (!filterUsage && !filterFormula));
+    });
   }, [guarantees, allRules, filterUsage, filterFormula]);
 
   const availableRulesForBulk = useMemo(() => {
@@ -192,6 +202,49 @@ export const GuaranteesConfig = () => {
       );
   }, [groupedRules]);
 
+  // Calculate counts for filters (excluding RC rules to match displayed guarantees)
+  const usageCounts = useMemo(() => {
+    if (!allRules || !guarantees) return {};
+    const guaranteeIds = guarantees.map(g => g.id);
+    const counts: Record<string, number> = {};
+    allRules.forEach((rule: any) => {
+      // Only count rules for non-RC guarantees
+      if (guaranteeIds.includes(rule.guaranteeId)) {
+        const usageId = rule.usageId || rule.usage?.id;
+        if (usageId) {
+          counts[usageId] = (counts[usageId] || 0) + 1;
+        }
+      }
+    });
+    return counts;
+  }, [allRules, guarantees]);
+
+  const formulaCounts = useMemo(() => {
+    if (!allRules || !guarantees) return { STANDARD: 0, DOMMAGES_COLLISION: 0, TOUS_RISQUES: 0 };
+    const guaranteeIds = guarantees.map(g => g.id);
+    const counts = { STANDARD: 0, DOMMAGES_COLLISION: 0, TOUS_RISQUES: 0 };
+    allRules.forEach((rule: PricingRule & { guaranteeId: string }) => {
+      // Only count rules for non-RC guarantees
+      if (guaranteeIds.includes(rule.guaranteeId)) {
+        if (!rule.formulaType || rule.formulaType === 'STANDARD') {
+          counts.STANDARD++;
+        } else if (rule.formulaType === 'DOMMAGES_COLLISIONS') {
+          counts.DOMMAGES_COLLISION++;
+        } else if (rule.formulaType === 'TOUS_RISQUES_0') {
+          counts.TOUS_RISQUES++;
+        }
+      }
+    });
+    return counts;
+  }, [allRules, guarantees]);
+
+  // Total count excluding RC
+  const totalNonRcRules = useMemo(() => {
+    if (!allRules || !guarantees) return 0;
+    const guaranteeIds = guarantees.map(g => g.id);
+    return allRules.filter((rule: any) => guaranteeIds.includes(rule.guaranteeId)).length;
+  }, [allRules, guarantees]);
+
   const getGuaranteeHint = (code: string) => {
     const hints: Record<string, string> = {
       'VOL': 'Formule: ((VV × taux) + prime fixe) × réduction',
@@ -210,7 +263,7 @@ export const GuaranteesConfig = () => {
     <div className="space-y-4">
       <Card className="p-4">
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex flex-col sm:flex-row flex-wrap justify-between items-start sm:items-center gap-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full">
               <div className="flex items-center gap-2">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
@@ -237,11 +290,13 @@ export const GuaranteesConfig = () => {
                     <select
                       value={filterUsage}
                       onChange={(e) => setFilterUsage(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white max-w-[220px]"
                     >
-                      <option value="">Tous</option>
+                      <option value="">Tous les usages · affichage uniquement ({totalNonRcRules})</option>
                       {usages?.map((u: { id: string; nameFr: string }) => (
-                        <option key={u.id} value={u.id}>{u.nameFr}</option>
+                        <option key={u.id} value={u.id}>
+                          {u.nameFr} ({usageCounts[u.id] || 0})
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -253,12 +308,12 @@ export const GuaranteesConfig = () => {
                     <select
                       value={filterFormula}
                       onChange={(e) => setFilterFormula(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white max-w-[220px]"
                     >
-                      <option value="">Toutes</option>
-                      <option value="STANDARD">Standard</option>
-                      <option value="DOMMAGES_COLLISION">Dommages Collision</option>
-                      <option value="TOUS_RISQUES">Tous Risques</option>
+                      <option value="">Toutes les formules · affichage uniquement ({totalNonRcRules})</option>
+                      <option value="STANDARD">Standard ({formulaCounts.STANDARD})</option>
+                      <option value="DOMMAGES_COLLISION">Dommages Collision ({formulaCounts.DOMMAGES_COLLISION})</option>
+                      <option value="TOUS_RISQUES">Tous Risques ({formulaCounts.TOUS_RISQUES})</option>
                     </select>
                   </div>
                 </>
@@ -303,7 +358,15 @@ export const GuaranteesConfig = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              {groupedRules.map((group) => {
+              {groupedRules
+                .filter(group => {
+                  // Hide guarantees with 0 rules when filters are active
+                  if (filterUsage || filterFormula) {
+                    return group.rules.length > 0;
+                  }
+                  return true;
+                })
+                .map((group) => {
                 const hint = getGuaranteeHint(group.code);
                 const isExpanded = expandedGroups.has(group.id);
 
@@ -348,7 +411,33 @@ export const GuaranteesConfig = () => {
 
                     {isExpanded && (
                       <div className="border-t border-gray-200 dark:border-gray-700">
-                        {group.rules.length === 0 ? (
+                        {group.code === 'DOMMAGES_COLLISIONS' ? (
+                          <>
+                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-700">
+                              <p className="text-sm text-blue-800 dark:text-blue-300 mb-2">
+                                <strong>ℹ️ Information importante :</strong> Les règles Dommages Collision sont gérées dans l'onglet dédié <strong>"Dommages Collision"</strong>.
+                              </p>
+                              <p className="text-xs text-blue-700 dark:text-blue-400">
+                                En raison de la complexité de cette garantie (taux progressifs, paliers de capital, matrice tarifaire), 
+                                sa configuration nécessite des tables dédiées et une interface spécialisée.
+                              </p>
+                            </div>
+                            <div className="p-6 text-center">
+                              <p className="text-gray-700 dark:text-gray-300 mb-2">
+                                <strong>{group.rules.length}</strong> configuration{group.rules.length !== 1 ? 's' : ''} DC disponible{group.rules.length !== 1 ? 's' : ''} pour cet usage
+                              </p>
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                                (Capital tiers, taux progressifs, franchise, etc.)
+                              </p>
+                              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                <p className="text-xs text-gray-600 dark:text-gray-400 italic">
+                                  💡 Les enregistrements affichés ici sont des marqueurs indiquant que DC est configuré pour cette compagnie/usage. 
+                                  La configuration complète (taux, paliers, franchise) se trouve dans l'onglet "Dommages Collision".
+                                </p>
+                              </div>
+                            </div>
+                          </>
+                        ) : group.rules.length === 0 ? (
                           <div className="p-4 text-center text-gray-500 dark:text-gray-400">
                             Aucune règle configurée
                           </div>

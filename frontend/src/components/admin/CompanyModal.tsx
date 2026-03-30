@@ -16,10 +16,6 @@ const companySchema = z.object({
     .min(2, 'Code minimum 2 caractères')
     .max(20)
     .regex(/^[A-Z0-9_]+$/, 'Code doit être en majuscules avec underscores'),
-  contractFees: z.number().min(0, 'Doit être >= 0').optional().nullable(),
-  fpac: z.number().min(0, 'Doit être >= 0').optional().nullable(),
-  fssr: z.number().min(0, 'Doit être >= 0').optional().nullable(),
-  fg: z.number().min(0, 'Doit être >= 0').optional().nullable(),
 });
 
 type CompanyForm = z.infer<typeof companySchema>;
@@ -41,13 +37,9 @@ export const CompanyModal = ({ isOpen, onClose, company }: CompanyModalProps) =>
       reset({ 
         name: company.name, 
         code: company.code,
-        contractFees: company.contractFees ?? undefined,
-        fpac: company.fpac ?? undefined,
-        fssr: company.fssr ?? undefined,
-        fg: company.fg ?? undefined,
       });
     } else {
-      reset({ name: '', code: '', contractFees: undefined, fpac: undefined, fssr: undefined, fg: undefined });
+      reset({ name: '', code: '' });
     }
   }, [company, reset]);
 
@@ -67,10 +59,6 @@ export const CompanyModal = ({ isOpen, onClose, company }: CompanyModalProps) =>
   const updateMutation = useMutation({
     mutationFn: (data: CompanyForm) => api.patch(`/companies/${company?.id}`, { 
       name: data.name,
-      contractFees: data.contractFees,
-      fpac: data.fpac,
-      fssr: data.fssr,
-      fg: data.fg,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] });
@@ -128,46 +116,10 @@ export const CompanyModal = ({ isOpen, onClose, company }: CompanyModalProps) =>
             </p>
           )}
 
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-              Frais et Taxes (optionnel)
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="Frais de contrat (DT)"
-                type="number"
-                step="0.01"
-                {...register('contractFees', { valueAsNumber: true })}
-                error={errors.contractFees?.message}
-                placeholder="Ex: 50"
-              />
-              <Input
-                label="FPAC (%)"
-                type="number"
-                step="0.01"
-                {...register('fpac', { valueAsNumber: true })}
-                error={errors.fpac?.message}
-                placeholder="Ex: 0.5"
-              />
-              <Input
-                label="FSSR (%)"
-                type="number"
-                step="0.01"
-                {...register('fssr', { valueAsNumber: true })}
-                error={errors.fssr?.message}
-                placeholder="Ex: 0.3"
-              />
-              <Input
-                label="FG (DT)"
-                type="number"
-                step="0.01"
-                {...register('fg', { valueAsNumber: true })}
-                error={errors.fg?.message}
-                placeholder="Ex: 3"
-              />
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              Ces frais sont requis pour générer des devis. Laissez vide pour configurer plus tard.
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-4">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              <strong>Note:</strong> Les frais (Frais de contrat, FPAC, FSSR, FG) sont maintenant configurés par type d'usage.
+              Rendez-vous dans <strong>Types d'Usage</strong> pour configurer les frais spécifiques à chaque usage.
             </p>
           </div>
 
