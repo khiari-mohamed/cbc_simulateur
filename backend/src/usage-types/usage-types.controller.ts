@@ -13,8 +13,7 @@ interface RequestWithUser extends ExpressRequest {
 }
 
 @Controller('usage-types')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMINISTRATEUR_ARS)
+@UseGuards(JwtAuthGuard)
 export class UsageTypesController {
   constructor(private readonly usageService: UsageTypesService) {}
 
@@ -30,11 +29,15 @@ export class UsageTypesController {
   }
 
   @Post()
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMINISTRATEUR_ARS)
   create(@Body() dto: CreateUsageTypeDto, @Request() req: RequestWithUser) {
     return this.usageService.create(dto, req.user.id);
   }
 
   @Patch(':id')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMINISTRATEUR_ARS)
   update(
     @Param('id') id: string,
     @Body() dto: UpdateUsageTypeDto,
@@ -44,16 +47,22 @@ export class UsageTypesController {
   }
 
   @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMINISTRATEUR_ARS)
   deactivate(@Param('id') id: string, @Request() req: RequestWithUser) {
     return this.usageService.deactivate(id, req.user.id);
   }
 
   @Delete(':id/permanent')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMINISTRATEUR_ARS)
   deletePermanent(@Param('id') id: string, @Request() req: RequestWithUser) {
     return this.usageService.delete(id, req.user.id);
   }
 
   @Patch(':id/reactivate')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMINISTRATEUR_ARS)
   reactivate(@Param('id') id: string, @Request() req: RequestWithUser) {
     return this.usageService.reactivate(id, req.user.id);
   }

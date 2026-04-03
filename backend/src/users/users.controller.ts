@@ -48,6 +48,13 @@ export class UsersController {
     return this.usersService.deactivate(id);
   }
 
+  @Patch(':id/reactivate')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMINISTRATEUR_ARS)
+  reactivate(@Param('id') id: string) {
+    return this.usersService.reactivate(id);
+  }
+
   @Post(':id/conventions/:conventionId')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMINISTRATEUR_ARS)
@@ -67,13 +74,6 @@ export class UsersController {
   @Roles(Role.ADMINISTRATEUR_ARS)
   toggle2FA(@Body() dto: Toggle2FADto) {
     return this.usersService.toggle2FA(dto.userId, dto.enabled);
-  }
-
-  @Patch(':id/activate')
-  @UseGuards(RolesGuard)
-  @Roles(Role.ADMINISTRATEUR_ARS)
-  activate(@Param('id') id: string) {
-    return this.usersService.activate(id);
   }
 
   @Delete(':id')

@@ -25,10 +25,11 @@ export const QuoteGenerationStep = ({
     mutationFn: async () => {
       const payload = {
         ...simulationData,
+        usageId: simulationData.usageId,
         vehicle: {
           ...simulationData.vehicle,
-          fiscalHorsepower: parseInt(String(simulationData.vehicle.fiscalHorsepower)),
-          numberOfSeats: parseInt(String(simulationData.vehicle.numberOfSeats)),
+          fiscalHorsepower: parseInt(String(simulationData.vehicle.fiscalHorsepower), 10),
+          numberOfSeats: parseInt(String(simulationData.vehicle.numberOfSeats), 10),
           newValue: parseFloat(String(simulationData.vehicle.newValue)),
           marketValue: parseFloat(String(simulationData.vehicle.marketValue)),
         },
@@ -82,6 +83,9 @@ export const QuoteGenerationStep = ({
   });
 
   const handleGenerate = () => {
+    setSimulationId(null);
+    setQuotes([]);
+    localStorage.removeItem('simulationId');
     createSimulationMutation.mutate();
   };
 
@@ -157,7 +161,7 @@ export const QuoteGenerationStep = ({
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Usage</span>
               <span className="font-medium text-gray-900 dark:text-white">
-                {simulationData.usage}
+                {simulationData.usageId}
               </span>
             </div>
             <div className="flex justify-between">

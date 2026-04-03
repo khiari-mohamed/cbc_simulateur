@@ -10,10 +10,11 @@ export class ReductionRatesService {
   /**
    * Get reduction rate using ConventionReductionRule with paliers
    * Returns discount percent (35 means 35% discount, apply as: prime * (1 - 35/100))
+   * @param systemRole - The system role of the guarantee (e.g., 'MANDATORY_VOL', 'MANDATORY_INCENDIE')
    */
   async getReductionPercent(
     companyId: string,
-    guaranteeCode: string,
+    systemRole: string,
     conventionId: string | undefined,
     metricValue: Decimal,
     metric: ReductionMetric,
@@ -22,7 +23,10 @@ export class ReductionRatesService {
   ): Promise<number> {
     if (!conventionId) return 0; // No convention = no reduction
 
-    const guarantee = await this.prisma.guarantee.findUnique({ where: { code: guaranteeCode } });
+    // Look up guarantee by systemRole, not by code
+    const guarantee = await this.prisma.guarantee.findFirst({ 
+      where: { systemRole: systemRole as any, isActive: true } 
+    });
     if (!guarantee) return 0;
 
     // Find matching rules ordered by priority desc, then created desc

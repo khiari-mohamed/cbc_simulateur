@@ -43,10 +43,7 @@ export class CreateSimulationDto {
   bgLimit?: number;
 
   @IsOptional()
-  @Transform(({ value }) => parseFloat(value))
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(1000)
-  dcCapital?: number;
+  dcCapitals?: Record<string, number>;
 
   @IsOptional()
   @IsEnum(FractionnementType)

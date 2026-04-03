@@ -20,4 +20,8 @@ export class UpdateGuaranteeDto {
   @IsOptional()
   @IsBoolean()
   isOptional?: boolean;
+
+  @IsOptional()
+  @IsString()
+  systemRole?: string;
 }

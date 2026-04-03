@@ -57,6 +57,17 @@ export type User = {
   phone?: string;
   role: Role;
   isActive: boolean;
+  organizationId?: string;
+  organization?: {
+    id: string;
+    name: string;
+    code: string;
+    conventions: Array<{
+      id: string;
+      name: string;
+      status: string;
+    }>;
+  };
   createdAt: string;
 };
 

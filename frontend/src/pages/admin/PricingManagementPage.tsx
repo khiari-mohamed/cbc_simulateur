@@ -6,6 +6,7 @@ import { GuaranteesConfig } from '../../components/admin/pricing/GuaranteesConfi
 import { DcConfigTab } from './formulas/DcConfigTab';
 import { GuaranteeBundlingsTab } from './formulas/GuaranteeBundlingsTab';
 import { GuaranteeAvailabilityTab } from './formulas/GuaranteeAvailabilityTab';
+import { DcCapitalTiersPage } from './DcCapitalTiersPage';
 import { Button } from '../../components/ui/Button';
 
 export const PricingManagementPage = () => {
@@ -40,7 +41,7 @@ export const PricingManagementPage = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-6">
+        <TabsList className="grid w-full grid-cols-6 mb-6">
           <TabsTrigger value="rc-table" className="flex items-center gap-2">
             <Table className="w-4 h-4" />
             Tableau RC
@@ -52,6 +53,10 @@ export const PricingManagementPage = () => {
           <TabsTrigger value="dc-config" className="flex items-center gap-2">
             <Calculator className="w-4 h-4" />
             Dommages Collision
+          </TabsTrigger>
+          <TabsTrigger value="dc-capitals" className="flex items-center gap-2">
+            <Calculator className="w-4 h-4" />
+            Paliers DC
           </TabsTrigger>
           <TabsTrigger value="bundlings" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
@@ -73,6 +78,10 @@ export const PricingManagementPage = () => {
 
         <TabsContent value="dc-config">
           <DcConfigTab />
+        </TabsContent>
+
+        <TabsContent value="dc-capitals">
+          <DcCapitalTiersPage />
         </TabsContent>
 
         <TabsContent value="bundlings">

@@ -53,6 +53,7 @@ export class GuaranteesService {
     nameAr?: string;
     nameEn?: string;
     isOptional: boolean;
+    systemRole?: string;
   }, userId: string) {
     const existing = await this.prisma.guarantee.findUnique({
       where: { code: data.code },
@@ -62,7 +63,16 @@ export class GuaranteesService {
       throw new ConflictException('Guarantee code already exists');
     }
 
-    const guarantee = await this.prisma.guarantee.create({ data });
+    const guarantee = await this.prisma.guarantee.create({ 
+      data: {
+        code: data.code,
+        nameFr: data.nameFr,
+        nameAr: data.nameAr,
+        nameEn: data.nameEn,
+        isOptional: data.isOptional,
+        systemRole: data.systemRole as any,
+      }
+    });
 
     await this.auditService.log(
       userId,
@@ -81,12 +91,19 @@ export class GuaranteesService {
     nameAr?: string;
     nameEn?: string;
     isOptional?: boolean;
+    systemRole?: string;
   }, userId: string) {
     const existing = await this.findById(id);
 
     const updated = await this.prisma.guarantee.update({
       where: { id },
-      data,
+      data: {
+        ...(data.nameFr !== undefined && { nameFr: data.nameFr }),
+        ...(data.nameAr !== undefined && { nameAr: data.nameAr }),
+        ...(data.nameEn !== undefined && { nameEn: data.nameEn }),
+        ...(data.isOptional !== undefined && { isOptional: data.isOptional }),
+        ...(data.systemRole !== undefined && { systemRole: data.systemRole as any }),
+      },
     });
 
     await this.auditService.log(
@@ -94,8 +111,8 @@ export class GuaranteesService {
       'GUARANTEE_UPDATED',
       'Guarantee',
       id,
-      { nameFr: existing.nameFr, isOptional: existing.isOptional },
-      { nameFr: updated.nameFr, isOptional: updated.isOptional },
+      { nameFr: existing.nameFr, isOptional: existing.isOptional, systemRole: existing.systemRole },
+      { nameFr: updated.nameFr, isOptional: updated.isOptional, systemRole: updated.systemRole },
     );
 
     return updated;
@@ -121,8 +138,58 @@ export class GuaranteesService {
     return updated;
   }
 
+  async reactivate(id: string, userId: string) {
+    const guarantee = await this.prisma.guarantee.findUnique({ where: { id } });
+    if (!guarantee) {
+      throw new NotFoundException('Guarantee not found');
+    }
+
+    const updated = await this.prisma.guarantee.update({
+      where: { id },
+      data: { isActive: true },
+    });
+
+    await this.auditService.log(
+      userId,
+      'GUARANTEE_REACTIVATED',
+      'Guarantee',
+      id,
+      { isActive: false },
+      { isActive: true },
+    );
+
+    return updated;
+  }
+
   async delete(id: string, userId: string) {
     const guarantee = await this.findById(id);
+
+    // Check if guarantee is used in any relations
+    const usageCount = await this.prisma.guarantee.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            pricingRules: true,
+            simulationGuarantees: true,
+            quoteItems: true,
+            conventionReductionRules: true,
+            parentBundlings: true,
+            includedInBundlings: true,
+            availabilityConfigs: true,
+          },
+        },
+      },
+    });
+
+    const totalUsage = usageCount?._count ? 
+      Object.values(usageCount._count).reduce((sum, count) => sum + count, 0) : 0;
+
+    if (totalUsage > 0) {
+      throw new ConflictException(
+        `Cannot delete guarantee. It is used in ${totalUsage} relation(s). Please deactivate it instead.`
+      );
+    }
 
     await this.prisma.guarantee.delete({
       where: { id },

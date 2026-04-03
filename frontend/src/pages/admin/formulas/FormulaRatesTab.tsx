@@ -195,8 +195,8 @@ export const FormulaRatesTab = () => {
                     Prime Fixe (DT)
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     defaultValue={Number(rule.fixedPremium || 0)}
                     onBlur={(e) => handleUpdate(rule.id, 'fixedPremium', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
@@ -253,8 +253,8 @@ export const FormulaRatesTab = () => {
                     Prime Fixe (DT)
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     defaultValue={Number(rule.fixedPremium || 0)}
                     onBlur={(e) => handleUpdate(rule.id, 'fixedPremium', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
@@ -402,8 +402,8 @@ export const FormulaRatesTab = () => {
                         Prime Fixe (DT)
                       </label>
                       <input
-                        type="number"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         defaultValue={Number(rule.fixedPremium || 0)}
                         onBlur={(e) => handleUpdate(rule.id, 'fixedPremium', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"

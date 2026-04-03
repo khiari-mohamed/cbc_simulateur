@@ -56,6 +56,13 @@ export class GuaranteesController {
     return this.guaranteesService.deactivate(id, req.user.id);
   }
 
+  @Patch(':id/reactivate')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMINISTRATEUR_ARS)
+  reactivate(@Param('id') id: string, @Request() req: any) {
+    return this.guaranteesService.reactivate(id, req.user.id);
+  }
+
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMINISTRATEUR_ARS)

@@ -58,6 +58,18 @@ export class QuotesService {
       }
     }
 
+    // Get DC capital for this specific company from dcCapitals object
+    let dcCapitalForCompany = new (require('@prisma/client').Decimal)(0);
+    if ((simulation as any).dcCapitals && typeof (simulation as any).dcCapitals === 'object') {
+      const dcCapitals = (simulation as any).dcCapitals as Record<string, number>;
+      if (dcCapitals[companyId]) {
+        dcCapitalForCompany = new (require('@prisma/client').Decimal)(dcCapitals[companyId]);
+      }
+    } else if (simulation.dcCapital) {
+      // Fallback for old single dcCapital field
+      dcCapitalForCompany = simulation.dcCapital;
+    }
+
     const pricing = await this.pricingEngine.calculatePremium(
       companyId,
       simulation.vehicle,
@@ -68,7 +80,7 @@ export class QuotesService {
         selectedGuarantees: allSelectedGuarantees,
         selectedCapitals: {
           BG: simulation.bgLimit ? new (require('@prisma/client').Decimal)(simulation.bgLimit) : new (require('@prisma/client').Decimal)(0),
-          DOMMAGES_COLLISIONS: simulation.dcCapital || new (require('@prisma/client').Decimal)(0),
+          DOMMAGES_COLLISIONS: dcCapitalForCompany,
           PERSONNES_TRANSPORTEES: new (require('@prisma/client').Decimal)(5000), // Default PTA capital
         },
         franchiseRate: simulation.franchiseRate ? Number(simulation.franchiseRate) : 0,

@@ -1,5 +1,6 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 import { useEffect } from 'react';
 import { Input } from '../ui/Input';
@@ -7,6 +8,7 @@ import { Select } from '../ui/Select';
 import { Car, User } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { VehicleData } from '../../pages/simulations/NewSimulationPage';
+import api from '../../lib/api/client';
 
 const combinedSchema = z.object({
   registration: z.string().optional(),
@@ -16,7 +18,7 @@ const combinedSchema = z.object({
   marketValue: z.coerce.number().min(0, 'Valeur requise'),
   firstCirculationDate: z.string().min(1, 'Date requise'),
   bonusMalus: z.coerce.number().int().min(1, 'Classe minimale 1').max(8, 'Classe maximale 8'),
-  usage: z.string().min(1, 'Usage requis'),
+  usageId: z.string().min(1, 'Usage requis'),
 }).refine(data => data.newValue >= data.marketValue, {
   message: 'La valeur à neuf doit être supérieure ou égale à la valeur vénale',
   path: ['newValue'],
@@ -27,13 +29,31 @@ const combinedSchema = z.object({
 
 interface VehicleInfoStepProps {
   data?: VehicleData;
-  driverData?: { bonusMalus?: number; usage?: string };
-  onUpdate: (data: VehicleData, driverData: { bonusMalus: number; usage: string }) => void;
+  driverData?: { bonusMalus?: number; usageId?: string };
+  onUpdate: (data: VehicleData, driverData: { bonusMalus: number; usageId: string }) => void;
   onNext: () => void;
 }
 
 export const VehicleInfoStep = ({ data, driverData, onUpdate, onNext }: VehicleInfoStepProps) => {
   const { t } = useLanguage();
+  const { data: usageTypes } = useQuery({
+    queryKey: ['public-usage-types-for-simulation'],
+    queryFn: async () => {
+      const { data } = await api.get('/usage-types');
+      return data as Array<{ id: string; code: string; nameFr: string; isActive: boolean }>;
+    },
+  });
+
+  const usageOptions = [
+    { value: '', label: 'Sélectionner un usage' },
+    ...((usageTypes ?? [])
+      .filter((usage) => usage.isActive)
+      .map((usage) => ({
+        value: usage.id,
+        label: usage.nameFr,
+      }))),
+  ];
+
   const { register, handleSubmit, formState: { errors }, watch } = useForm({
     resolver: zodResolver(combinedSchema) as any,
     defaultValues: { ...data, ...driverData },
@@ -43,15 +63,15 @@ export const VehicleInfoStep = ({ data, driverData, onUpdate, onNext }: VehicleI
   const watchedData = watch();
 
   useEffect(() => {
-    const { bonusMalus, usage, ...vehicleData } = watchedData;
-    if (vehicleData.firstCirculationDate && vehicleData.fiscalHorsepower && vehicleData.numberOfSeats && vehicleData.newValue && vehicleData.marketValue && bonusMalus && usage) {
-      onUpdate(vehicleData as VehicleData, { bonusMalus: Number(bonusMalus), usage });
+    const { bonusMalus, usageId, ...vehicleData } = watchedData;
+    if (vehicleData.firstCirculationDate && vehicleData.fiscalHorsepower && vehicleData.numberOfSeats && vehicleData.newValue && vehicleData.marketValue && bonusMalus && usageId) {
+      onUpdate(vehicleData as VehicleData, { bonusMalus: Number(bonusMalus), usageId });
     }
   }, [watchedData.firstCirculationDate]);
 
   const onSubmit = (formData: any) => {
-    const { bonusMalus, usage, ...vehicleData } = formData;
-    onUpdate(vehicleData as VehicleData, { bonusMalus, usage });
+    const { bonusMalus, usageId, ...vehicleData } = formData;
+    onUpdate(vehicleData as VehicleData, { bonusMalus, usageId });
     onNext();
   };
 
@@ -183,13 +203,10 @@ export const VehicleInfoStep = ({ data, driverData, onUpdate, onNext }: VehicleI
 
         <Select
           label="Type d'usage"
-          {...register('usage')}
-          error={errors.usage?.message}
+          {...register('usageId')}
+          error={errors.usageId?.message}
           required
-          options={[
-            { value: '', label: 'Sélectionner un usage' },
-            { value: 'PRIVATE_BUSINESS', label: 'Promenade et Affaires' },
-          ]}
+          options={usageOptions}
         />
       </div>
 

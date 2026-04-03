@@ -7,6 +7,23 @@
     url      = env("DATABASE_URL")
   }
 
+  enum SystemRole {
+    MANDATORY_RC
+    MANDATORY_VOL
+    MANDATORY_INCENDIE
+    MANDATORY_CAS
+    MANDATORY_PERSONNES_TRANSPORTEES
+    MANDATORY_ASSISTANCE
+    OPTIONAL_TOUS_RISQUES
+    OPTIONAL_DOMMAGES_COLLISIONS
+    OPTIONAL_BRIS_GLACES
+    OPTIONAL_CATASTROPHES_NATURELLES
+    OPTIONAL_DOMMAGES_EMEUTES
+    OPTIONAL_INCENDIE_EMEUTES
+    OPTIONAL_DEFENSE_RECOURS
+    OPTIONAL_ASSURANCE_CONDUCTEUR
+  }
+
   enum Role {
     CLIENT_ADHERENT
     ADMINISTRATEUR_ARS
@@ -148,10 +165,10 @@
     id           String   @id @default(uuid())
     name         String   @unique
     code         String   @unique
-    contractFees Decimal? @db.Decimal(15, 0)
-    fpac         Decimal  @default(0.5) @db.Decimal(12, 2)
-    fssr         Decimal  @default(0.3) @db.Decimal(12, 2)
-    fg           Decimal  @default(3.0) @db.Decimal(12, 2)
+    contractFees Decimal? @db.Decimal(15, 3)
+    fpac         Decimal  @default(0.5) @db.Decimal(12, 3)
+    fssr         Decimal  @default(0.3) @db.Decimal(12, 3)
+    fg           Decimal  @default(3.0) @db.Decimal(12, 3)
     isActive     Boolean  @default(true)
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt
@@ -311,6 +328,7 @@
     franchiseRate Int?
     bgLimit       Int?             // BG capital limit chosen by client (from bg_capital_limits table)
     dcCapital     Decimal?         @db.Decimal(15, 0)
+    dcCapitals    Json?            // Per-company DC capitals: { companyId: capital }
     status        SimulationStatus @default(DRAFT)
     createdAt     DateTime         @default(now())
     updatedAt     DateTime         @updatedAt
@@ -346,13 +364,13 @@
     companyId         String
     company           Company          @relation(fields: [companyId], references: [id])
     status            QuoteStatus      @default(GENERATED)
-    primeNette        Decimal          @db.Decimal(15, 0)
-    frais             Decimal          @db.Decimal(15, 0)
-    taxes             Decimal          @db.Decimal(15, 0)
-    fpac              Decimal          @db.Decimal(15, 0)
-    fssr              Decimal          @db.Decimal(15, 0)
-    fg                Decimal          @db.Decimal(15, 0)
-    totalAPayer       Decimal          @db.Decimal(15, 0)
+    primeNette        Decimal          @db.Decimal(15, 3)
+    frais             Decimal          @db.Decimal(15, 3)
+    taxes             Decimal          @db.Decimal(15, 3)
+    fpac              Decimal          @db.Decimal(15, 3)
+    fssr              Decimal          @db.Decimal(15, 3)
+    fg                Decimal          @db.Decimal(15, 3)
+    totalAPayer       Decimal          @db.Decimal(15, 3)
     pricingSnapshot   Json?
     pdfPath           String?
     validatedById     String?
@@ -380,8 +398,8 @@
     quote       Quote     @relation(fields: [quoteId], references: [id], onDelete: Cascade)
     guaranteeId String
     guarantee   Guarantee @relation(fields: [guaranteeId], references: [id])
-    capital     Decimal   @db.Decimal(15, 0)
-    prime       Decimal   @db.Decimal(15, 0)
+    capital     Decimal   @db.Decimal(15, 3)
+    prime       Decimal   @db.Decimal(15, 3)
 
     @@map("quote_items")
   }
@@ -409,15 +427,16 @@
   }
 
   model Guarantee {
-    id         String   @id @default(uuid())
-    code       String   @unique
+    id         String      @id @default(uuid())
+    code       String      @unique
     nameFr     String
     nameAr     String?
     nameEn     String?
-    isOptional Boolean  @default(false)
-    isActive   Boolean  @default(true)
-    createdAt  DateTime @default(now())
-    updatedAt  DateTime @updatedAt
+    systemRole SystemRole? @unique
+    isOptional Boolean     @default(false)
+    isActive   Boolean     @default(true)
+    createdAt  DateTime    @default(now())
+    updatedAt  DateTime    @updatedAt
 
     pricingRules             PricingRule[]
     simulationGuarantees     SimulationGuarantee[]
@@ -478,7 +497,7 @@
     franchiseRate   Int?
     ratePercentage  Decimal?     @db.Decimal(12, 6)
     baseRate        Decimal?     @db.Decimal(12, 4)
-    fixedPremium    Decimal?     @db.Decimal(15, 0)
+    fixedPremium    Decimal?     @db.Decimal(15, 6)
     multiplier      Decimal?     @db.Decimal(12, 4)
     reductionRate   Decimal?     @db.Decimal(5, 2)
     tierLevel       Int?
@@ -724,10 +743,10 @@
     usageId      String
     companyId    String
 
-    contractFees Decimal  @db.Decimal(15, 0)
-    fpac         Decimal  @db.Decimal(12, 2)
-    fssr         Decimal  @db.Decimal(12, 2)
-    fg           Decimal  @db.Decimal(12, 2)
+    contractFees Decimal  @db.Decimal(15, 3)
+    fpac         Decimal  @db.Decimal(12, 3)
+    fssr         Decimal  @db.Decimal(12, 3)
+    fg           Decimal  @db.Decimal(12, 3)
 
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt

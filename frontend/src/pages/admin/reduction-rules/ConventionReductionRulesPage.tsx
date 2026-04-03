@@ -1452,7 +1452,7 @@ export const ConventionReductionRulesPage = () => {
                   required
                 >
                   <option value="">Sélectionner une garantie</option>
-                  {guarantees?.filter((g: any) => ['TOUS_RISQUES_ZERO', 'DOMMAGES_COLLISIONS', 'VOL', 'INCENDIE', 'BG'].includes(g.code)).map((g: any) => (
+                  {guarantees?.map((g: any) => (
                     <option key={g.id} value={g.id}>{g.nameFr}</option>
                   ))}
                 </select>

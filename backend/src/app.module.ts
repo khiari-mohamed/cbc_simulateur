@@ -29,6 +29,7 @@ import { SeedModule } from './seed/seed.module';
 import { FranchiseValuesModule } from './franchise-values/franchise-values.module';
 import { BgCapitalLimitsModule } from './bg-capital-limits/bg-capital-limits.module';
 import { GuaranteeAvailabilityModule } from './guarantee-availability/guarantee-availability.module';
+import { DcCapitalTiersModule } from './dc-capital-tiers/dc-capital-tiers.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { GuaranteeAvailabilityModule } from './guarantee-availability/guarantee-
     FranchiseValuesModule,
     BgCapitalLimitsModule,
     GuaranteeAvailabilityModule,
+    DcCapitalTiersModule,
   ],
 })
 export class AppModule {}

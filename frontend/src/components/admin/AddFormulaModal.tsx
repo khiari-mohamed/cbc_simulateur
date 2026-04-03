@@ -17,7 +17,20 @@ export const AddFormulaModal = ({ isOpen, onClose, onSubmit, type }: AddFormulaM
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    const submitData = { ...formData };
+    if (submitData.fixedPremium) {
+      submitData.fixedPremium = parseFloat(submitData.fixedPremium);
+    }
+    if (submitData.ratePercentage) {
+      submitData.ratePercentage = parseFloat(submitData.ratePercentage);
+    }
+    if (submitData.reductionRate) {
+      submitData.reductionRate = parseFloat(submitData.reductionRate);
+    }
+    if (submitData.minCapital) {
+      submitData.minCapital = parseFloat(submitData.minCapital);
+    }
+    onSubmit(submitData);
     setFormData({});
     onClose();
   };
@@ -33,15 +46,18 @@ export const AddFormulaModal = ({ isOpen, onClose, onSubmit, type }: AddFormulaM
               type="number"
               step="0.00001"
               value={formData.ratePercentage || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, ratePercentage: parseFloat(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, ratePercentage: e.target.value })}
               required
             />
             <Input
               label="Prime Fixe (DT)"
-              type="number"
-              step="0.01"
+              type="text"
+              inputMode="decimal"
               value={formData.fixedPremium || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, fixedPremium: parseFloat(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                const value = e.target.value.replace(',', '.');
+                setFormData({ ...formData, fixedPremium: value });
+              }}
               required
             />
             <Input
@@ -49,7 +65,7 @@ export const AddFormulaModal = ({ isOpen, onClose, onSubmit, type }: AddFormulaM
               type="number"
               step="0.01"
               value={formData.reductionRate || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, reductionRate: parseFloat(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, reductionRate: e.target.value })}
             />
           </>
         );
@@ -61,7 +77,7 @@ export const AddFormulaModal = ({ isOpen, onClose, onSubmit, type }: AddFormulaM
               type="number"
               step="0.001"
               value={formData.ratePercentage || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, ratePercentage: parseFloat(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, ratePercentage: e.target.value })}
               required
             />
             <Input
@@ -69,7 +85,7 @@ export const AddFormulaModal = ({ isOpen, onClose, onSubmit, type }: AddFormulaM
               type="number"
               step="0.01"
               value={formData.reductionRate || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, reductionRate: parseFloat(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, reductionRate: e.target.value })}
             />
           </>
         );
@@ -98,15 +114,18 @@ export const AddFormulaModal = ({ isOpen, onClose, onSubmit, type }: AddFormulaM
               type="number"
               step="0.0001"
               value={formData.ratePercentage || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, ratePercentage: parseFloat(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, ratePercentage: e.target.value })}
               required
             />
             <Input
               label="Prime Fixe (DT)"
-              type="number"
-              step="0.01"
+              type="text"
+              inputMode="decimal"
               value={formData.fixedPremium || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, fixedPremium: parseFloat(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                const value = e.target.value.replace(',', '.');
+                setFormData({ ...formData, fixedPremium: value });
+              }}
               required
             />
             <Input
@@ -114,7 +133,7 @@ export const AddFormulaModal = ({ isOpen, onClose, onSubmit, type }: AddFormulaM
               type="number"
               step="0.01"
               value={formData.reductionRate || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, reductionRate: parseFloat(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, reductionRate: e.target.value })}
             />
           </>
         );
@@ -125,15 +144,18 @@ export const AddFormulaModal = ({ isOpen, onClose, onSubmit, type }: AddFormulaM
               label="Capital (DT)"
               type="number"
               value={formData.minCapital || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, minCapital: parseFloat(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, minCapital: e.target.value })}
               required
             />
             <Input
               label="Prime (DT)"
-              type="number"
-              step="0.01"
+              type="text"
+              inputMode="decimal"
               value={formData.fixedPremium || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, fixedPremium: parseFloat(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                const value = e.target.value.replace(',', '.');
+                setFormData({ ...formData, fixedPremium: value });
+              }}
               required
             />
           </>
@@ -142,10 +164,13 @@ export const AddFormulaModal = ({ isOpen, onClose, onSubmit, type }: AddFormulaM
         return (
           <Input
             label="Prime Fixe (DT)"
-            type="number"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
             value={formData.fixedPremium || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, fixedPremium: parseFloat(e.target.value) })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              const value = e.target.value.replace(',', '.');
+              setFormData({ ...formData, fixedPremium: value });
+            }}
             required
           />
         );

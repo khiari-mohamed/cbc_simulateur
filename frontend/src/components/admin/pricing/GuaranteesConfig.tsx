@@ -475,7 +475,7 @@ export const GuaranteesConfig = () => {
                                       <div>
                                         <span className="text-gray-500 dark:text-gray-400">Prime fixe:</span>
                                         <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                                          {Number(rule.fixedPremium).toFixed(2)} DT
+                                          {Number(rule.fixedPremium)} DT
                                         </span>
                                       </div>
                                     )}

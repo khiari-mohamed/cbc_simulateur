@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Mail, Phone, Calendar, Shield, CheckCircle, XCircle, UserPlus, Trash2 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
+import { ConfirmationModal } from '../../../components/ui/ConfirmationModal';
 import api from '../../../lib/api/client';
 import { Role } from '../../../types';
 import toast from 'react-hot-toast';
@@ -11,6 +12,15 @@ export const UsersManagementPage = () => {
   const queryClient = useQueryClient();
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [showConventionModal, setShowConventionModal] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'deactivate' | 'reactivate' | 'delete' | null;
+    user: any;
+  }>({ isOpen: false, type: null, user: null });
+  const [errorModal, setErrorModal] = useState<{
+    isOpen: boolean;
+    message: string;
+  }>({ isOpen: false, message: '' });
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
@@ -38,14 +48,55 @@ export const UsersManagementPage = () => {
     onError: () => toast.error('Erreur'),
   });
 
-  const toggleActiveMutation = useMutation({
-    mutationFn: ({ userId, activate }: { userId: string; activate: boolean }) =>
-      activate ? api.patch(`/users/${userId}/activate`) : api.patch(`/users/${userId}/deactivate`),
+  const deactivateMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await api.patch(`/users/${userId}/deactivate`);
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('Statut mis à jour');
+      toast.success('Utilisateur désactivé avec succès');
+      setConfirmModal({ isOpen: false, type: null, user: null });
     },
-    onError: () => toast.error('Erreur'),
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Erreur lors de la désactivation';
+      toast.error(message);
+      setConfirmModal({ isOpen: false, type: null, user: null });
+    },
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await api.patch(`/users/${userId}/reactivate`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('Utilisateur réactivé avec succès');
+      setConfirmModal({ isOpen: false, type: null, user: null });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Erreur lors de la réactivation';
+      toast.error(message);
+      setConfirmModal({ isOpen: false, type: null, user: null });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await api.delete(`/users/${userId}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('Utilisateur supprimé définitivement');
+      setConfirmModal({ isOpen: false, type: null, user: null });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Erreur lors de la suppression';
+      setConfirmModal({ isOpen: false, type: null, user: null });
+      setErrorModal({ isOpen: true, message });
+    },
   });
 
   const assignConventionMutation = useMutation({
@@ -69,18 +120,54 @@ export const UsersManagementPage = () => {
     onError: () => toast.error('Erreur'),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (userId: string) => api.delete(`/users/${userId}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('Utilisateur supprimé avec succès');
-    },
-    onError: () => toast.error('Erreur lors de la suppression'),
-  });
+  const handleConfirmAction = () => {
+    if (!confirmModal.user) return;
 
-  const handleDelete = (userId: string, userName: string) => {
-    if (confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur ${userName} ?`)) {
-      deleteMutation.mutate(userId);
+    switch (confirmModal.type) {
+      case 'deactivate':
+        deactivateMutation.mutate(confirmModal.user.id);
+        break;
+      case 'reactivate':
+        reactivateMutation.mutate(confirmModal.user.id);
+        break;
+      case 'delete':
+        deleteMutation.mutate(confirmModal.user.id);
+        break;
+    }
+  };
+
+  const getConfirmModalConfig = () => {
+    const userName = confirmModal.user ? `${confirmModal.user.firstName} ${confirmModal.user.lastName}` : '';
+    
+    switch (confirmModal.type) {
+      case 'deactivate':
+        return {
+          title: 'Désactiver l\'utilisateur',
+          message: `Êtes-vous sûr de vouloir désactiver l'utilisateur "${userName}" ?\n\nL'utilisateur ne pourra plus se connecter.`,
+          confirmText: 'Désactiver',
+          variant: 'warning' as const,
+        };
+      case 'reactivate':
+        return {
+          title: 'Réactiver l\'utilisateur',
+          message: `Êtes-vous sûr de vouloir réactiver l'utilisateur "${userName}" ?\n\nL'utilisateur pourra à nouveau se connecter.`,
+          confirmText: 'Réactiver',
+          variant: 'info' as const,
+        };
+      case 'delete':
+        return {
+          title: 'Supprimer définitivement',
+          message: `ATTENTION: Voulez-vous vraiment supprimer définitivement l'utilisateur "${userName}" ?\n\nCette action est IRRÉVERSIBLE.\n\nNote: La suppression échouera si l'utilisateur possède des données associées (devis, simulations, contrats). Dans ce cas, utilisez le bouton "Désactiver" à la place.`,
+          confirmText: 'Supprimer définitivement',
+          variant: 'danger' as const,
+        };
+      default:
+        return {
+          title: '',
+          message: '',
+          confirmText: 'Confirmer',
+          variant: 'warning' as const,
+        };
     }
   };
 
@@ -128,7 +215,7 @@ export const UsersManagementPage = () => {
                     </span>
                   </div>
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                         {user.firstName} {user.lastName}
                       </h3>
@@ -151,6 +238,13 @@ export const UsersManagementPage = () => {
                       >
                         {user.otpEnabled ? '2FA ON' : '2FA OFF'}
                       </span>
+                      {user.organization?.conventions && user.organization.conventions.length > 0 && (
+                        user.organization.conventions.map((conv: any) => (
+                          <span key={conv.id} className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
+                            {conv.name}
+                          </span>
+                        ))
+                      )}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-gray-600 dark:text-gray-400 mb-3">
                       <div className="flex items-center gap-2">
@@ -210,19 +304,27 @@ export const UsersManagementPage = () => {
                         <Shield className="w-3 h-3 mr-1" />
                         {user.otpEnabled ? 'Désactiver 2FA' : 'Activer 2FA'}
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          toggleActiveMutation.mutate({
-                            userId: user.id,
-                            activate: !user.isActive,
-                          })
-                        }
-                      >
-                        {user.isActive ? <XCircle className="w-3 h-3 mr-1" /> : <CheckCircle className="w-3 h-3 mr-1" />}
-                        {user.isActive ? 'Désactiver' : 'Activer'}
-                      </Button>
+                      {user.isActive ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-orange-600 hover:text-orange-700 hover:border-orange-600"
+                          onClick={() => setConfirmModal({ isOpen: true, type: 'deactivate', user })}
+                        >
+                          <XCircle className="w-3 h-3 mr-1" />
+                          Désactiver
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-green-600 hover:text-green-700 hover:border-green-600"
+                          onClick={() => setConfirmModal({ isOpen: true, type: 'reactivate', user })}
+                        >
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Réactiver
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
@@ -237,7 +339,7 @@ export const UsersManagementPage = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleDelete(user.id, `${user.firstName} ${user.lastName}`)}
+                        onClick={() => setConfirmModal({ isOpen: true, type: 'delete', user })}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
                       >
                         <Trash2 className="w-3 h-3 mr-1" />
@@ -294,6 +396,27 @@ export const UsersManagementPage = () => {
             </div>
           </div>
         )}
+
+        {/* Confirmation Modal */}
+        <ConfirmationModal
+          isOpen={confirmModal.isOpen}
+          onClose={() => setConfirmModal({ isOpen: false, type: null, user: null })}
+          onConfirm={handleConfirmAction}
+          isLoading={deactivateMutation.isPending || reactivateMutation.isPending || deleteMutation.isPending}
+          {...getConfirmModalConfig()}
+        />
+
+        {/* Error Modal */}
+        <ConfirmationModal
+          isOpen={errorModal.isOpen}
+          onClose={() => setErrorModal({ isOpen: false, message: '' })}
+          onConfirm={() => setErrorModal({ isOpen: false, message: '' })}
+          title="Suppression impossible"
+          message={errorModal.message}
+          confirmText="Compris"
+          variant="danger"
+          isLoading={false}
+        />
       </div>
   );
 };

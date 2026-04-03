@@ -33,7 +33,21 @@ export const GuaranteeRuleModal = ({
     formulaType: rule?.formulaType || '',
     minMarketValue: rule?.minMarketValue?.toString() || '',
     maxMarketValue: rule?.maxMarketValue?.toString() || '',
-    referenceValue: rule?.referenceValue || '',
+    referenceValue: rule?.referenceValue || (() => {
+      // Auto-set default reference value for mandatory guarantees when editing old rules
+      const code = guarantee.code;
+      if (['VOL', 'INCENDIE', 'TOUS_RISQUES_ZERO', 'TOUS_RISQUES', 'DOMMAGES_COLLISIONS'].includes(code)) {
+        const vvMapping: Record<string, 'MARKET_VALUE' | 'NEW_VALUE'> = {
+          'VOL': 'MARKET_VALUE',
+          'INCENDIE': 'MARKET_VALUE',
+          'DOMMAGES_COLLISIONS': 'MARKET_VALUE',
+          'TOUS_RISQUES_ZERO': 'NEW_VALUE',
+          'TOUS_RISQUES': 'NEW_VALUE',
+        };
+        return vvMapping[code] || 'MARKET_VALUE';
+      }
+      return '';
+    })(),
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -212,7 +226,7 @@ export const GuaranteeRuleModal = ({
 
     // Validate fixedPremium (>= 0)
     if (formData.fixedPremium !== '' && showField('fixedPremium')) {
-      const premium = parseFloat(formData.fixedPremium as string);
+      const premium = parseFloat(formData.fixedPremium.toString().replace(',', '.'));
       if (isNaN(premium)) {
         newErrors.fixedPremium = 'Valeur invalide';
       } else if (premium < 0) {
@@ -276,8 +290,9 @@ export const GuaranteeRuleModal = ({
     Object.entries(formData).forEach(([key, value]) => {
       if (value !== '') {
         if (['franchiseRate', 'ratePercentage', 'fixedPremium', 'minCapital', 'maxCapital', 'reductionRate', 'minMarketValue', 'maxMarketValue'].includes(key)) {
-          // Use parseFloat to preserve precision (e.g., 21.75)
-          cleanData[key] = parseFloat(value as string);
+          // Replace comma with dot and use parseFloat to preserve precision (e.g., 21.75)
+          const stringValue = value.toString().replace(',', '.');
+          cleanData[key] = parseFloat(stringValue);
         } else {
           cleanData[key] = value;
         }
@@ -658,24 +673,29 @@ export const GuaranteeRuleModal = ({
                   Prime fixe (DT)
                 </label>
                 <input
-                  type="number"
-                  step="0.001"
+                  type="text"
+                  inputMode="decimal"
                   value={formData.fixedPremium}
                   onChange={(e) => {
-                    setFormData({ ...formData, fixedPremium: e.target.value });
-                    setErrors({ ...errors, fixedPremium: '' });
+                    // Allow numbers with comma or dot as decimal separator
+                    const value = e.target.value.replace(',', '.');
+                    // Only allow valid number format: digits, optional dot, and up to 3 decimal places
+                    if (value === '' || /^\d*\.?\d{0,3}$/.test(value)) {
+                      setFormData({ ...formData, fixedPremium: value });
+                      setErrors({ ...errors, fixedPremium: '' });
+                    }
                   }}
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
                     errors.fixedPremium ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
                   }`}
-                  placeholder="30"
+                  placeholder="30 ou 21.75"
                 />
                 {errors.fixedPremium && (
                   <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.fixedPremium}</p>
                 )}
                 {(guarantee.code === 'TOUS_RISQUES_ZERO' || guarantee.code === 'TOUS_RISQUES') && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Exemples: 22 DT (0%), 21.75 DT (1%), 19 DT (2%), 15 DT (4%)
+                    Exemples: 22 (0%), 21.75 (1%), 19 (2%), 15 (4%)
                   </p>
                 )}
               </div>

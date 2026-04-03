@@ -25,6 +25,7 @@ export class SimulationsService {
     franchiseRate?: number;
     bgLimit?: number;
     dcCapital?: number;
+    dcCapitals?: Record<string, number>;
     fractionnement?: 'ANNUEL' | 'SEMESTRIEL';
   }) {
     const vehicle = await this.vehiclesService.create(data.vehicle);
@@ -49,6 +50,7 @@ export class SimulationsService {
         franchiseRate: data.franchiseRate ?? null,
         bgLimit: data.bgLimit,
         dcCapital: data.dcCapital ? new Decimal(data.dcCapital) : null,
+        dcCapitals: data.dcCapitals ? data.dcCapitals : undefined,
       },
       include: { vehicle: true },
     });
@@ -118,6 +120,7 @@ export class SimulationsService {
     franchiseRate?: number;
     bgLimit?: number;
     dcCapital?: number;
+    dcCapitals?: Record<string, number>;
     fractionnement?: 'ANNUEL' | 'SEMESTRIEL';
   }) {
     const simulation = await this.findById(id);
@@ -149,6 +152,7 @@ export class SimulationsService {
     if (data.franchiseRate !== undefined) updateData.franchiseRate = data.franchiseRate ?? null;
     if (data.bgLimit !== undefined) updateData.bgLimit = data.bgLimit;
     if (data.dcCapital !== undefined) updateData.dcCapital = data.dcCapital ? new Decimal(data.dcCapital) : null;
+    if (data.dcCapitals !== undefined) updateData.dcCapitals = data.dcCapitals ? data.dcCapitals : undefined;
 
     const updated = await this.prisma.simulation.update({
       where: { id },

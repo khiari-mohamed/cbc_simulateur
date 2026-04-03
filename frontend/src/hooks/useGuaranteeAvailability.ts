@@ -11,9 +11,10 @@ export const useGuaranteeAvailability = (
   companyId: string | undefined,
   guaranteeCodes: string[],
   formulaType: FormulaType | undefined,
+  franchiseRate?: number,
 ) => {
   return useQuery<Record<string, AvailabilityResult>>({
-    queryKey: ['guarantee-availability-bulk', companyId, guaranteeCodes, formulaType],
+    queryKey: ['guarantee-availability-bulk', companyId, guaranteeCodes, formulaType, franchiseRate],
     queryFn: async () => {
       if (!companyId || !formulaType || guaranteeCodes.length === 0) {
         // Return default: all available, not free
@@ -27,6 +28,7 @@ export const useGuaranteeAvailability = (
         companyId,
         guaranteeCodes,
         formulaType,
+        franchiseRate,
       });
       return data;
     },

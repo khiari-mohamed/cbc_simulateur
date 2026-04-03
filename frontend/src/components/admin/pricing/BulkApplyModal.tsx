@@ -280,7 +280,7 @@ export const BulkApplyModal = ({
                                         <span>Taux: {Number(rule.ratePercentage).toFixed(4)}</span>
                                       )}
                                       {rule.fixedPremium && (
-                                        <span>Prime fixe: {Number(rule.fixedPremium).toFixed(2)} DT</span>
+                                        <span>Prime fixe: {Number(rule.fixedPremium)} DT</span>
                                       )}
                                     </div>
                                   </div>

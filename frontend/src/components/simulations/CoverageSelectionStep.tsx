@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Shield, } from 'lucide-react';
+import { Shield, CheckCircle } from 'lucide-react';
 import { Select } from '../ui/Select';
 import api from '../../lib/api/client';
 import { FormulaType, FractionnementType, type Guarantee } from '../../types';
 import { useGuaranteeAvailability } from '../../hooks/useGuaranteeAvailability';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface CoverageSelectionStepProps {
   vehicleAge: number;
@@ -13,16 +14,18 @@ interface CoverageSelectionStepProps {
   conventionId?: string;
   franchiseRate?: number;
   bgLimit?: number;
-  dcCapital?: number;
+  dcCapitals?: Record<string, number>;
   fractionnement?: FractionnementType;
   firstCirculationDate: Date;
+  usageId?: string;
+  companyIds?: string[];
   onUpdate: (data: { 
     formulaType: FormulaType; 
     selectedGuarantees: string[]; 
     conventionId?: string;
     franchiseRate?: number;
     bgLimit?: number;
-    dcCapital?: number;
+    dcCapitals?: Record<string, number>;
     fractionnement?: FractionnementType;
     companyIds?: string[];
   }) => void;
@@ -36,36 +39,90 @@ export const CoverageSelectionStep = ({
   conventionId,
   franchiseRate,
   bgLimit,
-  dcCapital,
+  dcCapitals,
   fractionnement,
   firstCirculationDate,
+  usageId,
+  companyIds,
   onUpdate,
   onNext,
+  onBack,
 }: CoverageSelectionStepProps) => {
+  const { user, refreshUser } = useAuth();
   const [localFormula, setLocalFormula] = useState<FormulaType | ''>(formulaType || '');
   const [localGuarantees, setLocalGuarantees] = useState<string[]>(selectedGuarantees);
   const [localConvention, setLocalConvention] = useState<string>(conventionId || '');
   const [localFranchiseRate, setLocalFranchiseRate] = useState<number>(franchiseRate || 0);
   const [localBgLimit, setLocalBgLimit] = useState<number>(bgLimit || 1000);
-  const [localDcCapital, setLocalDcCapital] = useState<number>(dcCapital || 1000);
+  const [localDcCapitals, setLocalDcCapitals] = useState<Record<string, number>>(dcCapitals || {});
   const [localFractionnement, setLocalFractionnement] = useState<FractionnementType>(fractionnement || FractionnementType.ANNUEL);
-  const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
-  const [showFormulaModal, setShowFormulaModal] = useState(false);
-  const [pendingFormula, setPendingFormula] = useState<FormulaType | null>(null);
+  const [selectedCompanies, setSelectedCompanies] = useState<string[]>(companyIds || []);
+  const [showDcModal, setShowDcModal] = useState(false);
+  const [dcModalCompanyId, setDcModalCompanyId] = useState<string | null>(null);
+  const [tempDcCapital, setTempDcCapital] = useState<number>(1000);
+
+  // Refresh user data on mount to get latest conventions
+  useEffect(() => {
+    refreshUser();
+  }, []);
+
+  // Sync selectedCompanies with companyIds prop
+  useEffect(() => {
+    if (companyIds && companyIds.length > 0) {
+      setSelectedCompanies(companyIds);
+    }
+  }, [companyIds]);
+
+  useEffect(() => {
+    setLocalFormula(formulaType || '');
+    setLocalGuarantees(selectedGuarantees);
+    setLocalConvention(conventionId || '');
+    setLocalFranchiseRate(franchiseRate || 0);
+    setLocalBgLimit(bgLimit || 1000);
+    setLocalDcCapitals(dcCapitals || {});
+    setLocalFractionnement(fractionnement || FractionnementType.ANNUEL);
+  }, [formulaType, selectedGuarantees, conventionId, franchiseRate, bgLimit, dcCapitals, fractionnement]);
+
+  // Get user's organization conventions (primary conventions owned by the organization)
+  const userOrgConventions = user?.organization?.conventions?.filter(c => c.status === 'ACTIVE') || [];
+  
+  // Debug logging
+  console.log('🔍 Convention Debug - FULL DATA:', {
+    userExists: !!user,
+    userEmail: user?.email,
+    hasOrganization: !!user?.organization,
+    organizationId: user?.organization?.id,
+    organizationName: user?.organization?.name,
+    organizationCode: user?.organization?.code,
+    allConventions: user?.organization?.conventions,
+    activeConventions: userOrgConventions,
+    conventionsCount: userOrgConventions.length,
+  });
+  
+  // Auto-select organization's first convention if user has exactly 1 convention and no convention is selected yet
+  useEffect(() => {
+    if (userOrgConventions.length === 1 && !localConvention) {
+      const primaryConvention = userOrgConventions[0];
+      setLocalConvention(primaryConvention.id);
+      if (localFormula) {
+        onUpdate({
+          formulaType: localFormula as FormulaType,
+          selectedGuarantees: localGuarantees,
+          conventionId: primaryConvention.id,
+          franchiseRate: localFranchiseRate,
+          bgLimit: localBgLimit,
+          dcCapitals: localDcCapitals,
+          fractionnement: localFractionnement,
+        });
+      }
+    }
+  }, [userOrgConventions, localConvention, localFormula]);
 
   const { data: guarantees } = useQuery({
     queryKey: ['guarantees'],
     queryFn: async () => {
       const { data } = await api.get('/guarantees');
       return data as Guarantee[];
-    },
-  });
-
-  const { data: conventions } = useQuery({
-    queryKey: ['conventions', 'my'],
-    queryFn: async () => {
-      const { data } = await api.get('/conventions/my');
-      return data;
     },
   });
 
@@ -89,6 +146,7 @@ export const CoverageSelectionStep = ({
     firstSelectedCompanyId,
     allOptionalCodes,
     localFormula as FormulaType | undefined,
+    localFranchiseRate,
   );
 
   // Fetch BG capital limits from API (admin-configurable)
@@ -97,6 +155,23 @@ export const CoverageSelectionStep = ({
     queryFn: async () => {
       const { data } = await api.get('/bg-capital-limits');
       return data as Array<{ id: string; value: number; label: string; isActive: boolean }>;
+    },
+  });
+
+  // Fetch DC capital tiers from API (admin-configurable)
+  const { data: dcCapitalTiers } = useQuery({
+    queryKey: ['dc-capital-tiers'],
+    queryFn: async () => {
+      const { data } = await api.get('/dc-capital-tiers');
+      return data as Array<{ 
+        id: string; 
+        minAmount: number; 
+        maxAmount: number | null; 
+        step: number; 
+        isActive: boolean;
+        company: { id: string; name: string; code: string };
+        usage: { id: string; code: string; nameFr: string };
+      }>;
     },
   });
 
@@ -115,24 +190,39 @@ export const CoverageSelectionStep = ({
   const canSelectTousRisques = vehicleAge < 2;
   const canSelectDommagesCollision = vehicleAge < 10;
 
-  useEffect(() => {
-    if (localFormula === FormulaType.TOUS_RISQUES_0) {
-      const brisDeGlacesGuarantee = optionalGuarantees.find(g => g.code === 'BG');
-      if (brisDeGlacesGuarantee && !localGuarantees.includes(brisDeGlacesGuarantee.id)) {
-        setLocalGuarantees([...localGuarantees, brisDeGlacesGuarantee.id]);
-      }
-    }
-  }, [localFormula, optionalGuarantees, localGuarantees]);
-
   const handleFormulaChange = (formula: string) => {
-    // If selecting DC or TR, show modal first
-    if (formula === FormulaType.DOMMAGES_COLLISIONS || formula === FormulaType.TOUS_RISQUES_0) {
-      setPendingFormula(formula as FormulaType);
-      setShowFormulaModal(true);
+    // DC formula - just mark selected, modal opens on company selection
+    if (formula === FormulaType.DOMMAGES_COLLISIONS) {
+      setLocalFormula(formula as FormulaType);
+      onUpdate({
+        formulaType: formula as FormulaType,
+        selectedGuarantees: localGuarantees,
+        conventionId: localConvention || undefined,
+        franchiseRate: localFranchiseRate,
+        bgLimit: localBgLimit,
+        dcCapitals: localDcCapitals,
+        fractionnement: localFractionnement,
+      });
       return;
     }
 
-    // Standard formula - apply directly
+    // TR formula
+    if (formula === FormulaType.TOUS_RISQUES_0) {
+      setLocalFormula(formula as FormulaType);
+      setLocalFranchiseRate(0);
+      onUpdate({
+        formulaType: formula as FormulaType,
+        selectedGuarantees: localGuarantees,
+        conventionId: localConvention || undefined,
+        franchiseRate: 0,
+        bgLimit: localBgLimit,
+        dcCapitals: localDcCapitals,
+        fractionnement: localFractionnement,
+      });
+      return;
+    }
+
+    // Standard formula
     setLocalFormula(formula as FormulaType);
     
     let updatedGuarantees = localGuarantees;
@@ -150,38 +240,30 @@ export const CoverageSelectionStep = ({
       conventionId: localConvention || undefined,
       franchiseRate: localFranchiseRate,
       bgLimit: localBgLimit,
-      dcCapital: localDcCapital,
+      dcCapitals: localDcCapitals,
       fractionnement: localFractionnement,
     });
   };
 
-  const confirmFormulaSelection = () => {
-    if (!pendingFormula) return;
+  const confirmDcCapital = () => {
+    if (!dcModalCompanyId) return;
 
-    setLocalFormula(pendingFormula);
-    
-    let updatedGuarantees = localGuarantees;
-    if (pendingFormula === FormulaType.TOUS_RISQUES_0) {
-      const brisDeGlacesGuarantee = optionalGuarantees.find(g => g.code === 'BG');
-      if (brisDeGlacesGuarantee && !localGuarantees.includes(brisDeGlacesGuarantee.id)) {
-        updatedGuarantees = [...localGuarantees, brisDeGlacesGuarantee.id];
-        setLocalGuarantees(updatedGuarantees);
-      }
-      setLocalBgLimit(1000);
-    }
+    const updated = { ...localDcCapitals, [dcModalCompanyId]: tempDcCapital };
+    setLocalDcCapitals(updated);
     
     onUpdate({
-      formulaType: pendingFormula,
-      selectedGuarantees: updatedGuarantees,
+      formulaType: localFormula as FormulaType,
+      selectedGuarantees: localGuarantees,
       conventionId: localConvention || undefined,
       franchiseRate: localFranchiseRate,
       bgLimit: localBgLimit,
-      dcCapital: localDcCapital,
+      dcCapitals: updated,
       fractionnement: localFractionnement,
+      companyIds: selectedCompanies,
     });
 
-    setShowFormulaModal(false);
-    setPendingFormula(null);
+    setShowDcModal(false);
+    setDcModalCompanyId(null);
   };
 
   const handleGuaranteeToggle = (guaranteeId: string) => {
@@ -198,7 +280,7 @@ export const CoverageSelectionStep = ({
         conventionId: localConvention || undefined,
         franchiseRate: localFranchiseRate,
         bgLimit: localBgLimit,
-        dcCapital: localDcCapital,
+        dcCapitals: localDcCapitals,
         fractionnement: localFractionnement,
       });
     }
@@ -213,13 +295,17 @@ export const CoverageSelectionStep = ({
         conventionId: localConvention || undefined,
         franchiseRate: localFranchiseRate,
         bgLimit: localBgLimit,
-        dcCapital: localDcCapital,
+        dcCapitals: localDcCapitals,
         fractionnement: localFractionnement,
         companyIds: selectedCompanies,
       });
       onNext();
     }
   };
+
+  // Validation: Check if all selected companies have DC capitals when DC formula is selected
+  const allDcCapitalsSet = localFormula !== FormulaType.DOMMAGES_COLLISIONS ||
+    selectedCompanies.every(cid => localDcCapitals[cid] !== undefined && localDcCapitals[cid] > 0);
 
   // Helper: Check if guarantee is available (uses new system with fallback)
   const isGuaranteeAvailable = (code: string): boolean => {
@@ -232,20 +318,49 @@ export const CoverageSelectionStep = ({
   // Helper: Check if guarantee is free (uses new system with fallback)
   const isGuaranteeFree = (code: string): boolean => {
     if (!availabilityMap) {
-      // Fallback to old hardcoded logic
-      if (code === 'BG' && localFormula === FormulaType.TOUS_RISQUES_0) return true;
       return false;
     }
     const availability = availabilityMap[code];
     if (!availability) {
-      // Fallback to old hardcoded logic
-      if (code === 'BG' && localFormula === FormulaType.TOUS_RISQUES_0) return true;
       return false;
     }
     return availability.isFree;
   };
 
   const isBrisDeGlacesFree = isGuaranteeFree('BG');
+
+  // Helper: Generate DC capital options from tier with performance safeguard
+  const MAX_OPTIONS_PER_TIER = 200;
+  
+  const generateOptionsFromTier = (tier: any) => {
+    const options: Array<{ value: number; label: string }> = [];
+    const min = Number(tier.minAmount);
+    const max = tier.maxAmount ? Number(tier.maxAmount) : null;
+    const step = Number(tier.step);
+
+    if (max && step > 0) {
+      // Calculate number of options
+      const numberOfOptions = Math.floor((max - min) / step) + 1;
+      
+      if (numberOfOptions > MAX_OPTIONS_PER_TIER) {
+        console.warn(
+          `Tier [${tier.company?.name} / ${tier.usage?.nameFr}] has ${numberOfOptions} options (min=${min}, max=${max}, step=${step}). ` +
+          `Skipping to avoid performance issues. Please adjust the step or range in admin panel.`
+        );
+        return options; // empty array → tier is ignored
+      }
+
+      for (let value = min; value <= max; value += step) {
+        const label = `${value.toLocaleString('fr-FR')} DT`;
+        options.push({ value, label });
+      }
+    } else if (!max) {
+      // No maximum → single option
+      const label = `${min.toLocaleString('fr-FR')} DT (minimum)`;
+      options.push({ value: min, label });
+    }
+    return options;
+  };
 
   return (
     <>
@@ -264,16 +379,50 @@ export const CoverageSelectionStep = ({
         </div>
       </div>
 
-      {conventions && conventions.length > 0 && (
-        <Select
-          label="Convention (optionnel)"
-          value={localConvention}
-          onChange={(e) => setLocalConvention(e.target.value)}
-          options={[
-            { value: '', label: 'Aucune convention' },
-            ...conventions.map((c: any) => ({ value: c.id, label: c.name })),
-          ]}
-        />
+      {/* Convention Display/Selection */}
+      {userOrgConventions.length === 1 ? (
+        /* Single convention - Show as badge (read-only) */
+        <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-700 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+              <CheckCircle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Convention appliquée
+              </p>
+              <p className="text-lg font-bold text-blue-900 dark:text-blue-200">
+                {userOrgConventions[0].name}
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+            Les réductions de votre convention seront automatiquement appliquées à ce devis.
+          </p>
+        </div>
+      ) : userOrgConventions.length > 1 ? (
+        /* Multiple conventions - Show dropdown */
+        <div>
+          <Select
+            label="Convention"
+            value={localConvention}
+            onChange={(e) => setLocalConvention(e.target.value)}
+            options={[
+              { value: '', label: 'Aucune convention' },
+              ...userOrgConventions.map((c: any) => ({ value: c.id, label: c.name })),
+            ]}
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Vous avez accès à plusieurs conventions. Sélectionnez celle à utiliser pour ce devis.
+          </p>
+        </div>
+      ) : (
+        /* No conventions - Show info message */
+        <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Aucune convention disponible. Le devis sera généré sans réduction conventionnelle.
+          </p>
+        </div>
       )}
 
       <div>
@@ -301,8 +450,8 @@ export const CoverageSelectionStep = ({
                     conventionId: localConvention || undefined,
                     franchiseRate: localFranchiseRate,
                     bgLimit: localBgLimit,
-                    dcCapital: localDcCapital,
                     fractionnement: FractionnementType.ANNUEL,
+                    dcCapitals: localDcCapitals,
                     companyIds: selectedCompanies,
                   });
                 }
@@ -337,8 +486,8 @@ export const CoverageSelectionStep = ({
                     conventionId: localConvention || undefined,
                     franchiseRate: localFranchiseRate,
                     bgLimit: localBgLimit,
-                    dcCapital: localDcCapital,
                     fractionnement: FractionnementType.SEMESTRIEL,
+                    dcCapitals: localDcCapitals,
                     companyIds: selectedCompanies,
                   });
                 }
@@ -438,7 +587,7 @@ export const CoverageSelectionStep = ({
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Couverture maximale sans franchise
               </p>
-              {isBrisDeGlacesFree && (
+              {isBrisDeGlacesFree && localFranchiseRate === 0 && (
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                   ✓ Bris de Glaces GRATUIT avec cette formule
                 </p>
@@ -456,18 +605,49 @@ export const CoverageSelectionStep = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {companies.map((c: any) => {
               const checked = selectedCompanies.includes(c.id);
+              const hasDcCapital = localDcCapitals[c.id] !== undefined && localDcCapitals[c.id] > 0;
+              const needsDcCapital = localFormula === FormulaType.DOMMAGES_COLLISIONS && checked && !hasDcCapital;
+              
               return (
-                <label key={c.id} className={`flex items-center p-3 border rounded-lg ${checked ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'}`}>
+                <label key={c.id} className={`flex items-center p-3 border rounded-lg ${
+                  checked ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'
+                } ${
+                  needsDcCapital ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : ''
+                }`}>
                   <input
                     type="checkbox"
                     className="mr-3"
                     checked={checked}
                     onChange={(e) => {
-                      const next = e.target.checked
-                        ? [...selectedCompanies, c.id]
-                        : selectedCompanies.filter(id => id !== c.id);
-                      if (next.length <= 2) {
+                      if (e.target.checked) {
+                        const next = [...selectedCompanies, c.id];
+                        if (next.length <= 2) {
+                          setSelectedCompanies(next);
+                          
+                          if (localFormula === FormulaType.DOMMAGES_COLLISIONS) {
+                            setDcModalCompanyId(c.id);
+                            setTempDcCapital(localDcCapitals[c.id] || 1000);
+                            setShowDcModal(true);
+                          } else if (localFormula) {
+                            onUpdate({
+                              formulaType: localFormula,
+                              selectedGuarantees: localGuarantees,
+                              conventionId: localConvention || undefined,
+                              franchiseRate: localFranchiseRate,
+                              bgLimit: localBgLimit,
+                              dcCapitals: localDcCapitals,
+                              fractionnement: localFractionnement,
+                              companyIds: next,
+                            });
+                          }
+                        }
+                      } else {
+                        const next = selectedCompanies.filter(id => id !== c.id);
                         setSelectedCompanies(next);
+                        
+                        const { [c.id]: _, ...rest } = localDcCapitals;
+                        setLocalDcCapitals(rest);
+                        
                         if (localFormula) {
                           onUpdate({
                             formulaType: localFormula,
@@ -475,7 +655,7 @@ export const CoverageSelectionStep = ({
                             conventionId: localConvention || undefined,
                             franchiseRate: localFranchiseRate,
                             bgLimit: localBgLimit,
-                            dcCapital: localDcCapital,
+                            dcCapitals: rest,
                             fractionnement: localFractionnement,
                             companyIds: next,
                           });
@@ -483,7 +663,19 @@ export const CoverageSelectionStep = ({
                       }
                     }}
                   />
-                  <span className="text-sm text-gray-900 dark:text-white">{c.name}</span>
+                  <div className="flex-1">
+                    <span className="text-sm text-gray-900 dark:text-white">{c.name}</span>
+                    {localFormula === FormulaType.DOMMAGES_COLLISIONS && checked && hasDcCapital && (
+                      <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                        ✓ {localDcCapitals[c.id].toLocaleString('fr-FR')} DT
+                      </span>
+                    )}
+                    {needsDcCapital && (
+                      <span className="ml-2 text-xs text-red-600 dark:text-red-400">
+                        ⚠ Capital requis
+                      </span>
+                    )}
+                  </div>
                 </label>
               );
             })}
@@ -502,9 +694,22 @@ export const CoverageSelectionStep = ({
           <div className="space-y-2">
             {optionalGuarantees
               .filter((guarantee) => {
-                // NEVER show these - they are formulas, not optional guarantees
-                if (guarantee.code === 'DOMMAGES_COLLISIONS') return false;
-                if (guarantee.code === 'TOUS_RISQUES_ZERO') return false;
+                // Filter out formula-type guarantees ONLY when Standard is selected
+                if (localFormula === FormulaType.STANDARD) {
+                  if (guarantee.code === 'DOMMAGES_COLLISIONS') return false;
+                  if (guarantee.code === 'TOUS_RISQUES_ZERO') return false;
+                  if (guarantee.code === 'TOUS_RISQUES') return false;
+                  if (guarantee.code === 'DOMMAGES_COLLISION') return false;
+                  
+                  // Also filter by name (case-insensitive) for manually entered guarantees
+                  const nameLower = guarantee.nameFr?.toLowerCase() || '';
+                  if (nameLower.includes('tous risques') && !nameLower.includes('bris')) return false;
+                  if (nameLower.includes('dommages collision')) return false;
+                  if (nameLower === 'tous risques') return false;
+                  if (nameLower === 'dommages collisions') return false;
+                }
+                
+                // ALWAYS filter these - they are not guarantees
                 if (guarantee.code === 'DEFENSE_RECOURS') return false;
                 
                 // ✅ NEW: Check availability from backend (with fallback to old logic)
@@ -597,7 +802,7 @@ export const CoverageSelectionStep = ({
                             conventionId: localConvention || undefined,
                             franchiseRate: localFranchiseRate,
                             bgLimit: localBgLimit,
-                            dcCapital: localDcCapital,
+                            dcCapitals: localDcCapitals,
                             fractionnement: localFractionnement,
                           });
                         }
@@ -611,7 +816,7 @@ export const CoverageSelectionStep = ({
                             conventionId: localConvention || undefined,
                             franchiseRate: localFranchiseRate,
                             bgLimit: localBgLimit,
-                            dcCapital: localDcCapital,
+                            dcCapitals: localDcCapitals,
                             fractionnement: localFractionnement,
                           });
                         }
@@ -677,7 +882,7 @@ export const CoverageSelectionStep = ({
                 conventionId: localConvention || undefined,
                 franchiseRate: localFranchiseRate,
                 bgLimit: limit,
-                dcCapital: localDcCapital,
+                dcCapitals: localDcCapitals,
                 fractionnement: localFractionnement,
               });
             }}
@@ -715,7 +920,7 @@ export const CoverageSelectionStep = ({
                 conventionId: localConvention || undefined,
                 franchiseRate: localFranchiseRate,
                 bgLimit: limit,
-                dcCapital: localDcCapital,
+                dcCapitals: localDcCapitals,
                 fractionnement: localFractionnement,
               });
             }}
@@ -770,58 +975,90 @@ export const CoverageSelectionStep = ({
           </div>
         </div>
       )}
+
+      <div className="flex gap-3 mt-6">
+        <button
+          type="button"
+          onClick={onBack}
+          className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+          Retour
+        </button>
+        <div className="flex-1">
+          <button
+            type="submit"
+            disabled={!localFormula || selectedCompanies.length === 0 || !allDcCapitalsSet}
+            className="w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Suivant
+          </button>
+          {localFormula === FormulaType.DOMMAGES_COLLISIONS && selectedCompanies.length > 0 && !allDcCapitalsSet && (
+            <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+              ⚠ Veuillez configurer le capital DC pour toutes les compagnies sélectionnées
+            </p>
+          )}
+        </div>
+      </div>
     </form>
 
-    {/* Formula Configuration Modal */}
-    {showFormulaModal && pendingFormula && (
+    {/* DC Capital Modal */}
+    {showDcModal && dcModalCompanyId && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
           <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-            {pendingFormula === FormulaType.DOMMAGES_COLLISIONS ? 'Configuration Dommages Collision' : 'Configuration Tous Risques'}
+            Configuration Dommages Collision
           </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            {companies?.find((c: any) => c.id === dcModalCompanyId)?.name}
+          </p>
 
-          {pendingFormula === FormulaType.DOMMAGES_COLLISIONS && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Capital assuré (DT)
-              </label>
-              <select
-                value={localDcCapital.toString()}
-                onChange={(e) => setLocalDcCapital(Number(e.target.value))}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="1000">1000 DT (1K-10K)</option>
-                <option value="5000">5000 DT (10K-20K)</option>
-                <option value="10000">10000 DT (20K-50K)</option>
-                <option value="25000">25000 DT (50K-100K)</option>
-              </select>
-            </div>
-          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Capital assuré (DT)
+            </label>
+            <select
+              value={tempDcCapital.toString()}
+              onChange={(e) => setTempDcCapital(Number(e.target.value))}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+            >
+              {(() => {
+                const filteredTiers = dcCapitalTiers?.filter(
+                  tier => tier.isActive 
+                    && tier.company.id === dcModalCompanyId
+                    && tier.usage.id === usageId
+                );
 
-          {pendingFormula === FormulaType.TOUS_RISQUES_0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Taux de franchise
-              </label>
-              <select
-                value={localFranchiseRate.toString()}
-                onChange={(e) => setLocalFranchiseRate(Number(e.target.value))}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="0">0% (Bris de Glaces gratuit et sans limite)</option>
-                <option value="1">1%</option>
-                <option value="2">2%</option>
-                <option value="4">4%</option>
-              </select>
-            </div>
-          )}
+                if (filteredTiers && filteredTiers.length > 0) {
+                  const allOptions = filteredTiers.flatMap(tier => generateOptionsFromTier(tier));
+                  
+                  if (allOptions.length > 0) {
+                    return allOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ));
+                  }
+                }
+                
+                return (
+                  <option value="" disabled>
+                    Aucun palier configuré
+                  </option>
+                );
+              })()}
+            </select>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Sélectionnez le capital assuré pour cette compagnie
+            </p>
+          </div>
 
           <div className="flex gap-3 mt-6">
             <button
               type="button"
               onClick={() => {
-                setShowFormulaModal(false);
-                setPendingFormula(null);
+                setShowDcModal(false);
+                setDcModalCompanyId(null);
+                setSelectedCompanies(prev => prev.filter(id => id !== dcModalCompanyId));
               }}
               className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
             >
@@ -829,7 +1066,7 @@ export const CoverageSelectionStep = ({
             </button>
             <button
               type="button"
-              onClick={confirmFormulaSelection}
+              onClick={confirmDcCapital}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               Confirmer

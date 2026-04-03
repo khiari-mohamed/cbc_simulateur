@@ -23,4 +23,8 @@ export class CreateGuaranteeDto {
 
   @IsBoolean()
   isOptional: boolean;
+
+  @IsOptional()
+  @IsString()
+  systemRole?: string;
 }

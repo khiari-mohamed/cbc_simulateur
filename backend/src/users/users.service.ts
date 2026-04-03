@@ -40,7 +40,34 @@ export class UsersService {
         driverProfile: true,
         organization: {
           include: {
-            conventions: true,
+            conventions: {
+              where: {
+                isActive: true,
+                status: 'ACTIVE',
+              },
+              select: {
+                id: true,
+                name: true,
+                status: true,
+              },
+            },
+            sharedConventions: {
+              where: {
+                convention: {
+                  isActive: true,
+                  status: 'ACTIVE',
+                },
+              },
+              select: {
+                convention: {
+                  select: {
+                    id: true,
+                    name: true,
+                    status: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -48,6 +75,32 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
+
+    if (user.organization) {
+      const primaryConventions = user.organization.conventions ?? [];
+      const sharedConventions = (user.organization.sharedConventions ?? []).map(
+        (shared) => shared.convention,
+      );
+      const conventions = Array.from(
+        new Map(
+          [...primaryConventions, ...sharedConventions].map((convention) => [
+            convention.id,
+            convention,
+          ]),
+        ).values(),
+      );
+
+      return {
+        ...user,
+        organization: {
+          id: user.organization.id,
+          name: user.organization.name,
+          code: user.organization.code,
+          conventions,
+        },
+      };
+    }
+
     return user;
   }
 
@@ -165,7 +218,7 @@ export class UsersService {
     });
   }
 
-  async activate(userId: string) {
+  async reactivate(userId: string) {
     return this.prisma.user.update({
       where: { id: userId },
       data: { isActive: true },
@@ -178,21 +231,38 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    // Safe deletion: if user has dependent data, perform soft-deactivate to avoid breaking references
-    const deps = await this.prisma.$transaction([
-      this.prisma.quote.count({ where: { userId } }),
-      this.prisma.simulation.count({ where: { userId } }),
-      this.prisma.contract.count({ where: { userId } }),
-      this.prisma.document.count({ where: { userId } }),
-    ]);
-    const hasDeps = deps.some((c) => c > 0);
+    // Check only meaningful user data (not system logs/notifications)
+    const usageCount = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        _count: {
+          select: {
+            simulations: true,
+            quotes: true,
+            contracts: true,
+          },
+        },
+      },
+    });
 
-    if (hasDeps) {
-      await this.prisma.user.update({ where: { id: userId }, data: { isActive: false } });
-      return { message: 'User has dependent records; account deactivated instead of hard delete' };
+    const counts = usageCount?._count;
+    const totalUsage = (counts?.simulations || 0) + (counts?.quotes || 0) + (counts?.contracts || 0);
+
+    if (totalUsage > 0) {
+      const details = [];
+      if (counts && counts.simulations && counts.simulations > 0) details.push(`${counts.simulations} simulation(s)`);
+      if (counts && counts.quotes && counts.quotes > 0) details.push(`${counts.quotes} devis`);
+      if (counts && counts.contracts && counts.contracts > 0) details.push(`${counts.contracts} contrat(s)`);
+      
+      const detailsText = details.length > 0 ? ` (${details.join(', ')})` : '';
+      
+      throw new ConflictException(
+        `Impossible de supprimer cet utilisateur. Il possède ${totalUsage} enregistrement(s) associé(s)${detailsText}. Veuillez désactiver l'utilisateur au lieu de le supprimer.`
+      );
     }
 
+    // Hard delete - Prisma will cascade delete system records (auditLogs, notifications, etc.)
     await this.prisma.user.delete({ where: { id: userId } });
-    return { message: 'User deleted successfully' };
+    return { message: 'User deleted permanently' };
   }
 }

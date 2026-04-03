@@ -358,8 +358,9 @@ export const PricingRuleModal = ({ rule, onClose, onSuccess }: PricingRuleModalP
                       <td className="px-4 py-2 bg-gray-50 dark:bg-gray-900 font-medium border-r border-gray-200 dark:border-gray-700">Prime fixe (DT)</td>
                       <td className="px-4 py-2">
                         <input
-                          type="number"
-                          step="0.01"
+                          type="text"
+                          inputMode="decimal"
+                          pattern="[0-9]*[.,]?[0-9]*"
                           value={formData.fixedPremium}
                           onChange={(e) => setFormData({ ...formData, fixedPremium: e.target.value })}
                           className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800"

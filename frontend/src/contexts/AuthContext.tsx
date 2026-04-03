@@ -11,6 +11,7 @@ interface AuthContextType {
   forgotPassword: (email: string) => Promise<{ userId: string }>;
   resetPassword: (userId: string, otp: string, newPassword: string) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -71,6 +72,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await api.post('/auth/reset-password', { userId, otp, newPassword });
   };
 
+  const refreshUser = async () => {
+    try {
+      const { data } = await api.get('/auth/me');
+      setUser(data);
+    } catch (error) {
+      console.error('Failed to refresh user:', error);
+    }
+  };
+
   const logout = () => {
     localStorage.clear();
     setUser(null);
@@ -78,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, verifyOtp, forgotPassword, resetPassword, logout, isAuthenticated: !!user, setUser } as any}>
+    <AuthContext.Provider value={{ user, loading, login, verifyOtp, forgotPassword, resetPassword, logout, refreshUser, isAuthenticated: !!user, setUser } as any}>
       {children}
     </AuthContext.Provider>
   );
