@@ -105,6 +105,7 @@ export class QuotesService {
         fssr: pricing.fssr,
         fg: pricing.fg,
         totalAPayer: pricing.totalAPayer,
+        fractionnement: (simulation as any).fractionnement ?? 'ANNUEL', // Save fractionnement from simulation
         pricingSnapshot: pricing as any,
         items: {
           create: pricing.items.map(({ guaranteeId, capital, prime }) => ({

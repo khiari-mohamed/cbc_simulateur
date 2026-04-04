@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Mail, Phone, Calendar, Shield, CheckCircle, XCircle, UserPlus, Trash2 } from 'lucide-react';
+import { Mail, Phone, Calendar, Shield, CheckCircle, XCircle, UserPlus, Trash2, Download } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { ConfirmationModal } from '../../../components/ui/ConfirmationModal';
 import api from '../../../lib/api/client';
 import { Role } from '../../../types';
 import toast from 'react-hot-toast';
+import { exportUsersToExcel } from '../../../lib/utils/exportUsers';
 
 export const UsersManagementPage = () => {
   const queryClient = useQueryClient();
@@ -21,6 +22,11 @@ export const UsersManagementPage = () => {
     isOpen: boolean;
     message: string;
   }>({ isOpen: false, message: '' });
+  const [filterRole, setFilterRole] = useState<Role | 'ALL'>('ALL');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [filterConvention, setFilterConvention] = useState<string>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
@@ -191,22 +197,168 @@ export const UsersManagementPage = () => {
     );
   };
 
+  const filteredUsers = users?.filter((user: any) => {
+    if (filterRole !== 'ALL' && user.role !== filterRole) return false;
+    if (filterStatus === 'ACTIVE' && !user.isActive) return false;
+    if (filterStatus === 'INACTIVE' && user.isActive) return false;
+    if (filterConvention !== 'ALL') {
+      const userConventions = user.organization?.conventions || [];
+      const hasConvention = userConventions.some((conv: any) => conv.id === filterConvention);
+      if (!hasConvention) return false;
+    }
+    return true;
+  }) || [];
+
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+
+  const handleFilterChange = (filterSetter: Function, value: any) => {
+    filterSetter(value);
+    setCurrentPage(1);
+  };
+
+  const handleExport = () => {
+    if (!filteredUsers || filteredUsers.length === 0) {
+      toast.error('Aucun utilisateur à exporter');
+      return;
+    }
+    try {
+      exportUsersToExcel(filteredUsers);
+      toast.success('Export Excel réussi!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Erreur lors de l\'export');
+    }
+  };
+
   return (
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Gestion des utilisateurs</h1>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
-            Gérer les utilisateurs, rôles, conventions et 2FA
-          </p>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Gestion des utilisateurs</h1>
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
+                Gérer les utilisateurs, rôles, conventions et 2FA
+              </p>
+            </div>
+            <Button
+              onClick={handleExport}
+              disabled={!filteredUsers || filteredUsers.length === 0}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Download className="w-4 h-4" />
+              Exporter Excel
+            </Button>
+          </div>
         </div>
+
+        {/* Filters */}
+        <Card className="p-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Filtrer par rôle
+              </label>
+              <select
+                value={filterRole}
+                onChange={(e) => handleFilterChange(setFilterRole, e.target.value as Role | 'ALL')}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="ALL">Tous les rôles</option>
+                <option value={Role.CLIENT_ADHERENT}>Client</option>
+                <option value={Role.ADMINISTRATEUR_ARS}>Administrateur</option>
+                <option value={Role.GESTIONNAIRE_VALIDATION_ARS}>Gestionnaire</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Filtrer par statut
+              </label>
+              <select
+                value={filterStatus}
+                onChange={(e) => handleFilterChange(setFilterStatus, e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="ALL">Tous les statuts</option>
+                <option value="ACTIVE">Actif</option>
+                <option value="INACTIVE">Inactif</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Filtrer par convention
+              </label>
+              <select
+                value={filterConvention}
+                onChange={(e) => handleFilterChange(setFilterConvention, e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="ALL">Toutes les conventions</option>
+                {conventions?.map((conv: any) => (
+                  <option key={conv.id} value={conv.id}>
+                    {conv.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          {(filterRole !== 'ALL' || filterStatus !== 'ALL' || filterConvention !== 'ALL') && (
+            <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {filteredUsers.length} utilisateur(s) trouvé(s)
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setFilterRole('ALL');
+                  setFilterStatus('ALL');
+                  setFilterConvention('ALL');
+                  setCurrentPage(1);
+                }}
+              >
+                Réinitialiser les filtres
+              </Button>
+            </div>
+          )}
+        </Card>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
+        ) : filteredUsers.length === 0 ? (
+          <Card className="p-12 text-center">
+            <p className="text-gray-500 dark:text-gray-400">Aucun utilisateur trouvé</p>
+          </Card>
         ) : (
-          <div className="grid gap-4">
-            {users?.map((user: any) => (
+          <>
+            <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Affichage de {startIndex + 1} à {Math.min(endIndex, filteredUsers.length)} sur {filteredUsers.length} utilisateur(s)
+              </p>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value={10}>10 par page</option>
+                <option value={20}>20 par page</option>
+                <option value={50}>50 par page</option>
+                <option value={100}>100 par page</option>
+              </select>
+            </div>
+
+            <div className="grid gap-4">
+              {paginatedUsers.map((user: any) => (
               <Card key={user.id} className="p-6">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
@@ -350,7 +502,75 @@ export const UsersManagementPage = () => {
                 </div>
               </Card>
             ))}
-          </div>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Page {currentPage} sur {totalPages}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                  >
+                    Premier
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Précédent
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      return (
+                        <Button
+                          key={pageNum}
+                          size="sm"
+                          variant={currentPage === pageNum ? 'primary' : 'outline'}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className="min-w-[2.5rem]"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Suivant
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Dernier
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {showConventionModal && selectedUser && (

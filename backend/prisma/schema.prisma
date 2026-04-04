@@ -314,24 +314,25 @@
   }
 
   model Simulation {
-    id            String           @id @default(uuid())
-    userId        String
-    user          User             @relation(fields: [userId], references: [id])
-    vehicleId     String
-    vehicle       Vehicle          @relation(fields: [vehicleId], references: [id])
-    conventionId  String?
-    convention    Convention?      @relation(fields: [conventionId], references: [id])
-    bonusMalus    Decimal          @db.Decimal(5, 2)
-    usageId       String
-    usage         Usage            @relation(fields: [usageId], references: [id])
-    formulaType   FormulaType
-    franchiseRate Int?
-    bgLimit       Int?             // BG capital limit chosen by client (from bg_capital_limits table)
-    dcCapital     Decimal?         @db.Decimal(15, 0)
-    dcCapitals    Json?            // Per-company DC capitals: { companyId: capital }
-    status        SimulationStatus @default(DRAFT)
-    createdAt     DateTime         @default(now())
-    updatedAt     DateTime         @updatedAt
+    id             String           @id @default(uuid())
+    userId         String
+    user           User             @relation(fields: [userId], references: [id])
+    vehicleId      String
+    vehicle        Vehicle          @relation(fields: [vehicleId], references: [id])
+    conventionId   String?
+    convention     Convention?      @relation(fields: [conventionId], references: [id])
+    bonusMalus     Decimal          @db.Decimal(5, 2)
+    usageId        String
+    usage          Usage            @relation(fields: [usageId], references: [id])
+    formulaType    FormulaType
+    franchiseRate  Int?
+    bgLimit        Int?             // BG capital limit chosen by client (from bg_capital_limits table)
+    dcCapital      Decimal?         @db.Decimal(15, 0)
+    dcCapitals     Json?            // Per-company DC capitals: { companyId: capital }
+    fractionnement String           @default("ANNUEL") // ANNUEL or SEMESTRIEL
+    status         SimulationStatus @default(DRAFT)
+    createdAt      DateTime         @default(now())
+    updatedAt      DateTime         @updatedAt
 
     quotes            Quote[]
     guarantees        SimulationGuarantee[]
@@ -371,6 +372,7 @@
     fssr              Decimal          @db.Decimal(15, 3)
     fg                Decimal          @db.Decimal(15, 3)
     totalAPayer       Decimal          @db.Decimal(15, 3)
+    fractionnement    String           @default("ANNUEL") // ANNUEL or SEMESTRIEL
     pricingSnapshot   Json?
     pdfPath           String?
     validatedById     String?
@@ -414,6 +416,7 @@
     status          ContractStatus @default(ACTIVE)
     startDate       DateTime
     endDate         DateTime
+    fractionnement  String         @default("ANNUEL") // ANNUEL or SEMESTRIEL
     pdfPath         String?
     deliveryType    DeliveryType   @default(AGENCY_PICKUP)
     deliveryFee     Decimal        @default(0) @db.Decimal(15, 0)

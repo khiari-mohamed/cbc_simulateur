@@ -51,6 +51,7 @@ export class SimulationsService {
         bgLimit: data.bgLimit,
         dcCapital: data.dcCapital ? new Decimal(data.dcCapital) : null,
         dcCapitals: data.dcCapitals ? data.dcCapitals : undefined,
+        fractionnement: data.fractionnement ?? 'ANNUEL', // Add fractionnement to database
       },
       include: { vehicle: true },
     });
@@ -153,6 +154,7 @@ export class SimulationsService {
     if (data.bgLimit !== undefined) updateData.bgLimit = data.bgLimit;
     if (data.dcCapital !== undefined) updateData.dcCapital = data.dcCapital ? new Decimal(data.dcCapital) : null;
     if (data.dcCapitals !== undefined) updateData.dcCapitals = data.dcCapitals ? data.dcCapitals : undefined;
+    if (data.fractionnement !== undefined) updateData.fractionnement = data.fractionnement; // Add fractionnement to update
 
     const updated = await this.prisma.simulation.update({
       where: { id },

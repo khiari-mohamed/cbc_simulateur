@@ -25,6 +25,14 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
+    // Validate admin registration key
+    if (dto.role === 'ADMINISTRATEUR_ARS') {
+      const validKey = this.configService.get<string>('ADMIN_REGISTRATION_KEY');
+      if (!dto.adminKey || dto.adminKey !== validKey) {
+        throw new BadRequestException('Clé administrateur invalide');
+      }
+    }
+
     // Clean email (remove mailto: prefix if present)
     dto.email = dto.email.replace(/^mailto:/, '');
     
@@ -43,8 +51,8 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(dto.password, 10);
     const otp = this.generateOTP();
     
-    // Remove organizationCode and organizationJoinKey before passing to user service
-    const { organizationCode, organizationJoinKey, ...userDto } = dto;
+    // Remove organizationCode, organizationJoinKey, and adminKey before passing to user service
+    const { organizationCode, organizationJoinKey, adminKey, ...userDto } = dto;
     
     const user = await this.usersService.create({
       ...userDto,

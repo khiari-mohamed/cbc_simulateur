@@ -131,6 +131,10 @@ export class PdfService {
           <div class="info-label">Client</div>
           <div class="info-value">${quote.user.firstName} ${quote.user.lastName}</div>
         </div>
+        <div class="info-item">
+          <div class="info-label">Fractionnement</div>
+          <div class="info-value">${quote.fractionnement === 'SEMESTRIEL' ? 'Semestriel' : 'Annuel'}</div>
+        </div>
       </div>
     </div>
 
@@ -240,7 +244,7 @@ export class PdfService {
         <span>${formatCurrency(quote.fg)}</span>
       </div>
       <div class="total-row final">
-        <span>TOTAL À PAYER</span>
+        <span>TOTAL À PAYER ${quote.fractionnement === 'SEMESTRIEL' ? '(Semestriel)' : '(Annuel)'}</span>
         <span>${formatCurrency(quote.totalAPayer)}</span>
       </div>
     </div>
@@ -281,211 +285,329 @@ export class PdfService {
   <meta charset="UTF-8">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Arial', sans-serif; color: #333; line-height: 1.3; font-size: 11px; }
-    .header { background: #d52b36; color: white; padding: 20px; text-align: center; }
-    .logo-box { display: inline-block; background: #ffffff; padding: 8px 14px; border-radius: 6px; margin: 0 auto 8px auto; }
-    .logo-box img { height: 42px; max-width: 160px; object-fit: contain; display: block; }
-    .header h1 { font-size: 20px; margin-bottom: 3px; }
-    .header p { font-size: 11px; opacity: 0.9; }
-    .content { padding: 15px 20px; }
-    .section { margin-bottom: 12px; }
-    .section-title { background: #f0f0f0; padding: 6px 10px; font-weight: bold; font-size: 12px; margin-bottom: 8px; border-left: 3px solid #d52b36; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .info-item { padding: 4px 0; }
-    .info-label { font-weight: bold; color: #666; font-size: 10px; }
-    .info-value { color: #333; font-size: 11px; margin-top: 2px; }
-    .status-badge { display: inline-block; padding: 3px 10px; background: #28a745; color: white; border-radius: 10px; font-size: 9px; font-weight: bold; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th { background: #d52b36; color: white; padding: 6px 8px; text-align: left; font-size: 10px; }
-    td { padding: 5px 8px; border-bottom: 1px solid #ddd; font-size: 10px; }
-    .total-section { background: #f8f8f8; padding: 12px; margin-top: 12px; border-radius: 3px; }
-    .total-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 11px; }
-    .total-row.final { font-size: 14px; font-weight: bold; color: #d52b36; border-top: 2px solid #d52b36; padding-top: 8px; margin-top: 6px; }
-    .footer { text-align: center; padding: 10px; font-size: 9px; color: #666; border-top: 1px solid #ddd; margin-top: 15px; }
-    .terms { background: #f9f9f9; padding: 10px; margin-top: 10px; font-size: 9px; border-left: 3px solid #d52b36; }
+    body { font-family: 'Arial', sans-serif; color: #d9112c; line-height: 1.4; font-size: 11px; background: #f4f6fb; }
+
+    .page-wrap { padding: 16px; }
+
+    /* ── HEADER ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #d9112c;
+      color: white;
+      padding: 18px 24px;
+      border-radius: 10px 10px 0 0;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .logo-circle {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: #ffffff;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; flex-shrink: 0;
+    }
+    .logo-circle img { width: 40px; height: 40px; object-fit: contain; }
+    .header-brand { font-size: 18px; font-weight: bold; letter-spacing: 0.5px; }
+    .header-sub { font-size: 10px; opacity: 0.65; margin-top: 2px; letter-spacing: 0.8px; text-transform: uppercase; }
+    .header-right { text-align: right; }
+    .contract-label { font-size: 9px; opacity: 0.55; text-transform: uppercase; letter-spacing: 1px; }
+    .contract-number { font-size: 20px; font-weight: bold; color: #e8b84b; letter-spacing: 1px; }
+    .status-pill {
+      display: inline-block; margin-top: 6px;
+      padding: 3px 12px; border-radius: 20px;
+      background: rgba(255,255,255,0.12);
+      font-size: 9px; letter-spacing: 0.8px; text-transform: uppercase;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+
+    /* ── GOLD ACCENT BAR ── */
+    .accent-bar { height: 4px; background: linear-gradient(90deg, #e8b84b, #f5d78e, #e8b84b); }
+
+    /* ── META ROW ── */
+    .meta-row {
+      display: flex; gap: 0;
+      background: #ffffff;
+      border: 1px solid #e0e5f0;
+      border-top: none;
+    }
+    .meta-cell {
+      flex: 1; padding: 10px 16px;
+      border-right: 1px solid #e0e5f0;
+    }
+    .meta-cell:last-child { border-right: none; }
+    .meta-cell-label { font-size: 8.5px; color: #8892aa; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
+    .meta-cell-value { font-size: 11px; color: #d9112c; font-weight: bold; }
+
+    /* ── BODY ── */
+    .body { background: #ffffff; border: 1px solid #e0e5f0; border-top: none; padding: 18px 20px; }
+
+    /* ── TWO-COL INFO ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+    .info-card {
+      background: #f7f9fc;
+      border: 1px solid #e0e5f0;
+      border-radius: 7px;
+      padding: 12px 14px;
+    }
+    .info-card-title {
+      font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.9px;
+      color: #8892aa; margin-bottom: 10px; padding-bottom: 7px;
+      border-bottom: 1px solid #e0e5f0;
+    }
+    .info-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 3px 0; }
+    .info-key { color: #7a8299; font-size: 10px; }
+    .info-val { color: #d9112c; font-size: 10px; font-weight: bold; text-align: right; max-width: 55%; }
+
+    /* ── SECTION HEADING ── */
+    .section-heading {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 10px; font-weight: bold; text-transform: uppercase;
+      letter-spacing: 0.8px; color: #d9112c;
+      margin: 16px 0 10px;
+    }
+    .section-heading::before {
+      content: '';
+      display: inline-block; width: 3px; height: 14px;
+      background: #e8b84b; border-radius: 2px; flex-shrink: 0;
+    }
+    .section-heading::after {
+      content: ''; flex: 1; height: 1px; background: #e0e5f0;
+    }
+
+    /* ── GUARANTEES TABLE ── */
+    .gtable { width: 100%; border-collapse: collapse; }
+    .gtable thead tr { background: #d9112c; }
+    .gtable th {
+      padding: 8px 10px; text-align: left;
+      font-size: 9px; font-weight: bold;
+      text-transform: uppercase; letter-spacing: 0.7px;
+      color: #e8b84b;
+    }
+    .gtable th:last-child { text-align: right; }
+    .gtable td { padding: 7px 10px; font-size: 10px; color: #2d3452; border-bottom: 1px solid #f0f2f8; }
+    .gtable td:last-child { text-align: right; font-weight: bold; color: #d9112c; }
+    .gtable tbody tr:nth-child(even) { background: #fafbfd; }
+    .gtable tbody tr:hover { background: #f2f5fc; }
+    .gtable .combined-row { background: #fffbef !important; }
+    .gtable .combined-row td { color: #7a5c00; }
+    .combined-tag { font-size: 8.5px; color: #b08a20; display: block; margin-top: 2px; }
+
+    /* ── TOTALS PANEL ── */
+    .totals-panel {
+      display: grid; grid-template-columns: 1fr 280px; gap: 16px; margin-top: 16px; align-items: start;
+    }
+    .terms-box {
+      background: #f7f9fc; border: 1px solid #e0e5f0; border-radius: 7px; padding: 12px 14px;
+    }
+    .terms-box-title { font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.8px; color: #8892aa; margin-bottom: 8px; }
+    .terms-list { list-style: none; }
+    .terms-list li { font-size: 9.5px; color: #5a6480; padding: 3px 0; display: flex; gap: 7px; align-items: flex-start; }
+    .terms-list li::before { content: '›'; color: #e8b84b; font-size: 12px; line-height: 1; flex-shrink: 0; }
+
+    .totals-box { background: #d9112c; border-radius: 7px; padding: 14px 16px; }
+    .total-line { display: flex; justify-content: space-between; padding: 4px 0; font-size: 10px; color: rgba(255,255,255,0.6); }
+    .total-line .amount { color: rgba(255,255,255,0.85); }
+    .total-divider { border: none; border-top: 1px solid rgba(255,255,255,0.12); margin: 8px 0; }
+    .total-final { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; }
+    .total-final-label { font-size: 10px; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.5px; }
+    .total-final-amount { font-size: 18px; font-weight: bold; color: #e8b84b; }
+
+    /* ── FOOTER ── */
+    .footer {
+      background: #f7f9fc; border: 1px solid #e0e5f0; border-top: none;
+      border-radius: 0 0 10px 10px;
+      padding: 10px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .footer-left { font-size: 8.5px; color: #8892aa; }
+    .footer-right { font-size: 8.5px; color: #8892aa; text-align: right; }
+    .footer-brand { font-size: 9px; font-weight: bold; color: #d9112c; }
   </style>
 </head>
 <body>
+<div class="page-wrap">
+
   <div class="header">
-    ${logoBase64 ? `
-      <div class="logo-box">
-        <img src="data:image/png;base64,${logoBase64}" alt="Logo" />
+    <div class="header-left">
+      ${logoBase64 ? `
+        <div class="logo-circle">
+          <img src="data:image/png;base64,${logoBase64}" alt="Logo" />
+        </div>
+      ` : ''}
+      <div>
+        <div class="header-brand">ARS ASSURANCE</div>
+        <div class="header-sub">Courtier en Assurances</div>
       </div>
-    ` : ''}
-    <h1>ARS ASSURANCE</h1>
-    <p>Contrat d'Assurance Automobile</p>
+    </div>
+    <div class="header-right">
+      <div class="contract-label">Contrat d'Assurance Automobile</div>
+      <div class="contract-number">${contract.contractNumber}</div>
+      <div class="status-pill">${contract.status}</div>
+    </div>
   </div>
 
-  <div class="content">
-    <div class="section">
-      <div class="section-title">Informations du Contrat</div>
-      <div class="info-grid">
-        <div class="info-item">
-          <div class="info-label">N° Contrat</div>
-          <div class="info-value">${contract.contractNumber}</div>
+  <div class="accent-bar"></div>
+
+  <div class="meta-row">
+    <div class="meta-cell">
+      <div class="meta-cell-label">Date Début</div>
+      <div class="meta-cell-value">${formatDate(contract.startDate)}</div>
+    </div>
+    <div class="meta-cell">
+      <div class="meta-cell-label">Date Fin</div>
+      <div class="meta-cell-value">${formatDate(contract.endDate)}</div>
+    </div>
+    <div class="meta-cell">
+      <div class="meta-cell-label">Devis Associé</div>
+      <div class="meta-cell-value">${contract.quote.quoteNumber}</div>
+    </div>
+    <div class="meta-cell">
+      <div class="meta-cell-label">Compagnie</div>
+      <div class="meta-cell-value">${contract.quote.company.name}</div>
+    </div>
+    <div class="meta-cell">
+      <div class="meta-cell-label">Fractionnement</div>
+      <div class="meta-cell-value">${contract.fractionnement === 'SEMESTRIEL' ? 'Semestriel' : 'Annuel'}</div>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <div class="two-col">
+      <div class="info-card">
+        <div class="info-card-title">Assuré</div>
+        <div class="info-row">
+          <span class="info-key">Nom complet</span>
+          <span class="info-val">${contract.user.firstName} ${contract.user.lastName}</span>
         </div>
-        <div class="info-item">
-          <div class="info-label">Statut</div>
-          <div class="info-value"><span class="status-badge">${contract.status}</span></div>
+        <div class="info-row">
+          <span class="info-key">Email</span>
+          <span class="info-val">${contract.user.email}</span>
         </div>
-        <div class="info-item">
-          <div class="info-label">Date Début</div>
-          <div class="info-value">${formatDate(contract.startDate)}</div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card-title">Véhicule Assuré</div>
+        <div class="info-row">
+          <span class="info-key">Immatriculation</span>
+          <span class="info-val">${contract.quote.simulation?.vehicle?.registration || 'N/A'}</span>
         </div>
-        <div class="info-item">
-          <div class="info-label">Date Fin</div>
-          <div class="info-value">${formatDate(contract.endDate)}</div>
+        <div class="info-row">
+          <span class="info-key">CV / Places</span>
+          <span class="info-val">${contract.quote.simulation?.vehicle?.fiscalHorsepower || 'N/A'} CV / ${contract.quote.simulation?.vehicle?.numberOfSeats || 'N/A'} pl.</span>
         </div>
-        <div class="info-item">
-          <div class="info-label">Devis Associé</div>
-          <div class="info-value">${contract.quote.quoteNumber}</div>
+        <div class="info-row">
+          <span class="info-key">1ère Circulation</span>
+          <span class="info-val">${contract.quote.simulation?.vehicle?.firstCirculationDate ? formatDate(contract.quote.simulation.vehicle.firstCirculationDate) : 'N/A'}</span>
         </div>
-        <div class="info-item">
-          <div class="info-label">Compagnie</div>
-          <div class="info-value">${contract.quote.company.name}</div>
+        <div class="info-row">
+          <span class="info-key">Valeur Neuf</span>
+          <span class="info-val">${contract.quote.simulation?.vehicle?.newValue ? formatCurrency(contract.quote.simulation.vehicle.newValue) : 'N/A'}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">Valeur Vénale</span>
+          <span class="info-val">${contract.quote.simulation?.vehicle?.marketValue ? formatCurrency(contract.quote.simulation.vehicle.marketValue) : 'N/A'}</span>
         </div>
       </div>
     </div>
 
-    <div class="section">
-      <div class="section-title">Assuré</div>
-      <div class="info-grid">
-        <div class="info-item">
-          <div class="info-label">Nom Complet</div>
-          <div class="info-value">${contract.user.firstName} ${contract.user.lastName}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Email</div>
-          <div class="info-value">${contract.user.email}</div>
-        </div>
-      </div>
-    </div>
+    <div class="section-heading">Garanties Souscrites</div>
 
-    <div class="section">
-      <div class="section-title">Véhicule Assuré</div>
-      <div class="info-grid">
-        <div class="info-item">
-          <div class="info-label">Immatriculation</div>
-          <div class="info-value">${contract.quote.simulation?.vehicle?.registration || 'N/A'}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">CV / Places</div>
-          <div class="info-value">${contract.quote.simulation?.vehicle?.fiscalHorsepower || 'N/A'} CV / ${contract.quote.simulation?.vehicle?.numberOfSeats || 'N/A'} places</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">1ère Circulation</div>
-          <div class="info-value">${contract.quote.simulation?.vehicle?.firstCirculationDate ? formatDate(contract.quote.simulation.vehicle.firstCirculationDate) : 'N/A'}</div>
-        </div>
-        <div class="info-item">
-          <div class="info-label">Valeur Neuf / Vénale</div>
-          <div class="info-value">${contract.quote.simulation?.vehicle?.newValue ? formatCurrency(contract.quote.simulation.vehicle.newValue) : 'N/A'} / ${contract.quote.simulation?.vehicle?.marketValue ? formatCurrency(contract.quote.simulation.vehicle.marketValue) : 'N/A'}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title">Garanties Souscrites</div>
-      <table>
-        <thead>
-          <tr>
-            <th>Garantie</th>
-            <th>Capital Assuré</th>
-            <th>Prime (DT)</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${(() => {
-            const isLloyd = contract.quote.company.code === 'LLOYD';
-            const hasCatNat = contract.quote.items.some((i: any) => i.guarantee.code === 'CATASTROPHES_NATURELLES');
-            const hasDommagesEmeutes = contract.quote.items.some((i: any) => i.guarantee.code === 'DOMMAGES_EMEUTES');
-            const shouldCombine = isLloyd && hasCatNat && hasDommagesEmeutes;
-            
-            let rows = '';
-            let combinedAdded = false;
-            
-            contract.quote.items.forEach((item: any) => {
-              // Skip individual CAT NAT and Dommages Émeutes for Lloyd if both present
-              if (shouldCombine && (item.guarantee.code === 'CATASTROPHES_NATURELLES' || item.guarantee.code === 'DOMMAGES_EMEUTES')) {
-                if (!combinedAdded) {
-                  // Add combined row once
-                  const catNatItem = contract.quote.items.find((i: any) => i.guarantee.code === 'CATASTROPHES_NATURELLES');
-                  const dommagesItem = contract.quote.items.find((i: any) => i.guarantee.code === 'DOMMAGES_EMEUTES');
-                  const combinedPrime = Number(catNatItem.prime) + Number(dommagesItem.prime);
-                  const combinedCapital = Math.max(Number(catNatItem.capital), Number(dommagesItem.capital));
-                  
-                  rows += `
-                    <tr style="background: #e3f2fd;">
-                      <td><strong>Extension Catastrophes Naturelles</strong><br/><span style="font-size: 9px; color: #666;">(CAT NAT + Dommages émeutes)</span></td>
-                      <td>${combinedCapital == 0 ? 'ILLIMITÉ' : formatCurrency(combinedCapital)}</td>
-                      <td><strong>${formatCurrency(combinedPrime)}</strong></td>
-                    </tr>
-                  `;
-                  combinedAdded = true;
-                }
-                return;
+    <table class="gtable">
+      <thead>
+        <tr>
+          <th>Garantie</th>
+          <th>Capital Assuré</th>
+          <th>Prime (DT)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${(() => {
+          const isLloyd = contract.quote.company.code === 'LLOYD';
+          const hasCatNat = contract.quote.items.some((i: any) => i.guarantee.code === 'CATASTROPHES_NATURELLES');
+          const hasDommagesEmeutes = contract.quote.items.some((i: any) => i.guarantee.code === 'DOMMAGES_EMEUTES');
+          const shouldCombine = isLloyd && hasCatNat && hasDommagesEmeutes;
+          
+          let rows = '';
+          let combinedAdded = false;
+          
+          contract.quote.items.forEach((item: any) => {
+            if (shouldCombine && (item.guarantee.code === 'CATASTROPHES_NATURELLES' || item.guarantee.code === 'DOMMAGES_EMEUTES')) {
+              if (!combinedAdded) {
+                const catNatItem = contract.quote.items.find((i: any) => i.guarantee.code === 'CATASTROPHES_NATURELLES');
+                const dommagesItem = contract.quote.items.find((i: any) => i.guarantee.code === 'DOMMAGES_EMEUTES');
+                const combinedPrime = Number(catNatItem.prime) + Number(dommagesItem.prime);
+                const combinedCapital = Math.max(Number(catNatItem.capital), Number(dommagesItem.capital));
+                
+                rows += `
+                  <tr class="combined-row">
+                    <td><strong>Extension Catastrophes Naturelles</strong><span class="combined-tag">CAT NAT + Dommages émeutes</span></td>
+                    <td>${combinedCapital == 0 ? 'ILLIMITÉ' : formatCurrency(combinedCapital)}</td>
+                    <td>${formatCurrency(combinedPrime)}</td>
+                  </tr>
+                `;
+                combinedAdded = true;
               }
-              
-              // Regular item
-              rows += `
-                <tr>
-                  <td>${item.guarantee.nameFr}</td>
-                  <td>${item.capital == 0 ? 'ILLIMITÉ' : formatCurrency(item.capital)}</td>
-                  <td>${formatCurrency(item.prime)}</td>
-                </tr>
-              `;
-            });
+              return;
+            }
             
-            return rows;
-          })()}
-        </tbody>
-      </table>
+            rows += `
+              <tr>
+                <td>${item.guarantee.nameFr}</td>
+                <td>${item.capital == 0 ? 'ILLIMITÉ' : formatCurrency(item.capital)}</td>
+                <td>${formatCurrency(item.prime)}</td>
+              </tr>
+            `;
+          });
+          
+          return rows;
+        })()}
+      </tbody>
+    </table>
+
+    <div class="totals-panel">
+      <div class="terms-box">
+        <div class="terms-box-title">Conditions du Contrat</div>
+        <ul class="terms-list">
+          <li>Contrat valable 1 an renouvelable</li>
+          <li>Déclaration sinistre sous 5 jours</li>
+          <li>Paiement avant prise d'effet</li>
+          <li>Modification à notifier sous 15 jours</li>
+        </ul>
+      </div>
+
+      <div class="totals-box">
+        <div class="total-line"><span>Prime Nette</span><span class="amount">${formatCurrency(contract.quote.primeNette)}</span></div>
+        <div class="total-line"><span>Frais</span><span class="amount">${formatCurrency(contract.quote.frais)}</span></div>
+        <div class="total-line"><span>Taxes</span><span class="amount">${formatCurrency(contract.quote.taxes)}</span></div>
+        <div class="total-line"><span>F.P.A.C</span><span class="amount">${formatCurrency(contract.quote.fpac)}</span></div>
+        <div class="total-line"><span>F.S.S.R</span><span class="amount">${formatCurrency(contract.quote.fssr)}</span></div>
+        <div class="total-line"><span>F.G</span><span class="amount">${formatCurrency(contract.quote.fg)}</span></div>
+        ${contract.deliveryFee > 0 ? `
+        <div class="total-line"><span>Frais de Livraison</span><span class="amount">${formatCurrency(contract.deliveryFee)}</span></div>
+        ` : ''}
+        <hr class="total-divider" />
+        <div class="total-final">
+          <span class="total-final-label">Total Payé</span>
+          <span class="total-final-amount">${formatCurrency(Number(contract.quote.totalAPayer) + Number(contract.deliveryFee))}</span>
+        </div>
+      </div>
     </div>
 
-    <div class="total-section">
-      <div class="total-row">
-        <span>Prime Nette</span>
-        <span>${formatCurrency(contract.quote.primeNette)}</span>
-      </div>
-      <div class="total-row">
-        <span>Frais</span>
-        <span>${formatCurrency(contract.quote.frais)}</span>
-      </div>
-      <div class="total-row">
-        <span>Taxes</span>
-        <span>${formatCurrency(contract.quote.taxes)}</span>
-      </div>
-      <div class="total-row">
-        <span>F.P.A.C</span>
-        <span>${formatCurrency(contract.quote.fpac)}</span>
-      </div>
-      <div class="total-row">
-        <span>F.S.S.R</span>
-        <span>${formatCurrency(contract.quote.fssr)}</span>
-      </div>
-      <div class="total-row">
-        <span>F.G</span>
-        <span>${formatCurrency(contract.quote.fg)}</span>
-      </div>
-      ${contract.deliveryFee > 0 ? `
-      <div class="total-row">
-        <span>Frais de Livraison</span>
-        <span>${formatCurrency(contract.deliveryFee)}</span>
-      </div>
-      ` : ''}
-      <div class="total-row final">
-        <span>TOTAL PAYÉ</span>
-        <span>${formatCurrency(Number(contract.quote.totalAPayer) + Number(contract.deliveryFee))}</span>
-      </div>
-    </div>
-
-    <div class="terms">
-      <strong>Conditions:</strong> Contrat valable 1 an renouvelable • Déclaration sinistre sous 5 jours • Paiement avant prise d'effet • Modification à notifier sous 15 jours
-    </div>
   </div>
 
   <div class="footer">
-    <p>Document officiel - Contrat d'assurance • ARS Assurance - Courtier Agréé • Émis le ${formatDate(contract.createdAt)}</p>
+    <div class="footer-left">
+      <div class="footer-brand">ARS ASSURANCE</div>
+      <div>Courtier Agréé • Document Officiel</div>
+    </div>
+    <div class="footer-right">
+      <div>Émis le ${formatDate(contract.createdAt)}</div>
+      ${contract.quittanceNumber ? `<div>Quittance N° ${contract.quittanceNumber}</div>` : ''}
+    </div>
   </div>
+
+</div>
 </body>
 </html>
     `;

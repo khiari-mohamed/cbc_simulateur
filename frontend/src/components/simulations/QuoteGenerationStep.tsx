@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { FileText, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import api from '../../lib/api/client';
@@ -20,6 +20,17 @@ export const QuoteGenerationStep = ({
 }: QuoteGenerationStepProps) => {
   const [simulationId, setSimulationId] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<Quote[]>([]);
+
+  // Fetch usage types to get the name
+  const { data: usageTypes } = useQuery({
+    queryKey: ['usage-types'],
+    queryFn: async () => {
+      const { data } = await api.get('/usage-types');
+      return data as Array<{ id: string; code: string; nameFr: string; isActive: boolean }>;
+    },
+  });
+
+  const usageName = usageTypes?.find(u => u.id === simulationData.usageId)?.nameFr || simulationData.usageId;
 
   const createSimulationMutation = useMutation({
     mutationFn: async () => {
@@ -161,7 +172,7 @@ export const QuoteGenerationStep = ({
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Usage</span>
               <span className="font-medium text-gray-900 dark:text-white">
-                {simulationData.usageId}
+                {usageName}
               </span>
             </div>
             <div className="flex justify-between">
@@ -246,6 +257,9 @@ export const QuoteGenerationStep = ({
                     </h4>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       Devis N° {quote.displayNumber ? `DEVIS-${String(quote.displayNumber).padStart(5, '0')}` : quote.quoteNumber}
+                    </p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mt-1">
+                      {simulationData.fractionnement === 'SEMESTRIEL' ? '📅 Fractionnement Semestriel' : '📅 Fractionnement Annuel'}
                     </p>
                   </div>
                   <div className="text-right">

@@ -67,7 +67,7 @@ export const VehicleInfoStep = ({ data, driverData, onUpdate, onNext }: VehicleI
     if (vehicleData.firstCirculationDate && vehicleData.fiscalHorsepower && vehicleData.numberOfSeats && vehicleData.newValue && vehicleData.marketValue && bonusMalus && usageId) {
       onUpdate(vehicleData as VehicleData, { bonusMalus: Number(bonusMalus), usageId });
     }
-  }, [watchedData.firstCirculationDate]);
+  }, [watchedData.firstCirculationDate, watchedData.newValue, watchedData.marketValue, watchedData.fiscalHorsepower, watchedData.numberOfSeats, watchedData.bonusMalus, watchedData.usageId]);
 
   const onSubmit = (formData: any) => {
     const { bonusMalus, usageId, ...vehicleData } = formData;

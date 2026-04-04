@@ -45,6 +45,7 @@ export class ContractsService {
         userId: quote.userId,
         startDate,
         endDate,
+        fractionnement: quote.fractionnement || 'ANNUEL', // Save fractionnement from quote
         createdById: createdBy,
         deliveryType: deliveryType || DeliveryType.AGENCY_PICKUP,
         deliveryFee,
@@ -54,6 +55,11 @@ export class ContractsService {
           include: {
             company: true,
             items: { include: { guarantee: true } },
+            simulation: {
+              include: {
+                vehicle: true,
+              },
+            },
           },
         },
         user: true,
@@ -132,6 +138,7 @@ export class ContractsService {
         userId: quote.userId,
         startDate,
         endDate,
+        fractionnement: quote.fractionnement || 'ANNUEL', // Save fractionnement from quote
         createdById: createdBy,
         deliveryType: deliveryType || DeliveryType.AGENCY_PICKUP,
         deliveryFee: 0,
@@ -142,6 +149,11 @@ export class ContractsService {
           include: {
             company: true,
             items: { include: { guarantee: true } },
+            simulation: {
+              include: {
+                vehicle: true,
+              },
+            },
           },
         },
         user: true,

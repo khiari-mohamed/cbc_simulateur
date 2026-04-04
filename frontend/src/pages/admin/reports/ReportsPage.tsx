@@ -4,6 +4,7 @@ import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, BarChart
 import { StatCard } from '../../../components/ui/StatCard';
 import { Button } from '../../../components/ui/Button';
 import api from '../../../lib/api/client';
+import { exportReportExcel } from '../../../lib/utils/exportReportExcel';
 
 export const ReportsPage = () => {
   const { data: stats } = useQuery({
@@ -31,28 +32,10 @@ export const ReportsPage = () => {
 
   const COLORS = ['#9ca3af', '#3b82f6', '#10b981', '#ef4444'];
 
-  const handleExport = () => {
-    const csvContent = [
-      ['Rapport Statistiques ARS', ''],
-      ['Date', new Date().toLocaleDateString('fr-FR')],
-      [''],
-      ['Résumé'],
-      ['Total Simulations', totalSimulations],
-      ['Total Devis', totalQuotes],
-      ['Devis Validés', validatedQuotes],
-      ['Utilisateurs', totalUsers],
-      [''],
-      ['Devis par Statut'],
-      ['Statut', 'Nombre'],
-      ...quotesChartData.map(item => [item.name, item.value]),
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `rapport-ars-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-  };
+const handleExport = async () => {
+  if (!stats?.reporting) return;
+  await exportReportExcel({ reporting: stats.reporting });
+};
 
   return (
       <div className="max-w-7xl mx-auto">
@@ -151,7 +134,7 @@ export const ReportsPage = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Simulations par statut
@@ -214,6 +197,83 @@ export const ReportsPage = () => {
             </div>
           </div>
         </div>
+
+        {/* Statistiques par Convention */}
+        {stats?.reporting?.byConvention && stats.reporting.byConvention.length > 0 ? (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Performance par Convention
+            </h3>
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={stats.reporting.byConvention.slice(0, 10)} layout="horizontal">
+                <XAxis type="category" dataKey="conventionName" tick={{ fontSize: 10 }} stroke="#9ca3af" angle={-45} textAnchor="end" height={100} />
+                <YAxis type="number" tick={{ fontSize: 11 }} stroke="#9ca3af" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '12px'
+                  }}
+                  formatter={(value: any, name: string) => {
+                    if (name === 'totalPremium') return [value.toFixed(2) + ' TND', 'Prime Nette'];
+                    if (name === 'totalSimulations') return [value, 'Simulations'];
+                    if (name === 'totalContracts') return [value, 'Contrats'];
+                    return [value, name];
+                  }}
+                />
+                <Bar dataKey="totalSimulations" fill="#3b82f6" name="Simulations" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="totalContracts" fill="#10b981" name="Contrats" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="totalPremium" fill="#7c3aed" name="Prime Nette (TND)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+            
+            {stats.reporting.byConvention.length > 10 && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 text-center">
+                Affichage des 10 premières conventions sur {stats.reporting.byConvention.length}
+              </p>
+            )}
+
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <th className="text-left py-2 px-3 font-semibold text-gray-700 dark:text-gray-300">Convention</th>
+                    <th className="text-left py-2 px-3 font-semibold text-gray-700 dark:text-gray-300">Organisation</th>
+                    <th className="text-center py-2 px-3 font-semibold text-gray-700 dark:text-gray-300">Simulations</th>
+                    <th className="text-center py-2 px-3 font-semibold text-gray-700 dark:text-gray-300">Contrats</th>
+                    <th className="text-right py-2 px-3 font-semibold text-gray-700 dark:text-gray-300">Prime Nette</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.reporting.byConvention.map((conv: any, idx: number) => (
+                    <tr key={idx} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="py-2 px-3 text-gray-900 dark:text-white font-medium">{conv.conventionName}</td>
+                      <td className="py-2 px-3 text-gray-600 dark:text-gray-400">{conv.organizationName}</td>
+                      <td className="py-2 px-3 text-center text-blue-600 dark:text-blue-400 font-semibold">{conv.totalSimulations}</td>
+                      <td className="py-2 px-3 text-center text-green-600 dark:text-green-400 font-semibold">{conv.totalContracts}</td>
+                      <td className="py-2 px-3 text-right text-purple-600 dark:text-purple-400 font-semibold">{conv.totalPremium.toFixed(2)} TND</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Performance par Convention
+            </h3>
+            <div className="text-center py-12">
+              <p className="text-gray-500 dark:text-gray-400">
+                Aucune donnée de convention disponible
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                Les statistiques apparaîtront lorsque des simulations seront créées avec des conventions
+              </p>
+            </div>
+          </div>
+        )}
       </div>
   );
 };

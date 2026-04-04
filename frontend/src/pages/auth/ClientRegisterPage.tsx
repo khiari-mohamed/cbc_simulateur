@@ -5,15 +5,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Select } from '../../components/ui/Select';
 import { GoogleButton } from '../../components/ui/GoogleButton';
 import { AuthLayout } from './AuthLayout';
 import { ArrowLeft, Shield, Lock as LockIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/api/client';
 
-
-const registerSchema = z.object({
+const clientRegisterSchema = z.object({
   email: z.string().email('Email invalide'),
   password: z.string().min(6, 'Mot de passe minimum 6 caractères'),
   confirmPassword: z.string(),
@@ -22,8 +20,6 @@ const registerSchema = z.object({
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Format de téléphone invalide').optional().or(z.literal('')),
   organizationCode: z.string().optional().or(z.literal('')),
   organizationJoinKey: z.string().optional().or(z.literal('')),
-  role: z.enum(['CLIENT_ADHERENT', 'ADMINISTRATEUR_ARS', 'GESTIONNAIRE_VALIDATION_ARS']).optional(),
-  adminKey: z.string().optional().or(z.literal('')),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Les mots de passe ne correspondent pas',
   path: ['confirmPassword'],
@@ -34,43 +30,27 @@ const registerSchema = z.object({
 }, {
   message: 'Code et clé d\'accès organisation requis ensemble',
   path: ['organizationJoinKey'],
-}).refine((data) => {
-  if (data.role === 'ADMINISTRATEUR_ARS' && data.adminKey !== import.meta.env.VITE_ADMIN_REGISTRATION_KEY) {
-    return false;
-  }
-  return true;
-}, {
-  message: 'Clé administrateur invalide',
-  path: ['adminKey'],
 });
 
-const roleOptions = [
-  { value: 'CLIENT_ADHERENT', label: 'Client / Adhérent' },
-  { value: 'ADMINISTRATEUR_ARS', label: 'Administrateur ARS' },
-  { value: 'GESTIONNAIRE_VALIDATION_ARS', label: 'Gestionnaire de Validation ARS' },
-];
+type ClientRegisterForm = z.infer<typeof clientRegisterSchema>;
 
-type RegisterForm = z.infer<typeof registerSchema>;
-
-export const RegisterPage = () => {
+export const ClientRegisterPage = () => {
   const [step, setStep] = useState<'register' | 'verify'>('register');
   const [userId, setUserId] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [otp, setOtp] = useState('');
   const [verifying, setVerifying] = useState(false);
   const navigate = useNavigate();
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<RegisterForm>({
-    resolver: zodResolver(registerSchema),
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ClientRegisterForm>({
+    resolver: zodResolver(clientRegisterSchema),
   });
 
-  const selectedRole = watch('role');
-
-  const onSubmit = async (data: RegisterForm) => {
+  const onSubmit = async (data: ClientRegisterForm) => {
     try {
-      const { confirmPassword, adminKey, ...registerData } = data;
+      const { confirmPassword, ...registerData } = data;
       const response = await api.post('/auth/register', {
         ...registerData,
-        adminKey, // Include adminKey for backend validation
+        role: 'CLIENT_ADHERENT',
       });
       setUserId(response.data.id);
       setEmail(data.email);
@@ -88,7 +68,6 @@ export const RegisterPage = () => {
       toast.error('Code OTP invalide (6 chiffres requis)');
       return;
     }
-    
     setVerifying(true);
     try {
       await api.post('/auth/verify-otp', { userId, otp });
@@ -105,7 +84,6 @@ export const RegisterPage = () => {
     return (
       <AuthLayout title="Vérification OTP" subtitle="Entrez le code reçu par email">
         <div className="space-y-6">
-          {/* OTP Icon + Message */}
           <div className="text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-2xl mb-4">
               <Shield className="w-8 h-8 text-primary-600" />
@@ -126,11 +104,9 @@ export const RegisterPage = () => {
               maxLength={6}
               className="text-center text-2xl tracking-[0.5em] font-mono"
             />
-
             <Button type="submit" loading={verifying} className="w-full !py-2.5">
               Vérifier le code
             </Button>
-
             <button
               type="button"
               onClick={() => setStep('register')}
@@ -203,63 +179,33 @@ export const RegisterPage = () => {
             placeholder="+212600000000"
           />
 
-          <Select
-            label="Rôle"
-            {...register('role')}
-            error={errors.role?.message}
-            options={roleOptions}
-          />
-
-          {selectedRole === 'ADMINISTRATEUR_ARS' && (
-            <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/20 p-4 space-y-3">
-              <div>
-                <p className="text-xs font-semibold text-red-900 dark:text-red-200 flex items-center gap-1.5">
-                  <LockIcon className="w-3.5 h-3.5" />
-                  Clé Administrateur Requise
-                </p>
-                <p className="text-xs text-red-700 dark:text-red-300 mt-1 leading-relaxed">
-                  Pour créer un compte administrateur, vous devez entrer la clé secrète fournie par l'équipe ARS.
-                </p>
-              </div>
-              <Input
-                label="Clé Administrateur"
-                type="password"
-                autoComplete="new-password"
-                {...register('adminKey')}
-                error={errors.adminKey?.message}
-                placeholder="Clé secrète administrateur"
-              />
+          {/* Organisation join section */}
+          <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/20 p-4 space-y-3">
+            <div>
+              <p className="text-xs font-semibold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                <LockIcon className="w-3.5 h-3.5" />
+                Accès Organisation (optionnel)
+              </p>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1 leading-relaxed">
+                Si vous appartenez à une organisation (ATB Bank, etc.), entrez le code et la clé d'accès fournis par votre organisation.
+              </p>
             </div>
-          )}
-
-          {selectedRole === 'CLIENT_ADHERENT' && (
-            <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/20 p-4 space-y-3">
-              <div>
-                <p className="text-xs font-semibold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
-                  <LockIcon className="w-3.5 h-3.5" />
-                  Accès Organisation (optionnel)
-                </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1 leading-relaxed">
-                  Si vous appartenez à une organisation (ATB Bank, etc.), entrez le code et la clé d'accès fournis par votre organisation.
-                </p>
-              </div>
-              <Input
-                label="Code Organisation"
-                type="text"
-                {...register('organizationCode')}
-                error={errors.organizationCode?.message}
-                placeholder="Ex: ATB"
-              />
-              <Input
-                label="Clé d'accès Organisation"
-                type="password"
-                autoComplete="new-password"
-                {...register('organizationJoinKey')}
-                error={errors.organizationJoinKey?.message}
-                placeholder="Ex: Alpha-Bravo-12345678"
-              />
-            </div>
-          )}
+            <Input
+              label="Code Organisation"
+              type="text"
+              {...register('organizationCode')}
+              error={errors.organizationCode?.message}
+              placeholder="Ex: ATB"
+            />
+            <Input
+              label="Clé d'accès Organisation"
+              type="password"
+              autoComplete="new-password"
+              {...register('organizationJoinKey')}
+              error={errors.organizationJoinKey?.message}
+              placeholder="Ex: Alpha-Bravo-12345678"
+            />
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <Input

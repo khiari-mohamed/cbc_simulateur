@@ -6,6 +6,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
+import { ClientRegisterPage } from './pages/auth/ClientRegisterPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { GoogleCallback } from './pages/auth/GoogleCallback';
 import { CompaniesPage } from './pages/admin/companies/CompaniesPage';
@@ -78,7 +79,8 @@ function App() {
             <AuthProvider>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/register" element={<ClientRegisterPage />} />
+              <Route path="/admin-access/register" element={<RegisterPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/auth/google/callback" element={<GoogleCallback />} />
               <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>

@@ -60,6 +60,8 @@ export const CoverageSelectionStep = ({
   const [showDcModal, setShowDcModal] = useState(false);
   const [dcModalCompanyId, setDcModalCompanyId] = useState<string | null>(null);
   const [tempDcCapital, setTempDcCapital] = useState<number>(1000);
+  const [showBgModal, setShowBgModal] = useState(false);
+  const [tempBgLimit, setTempBgLimit] = useState<number>(1000);
 
   // Refresh user data on mount to get latest conventions
   useEffect(() => {
@@ -245,6 +247,30 @@ export const CoverageSelectionStep = ({
     });
   };
 
+  const confirmBgLimit = () => {
+    const bgGuarantee = optionalGuarantees.find(g => g.code === 'BG');
+    if (!bgGuarantee) return;
+    
+    const updatedGuarantees = [...localGuarantees, bgGuarantee.id];
+    setLocalGuarantees(updatedGuarantees);
+    setLocalBgLimit(tempBgLimit);
+    
+    if (localFormula) {
+      onUpdate({
+        formulaType: localFormula as FormulaType,
+        selectedGuarantees: updatedGuarantees,
+        conventionId: localConvention || undefined,
+        franchiseRate: localFranchiseRate,
+        bgLimit: tempBgLimit,
+        dcCapitals: localDcCapitals,
+        fractionnement: localFractionnement,
+        companyIds: selectedCompanies,
+      });
+    }
+    
+    setShowBgModal(false);
+  };
+
   const confirmDcCapital = () => {
     if (!dcModalCompanyId) return;
 
@@ -267,6 +293,23 @@ export const CoverageSelectionStep = ({
   };
 
   const handleGuaranteeToggle = (guaranteeId: string) => {
+    const bgGuarantee = optionalGuarantees.find(g => g.code === 'BG');
+    const isTogglingBg = bgGuarantee && guaranteeId === bgGuarantee.id;
+    const willBeSelected = !localGuarantees.includes(guaranteeId);
+    
+    // Check if we need to show BG modal
+    const needsBgModal = isTogglingBg && 
+                        willBeSelected && 
+                        (localFormula === FormulaType.STANDARD || localFormula === FormulaType.DOMMAGES_COLLISIONS);
+    
+    if (needsBgModal) {
+      // Open modal instead of directly toggling
+      setTempBgLimit(localBgLimit || 1000);
+      setShowBgModal(true);
+      return;
+    }
+    
+    // Normal toggle for other guarantees or when unchecking BG
     const updatedGuarantees = localGuarantees.includes(guaranteeId)
       ? localGuarantees.filter(id => id !== guaranteeId)
       : [...localGuarantees, guaranteeId];
@@ -731,6 +774,7 @@ export const CoverageSelectionStep = ({
               .map((guarantee) => {
                 const isDisabled = guarantee.code === 'BG' && isBrisDeGlacesFree;
                 const isFree = isGuaranteeFree(guarantee.code);
+                const isBgWithLimit = guarantee.code === 'BG' && localGuarantees.includes(guarantee.id) && localBgLimit;
 
                 return (
                   <label
@@ -755,6 +799,11 @@ export const CoverageSelectionStep = ({
                     <div className="flex-1">
                       <div className="font-medium text-gray-900 dark:text-white">
                         {guarantee.nameFr}
+                        {isBgWithLimit && (
+                          <span className="ml-2 text-sm font-normal text-green-600 dark:text-green-400">
+                            {localBgLimit.toLocaleString('fr-FR')} DT
+                          </span>
+                        )}
                       </div>
                       {isFree && (
                         <span className="text-xs text-green-600 dark:text-green-400">
@@ -765,6 +814,7 @@ export const CoverageSelectionStep = ({
                   </label>
                 );
               })}
+         
             
             {/* Lloyd Combined Option: Only show when Lloyd is the ONLY company selected */}
             {(() => {
@@ -866,81 +916,7 @@ export const CoverageSelectionStep = ({
       )}
 
       {/* BG limit for DC formula when BG is selected */}
-      {localFormula === FormulaType.DOMMAGES_COLLISIONS && (() => {
-        const bgGuarantee = optionalGuarantees.find(g => g.code === 'BG');
-        const isBgSelected = bgGuarantee && localGuarantees.includes(bgGuarantee.id);
-        return isBgSelected ? (
-          <Select
-            label="Limite Bris de Glaces (DT) - Optionnel"
-            value={localBgLimit.toString()}
-            onChange={(e) => {
-              const limit = Number(e.target.value);
-              setLocalBgLimit(limit);
-              onUpdate({
-                formulaType: localFormula,
-                selectedGuarantees: localGuarantees,
-                conventionId: localConvention || undefined,
-                franchiseRate: localFranchiseRate,
-                bgLimit: limit,
-                dcCapitals: localDcCapitals,
-                fractionnement: localFractionnement,
-              });
-            }}
-            options={
-              bgCapitalLimits && bgCapitalLimits.length > 0
-                ? bgCapitalLimits
-                    .filter(limit => limit.isActive)
-                    .map(limit => ({
-                      value: limit.value.toString(),
-                      label: limit.label || `${limit.value.toLocaleString('fr-FR')} DT`,
-                    }))
-                : [
-                    { value: '1000', label: '1 000 DT' },
-                    { value: '2000', label: '2 000 DT' },
-                    { value: '3000', label: '3 000 DT' },
-                  ]
-            }
-          />
-        ) : null;
-      })()}
-
-      {localFormula === FormulaType.STANDARD && (() => {
-        const bgGuarantee = optionalGuarantees.find(g => g.code === 'BG');
-        const isBgSelected = bgGuarantee && localGuarantees.includes(bgGuarantee.id);
-        return isBgSelected ? (
-          <Select
-            label="Limite Bris de Glaces (DT)"
-            value={localBgLimit.toString()}
-            onChange={(e) => {
-              const limit = Number(e.target.value);
-              setLocalBgLimit(limit);
-              onUpdate({
-                formulaType: localFormula,
-                selectedGuarantees: localGuarantees,
-                conventionId: localConvention || undefined,
-                franchiseRate: localFranchiseRate,
-                bgLimit: limit,
-                dcCapitals: localDcCapitals,
-                fractionnement: localFractionnement,
-              });
-            }}
-            options={
-              bgCapitalLimits && bgCapitalLimits.length > 0
-                ? bgCapitalLimits
-                    .filter(limit => limit.isActive)
-                    .map(limit => ({
-                      value: limit.value.toString(),
-                      label: limit.label || `${limit.value.toLocaleString('fr-FR')} DT`,
-                    }))
-                : [
-                    { value: '1000', label: '1 000 DT' },
-                    { value: '2000', label: '2 000 DT' },
-                    { value: '3000', label: '3 000 DT' },
-                  ]
-            }
-          />
-        ) : null;
-      })()}
+      {/* REMOVED - Now handled by modal */}
 
       {mandatoryGuarantees.length > 0 && (
         <div>
@@ -1050,6 +1026,21 @@ export const CoverageSelectionStep = ({
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Sélectionnez le capital assuré pour cette compagnie
             </p>
+            {(() => {
+              const simulationData = JSON.parse(localStorage.getItem('simulationData') || '{}');
+              const marketValue = simulationData.vehicle?.marketValue || 0;
+              const maxAllowed = marketValue * 0.8;
+              if (tempDcCapital > maxAllowed && marketValue > 0) {
+                return (
+                  <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                    <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                      ⚠️ <strong>Attention:</strong> Le capital sélectionné ({tempDcCapital.toLocaleString('fr-FR')} DT) dépasse 80% de la valeur vénale ({maxAllowed.toFixed(0)} DT max). Cela pourrait être rejeté lors de la génération du devis.
+                    </p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
 
           <div className="flex gap-3 mt-6">
@@ -1075,6 +1066,69 @@ export const CoverageSelectionStep = ({
         </div>
       </div>
     )}
+      {/* BG Limit Modal */}
+      {showBgModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              Configuration Bris de Glaces
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Sélectionnez la limite de capital pour la garantie Bris de Glaces
+            </p>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Limite Bris de Glaces (DT)
+              </label>
+              <select
+                value={tempBgLimit.toString()}
+                onChange={(e) => setTempBgLimit(Number(e.target.value))}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+              >
+                {bgCapitalLimits && bgCapitalLimits.length > 0
+                  ? bgCapitalLimits
+                      .filter(limit => limit.isActive)
+                      .map(limit => (
+                        <option key={limit.id} value={limit.value.toString()}>
+                          {limit.label || `${limit.value.toLocaleString('fr-FR')} DT`}
+                        </option>
+                      ))
+                  : [
+                      { value: '1000', label: '1 000 DT' },
+                      { value: '2000', label: '2 000 DT' },
+                      { value: '3000', label: '3 000 DT' },
+                    ].map(opt => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))
+                }
+              </select>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Cette limite détermine le montant maximum de remboursement
+              </p>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowBgModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={confirmBgLimit}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

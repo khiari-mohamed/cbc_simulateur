@@ -40,4 +40,8 @@ export class RegisterDto {
   @IsOptional()
   @IsEnum(Role, { message: 'Invalid role' })
   role?: Role;
+
+  @IsOptional()
+  @IsString()
+  adminKey?: string;
 }
