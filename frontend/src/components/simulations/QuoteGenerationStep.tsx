@@ -278,85 +278,31 @@ export const QuoteGenerationStep = ({
                     Détail des garanties
                   </h5>
                   <div className="space-y-1.5">
-                    {quote.items && quote.items
-                      .filter((item: any) => {
-                        // For Lloyd, hide individual CAT NAT and Dommages Émeutes (shown combined below)
-                        if (quote.company.code === 'LLOYD') {
-                          const hasBoth = quote.items?.some((i: any) => i.guarantee.code === 'CATASTROPHES_NATURELLES') &&
-                                         quote.items?.some((i: any) => i.guarantee.code === 'DOMMAGES_EMEUTES');
-                          if (hasBoth && (item.guarantee.code === 'CATASTROPHES_NATURELLES' || item.guarantee.code === 'DOMMAGES_EMEUTES')) {
-                            return false;
-                          }
-                        }
-                        return true;
-                      })
-                      .map((item: any) => (
+                    {quote.items && quote.items.map((item: any) => {
+                      const isFree = parseFloat(item.prime) === 0;
+                      const isNotCovered = item.isNotCovered || false;
+                      return (
                         <div key={item.id} className="flex justify-between text-xs">
                           <span className="text-gray-600 dark:text-gray-400">
                             {item.guarantee.nameFr}
+                            {!isNotCovered && isFree && (
+                              <span className="ml-2 text-xs text-green-600 dark:text-green-400 font-semibold">
+                                (Gratuit)
+                              </span>
+                            )}
+                            {isNotCovered && (
+                              <span className="ml-2 text-xs text-red-600 dark:text-red-400 font-bold">
+                                (NON ACCORDÉE)
+                              </span>
+                            )}
                           </span>
                           <span className="font-medium text-gray-900 dark:text-white">
                             {parseFloat(item.prime).toLocaleString()} DT
                           </span>
                         </div>
-                      ))}
-                    
-                    {/* Company-specific guarantee display */}
-                    {quote.company.code === 'AMANA' && (
-                      <>
-                        {/* Incendie Suite Émeutes - always NC for AMANA */}
-                        {!quote.items?.some((i: any) => i.guarantee.code === 'INCENDIE_EMEUTES') && (
-                          <div className="flex justify-between text-xs">
-                            <span className="text-gray-600 dark:text-gray-400">
-                              Incendie suite émeutes
-                            </span>
-                            <span className="text-red-600 dark:text-red-400 font-medium">
-                              ❌ Non accordée
-                            </span>
-                          </div>
-                        )}
-                        
-                        {/* CAT NAT - NC if not Tous Risques */}
-                        {simulationData.formulaType !== 'TOUS_RISQUES_0' && 
-                         !quote.items?.some((i: any) => i.guarantee.code === 'CATASTROPHES_NATURELLES') && (
-                          <div className="flex justify-between text-xs">
-                            <span className="text-gray-600 dark:text-gray-400">
-                              Dommages suite CAT NAT
-                            </span>
-                            <span className="text-red-600 dark:text-red-400 font-medium">
-                              ❌ Non accordée (Tous Risques uniquement)
-                            </span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                    
-                    {/* Lloyd: Show combined CAT NAT + Dommages Émeutes if both present */}
-                    {quote.company.code === 'LLOYD' && (() => {
-                      const hasCatNat = quote.items?.some((i: any) => i.guarantee.code === 'CATASTROPHES_NATURELLES');
-                      const hasDommagesEmeutes = quote.items?.some((i: any) => i.guarantee.code === 'DOMMAGES_EMEUTES');
-                      
-                      if (hasCatNat && hasDommagesEmeutes) {
-                        const catNatItem = quote.items?.find((i: any) => i.guarantee.code === 'CATASTROPHES_NATURELLES');
-                        const dommagesItem = quote.items?.find((i: any) => i.guarantee.code === 'DOMMAGES_EMEUTES');
-                        const combinedPrime = (parseFloat(String(catNatItem?.prime || 0)) + parseFloat(String(dommagesItem?.prime || 0)));
-                        
-                        return (
-                          <div className="flex justify-between text-xs bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
-                            <span className="text-gray-600 dark:text-gray-400">
-                              Extension Catastrophes Naturelles
-                              <span className="block text-[10px] text-gray-500">
-                                (CAT NAT + Dommages émeutes)
-                              </span>
-                            </span>
-                            <span className="font-medium text-gray-900 dark:text-white">
-                              {combinedPrime.toLocaleString()} DT
-                            </span>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
+                      );
+                    })}
+
                   </div>
                 </div>
 

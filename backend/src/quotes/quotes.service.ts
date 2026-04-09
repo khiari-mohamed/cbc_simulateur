@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PricingEngineService } from '../pricing-engine/pricing-engine.service';
 import { PdfService } from '../pdf/pdf.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { FormulaEligibilityService } from '../formula-eligibility/formula-eligibility.service';
 import { QuoteStatus } from '@prisma/client';
 
 import { calculateEffectiveDate } from '../src/common/utils/effective-date.util';
@@ -14,6 +15,7 @@ export class QuotesService {
     private pricingEngine: PricingEngineService,
     private pdfService: PdfService,
     private notificationsService: NotificationsService,
+    private formulaEligibilityService: FormulaEligibilityService,
   ) {}
 
   async generate(simulationId: string, companyId: string) {
@@ -27,6 +29,21 @@ export class QuotesService {
 
     if (!simulation) {
       throw new Error('Simulation not found');
+    }
+
+    // ✅ Check age eligibility
+    const vehicleAge = this.calculateVehicleAge(simulation.vehicle.firstCirculationDate);
+    const eligibility = await this.formulaEligibilityService.checkEligibility(
+      companyId,
+      simulation.usageId,
+      simulation.formulaType,
+      vehicleAge,
+    );
+
+    if (!eligibility.eligible) {
+      throw new Error(
+        `La formule ${simulation.formulaType} n'est pas éligible pour ce véhicule: ${eligibility.reason}`,
+      );
     }
 
     // Get ALL active guarantees (both mandatory and optional selected)
@@ -45,16 +62,40 @@ export class QuotesService {
     // Combine: ALL mandatory + selected optional
     let allSelectedGuarantees = [...new Set([...mandatoryGuarantees, ...selectedOptionalGuarantees])];
 
-    // Lloyd business rule: CAT NAT and Dommages Émeutes are bundled
-    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
-    if (company?.code === 'LLOYD') {
-      const hasCatNat = allSelectedGuarantees.includes('CATASTROPHES_NATURELLES');
-      const hasDommagesEmeutes = allSelectedGuarantees.includes('DOMMAGES_EMEUTES');
-      
-      if (hasCatNat || hasDommagesEmeutes) {
-        // Ensure both are included for Lloyd
-        if (!hasCatNat) allSelectedGuarantees.push('CATASTROPHES_NATURELLES');
-        if (!hasDommagesEmeutes) allSelectedGuarantees.push('DOMMAGES_EMEUTES');
+    // ✅ Apply bundling rules dynamically from database
+    const bundlings = await this.prisma.guaranteeBundling.findMany({
+      where: {
+        companyId,
+        isActive: true,
+        OR: [
+          { formulaType: null },
+          { formulaType: simulation.formulaType },
+        ],
+      },
+      include: {
+        parentGuarantee: true,
+        includedGuarantee: true,
+      },
+    });
+
+    // Group bundlings by parent guarantee
+    const bundlingMap = new Map<string, string[]>();
+    for (const bundling of bundlings) {
+      const parentCode = bundling.parentGuarantee.code;
+      if (!bundlingMap.has(parentCode)) {
+        bundlingMap.set(parentCode, []);
+      }
+      bundlingMap.get(parentCode)!.push(bundling.includedGuarantee.code);
+    }
+
+    // Apply bundling: if user selected a parent guarantee, include all bundled guarantees
+    for (const [parentCode, includedCodes] of bundlingMap.entries()) {
+      if (allSelectedGuarantees.includes(parentCode)) {
+        for (const includedCode of includedCodes) {
+          if (!allSelectedGuarantees.includes(includedCode)) {
+            allSelectedGuarantees.push(includedCode);
+          }
+        }
       }
     }
 
@@ -70,6 +111,15 @@ export class QuotesService {
       dcCapitalForCompany = simulation.dcCapital;
     }
 
+    // Get AC capital for this specific company from acCapitals object
+    let acCapitalForCompany = new (require('@prisma/client').Decimal)(0);
+    if ((simulation as any).acCapitals && typeof (simulation as any).acCapitals === 'object') {
+      const acCapitals = (simulation as any).acCapitals as Record<string, number>;
+      if (acCapitals[companyId]) {
+        acCapitalForCompany = new (require('@prisma/client').Decimal)(acCapitals[companyId]);
+      }
+    }
+
     const pricing = await this.pricingEngine.calculatePremium(
       companyId,
       simulation.vehicle,
@@ -81,6 +131,7 @@ export class QuotesService {
         selectedCapitals: {
           BG: simulation.bgLimit ? new (require('@prisma/client').Decimal)(simulation.bgLimit) : new (require('@prisma/client').Decimal)(0),
           DOMMAGES_COLLISIONS: dcCapitalForCompany,
+          ASSURANCE_CONDUCTEUR: acCapitalForCompany,
           PERSONNES_TRANSPORTEES: new (require('@prisma/client').Decimal)(5000), // Default PTA capital
         },
         franchiseRate: simulation.franchiseRate ? Number(simulation.franchiseRate) : 0,
@@ -105,13 +156,19 @@ export class QuotesService {
         fssr: pricing.fssr,
         fg: pricing.fg,
         totalAPayer: pricing.totalAPayer,
-        fractionnement: (simulation as any).fractionnement ?? 'ANNUEL', // Save fractionnement from simulation
+        fractionnement: (simulation as any).fractionnement ?? 'ANNUEL',
         pricingSnapshot: pricing as any,
+        eligibilitySnapshot: {
+          vehicleAge,
+          maxAgeYears: eligibility.maxAge,
+          ruleApplied: eligibility.maxAge !== undefined,
+        },
         items: {
-          create: pricing.items.map(({ guaranteeId, capital, prime }) => ({
+          create: pricing.items.map(({ guaranteeId, capital, prime, isNotCovered }) => ({
             guaranteeId,
             capital,
             prime,
+            isNotCovered: isNotCovered || false,
           })),
         },
       },
@@ -365,8 +422,8 @@ export class QuotesService {
         note,
       );
       console.log('✅ Notification sent to client:', updated.user.email);
-    } catch (err) {
-      console.error('❌ Failed to send notification:', err.message);
+    } catch (err: any) {
+      console.error('❌ Failed to send notification:', err?.message || 'Unknown error');
       console.error('Full error:', err);
     }
 
@@ -416,5 +473,14 @@ export class QuotesService {
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 1000);
     return `Q${year}${timestamp}${random}`;
+  }
+
+  private calculateVehicleAge(firstCirculationDate: Date): number {
+    const now = new Date();
+    const birthDate = new Date(firstCirculationDate);
+    let age = now.getFullYear() - birthDate.getFullYear();
+    const hasNotReachedBirthday = now < new Date(now.getFullYear(), birthDate.getMonth(), birthDate.getDate());
+    if (hasNotReachedBirthday) age--;
+    return age;
   }
 }

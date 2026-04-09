@@ -91,6 +91,7 @@
     GRATUIT
     NON_ACCORDEE
     DEFAULT
+    HIDDEN
   }
 
 
@@ -116,6 +117,7 @@
     simulations              Simulation[]
     conventionReductionRules ConventionReductionRule[]
     usageFeeConfigs          UsageFeeConfig[]
+    formulaEligibilityRules  FormulaEligibilityAgeRule[]
 
     @@map("usage_types")
   }
@@ -186,6 +188,7 @@
     guaranteeBundlings        GuaranteeBundling[]
     guaranteeAvailabilities    GuaranteeAvailability[]
     usageFeeConfigs          UsageFeeConfig[]
+    formulaEligibilityRules  FormulaEligibilityAgeRule[]
 
     @@map("companies")
   }
@@ -329,6 +332,7 @@
     bgLimit        Int?             // BG capital limit chosen by client (from bg_capital_limits table)
     dcCapital      Decimal?         @db.Decimal(15, 0)
     dcCapitals     Json?            // Per-company DC capitals: { companyId: capital }
+    acCapitals     Json?            // Per-company AC capitals: { companyId: capital }
     fractionnement String           @default("ANNUEL") // ANNUEL or SEMESTRIEL
     status         SimulationStatus @default(DRAFT)
     createdAt      DateTime         @default(now())
@@ -355,37 +359,38 @@
   }
 
   model Quote {
-    id                String           @id @default(uuid())
-    quoteNumber       String           @unique
-    displayNumber     Int              @default(autoincrement())
-    simulationId      String
-    simulation        Simulation       @relation(fields: [simulationId], references: [id])
-    userId            String
-    user              User             @relation(fields: [userId], references: [id])
-    companyId         String
-    company           Company          @relation(fields: [companyId], references: [id])
-    status            QuoteStatus      @default(GENERATED)
-    primeNette        Decimal          @db.Decimal(15, 3)
-    frais             Decimal          @db.Decimal(15, 3)
-    taxes             Decimal          @db.Decimal(15, 3)
-    fpac              Decimal          @db.Decimal(15, 3)
-    fssr              Decimal          @db.Decimal(15, 3)
-    fg                Decimal          @db.Decimal(15, 3)
-    totalAPayer       Decimal          @db.Decimal(15, 3)
-    fractionnement    String           @default("ANNUEL") // ANNUEL or SEMESTRIEL
-    pricingSnapshot   Json?
-    pdfPath           String?
-    validatedById     String?
-    validatedBy       User?            @relation("QuoteValidator", fields: [validatedById], references: [id])
-    validationRole    Role?
-    validatedAt       DateTime?
-    rejectionReason   String?          @db.Text
-    modificationNote  String?          @db.Text
-    effectiveDate     DateTime?
-    comparisonGroupId String?
-    comparisonGroup   QuoteComparison? @relation(fields: [comparisonGroupId], references: [id])
-    createdAt         DateTime         @default(now())
-    updatedAt         DateTime         @updatedAt
+    id                  String           @id @default(uuid())
+    quoteNumber         String           @unique
+    displayNumber       Int              @default(autoincrement())
+    simulationId        String
+    simulation          Simulation       @relation(fields: [simulationId], references: [id])
+    userId              String
+    user                User             @relation(fields: [userId], references: [id])
+    companyId           String
+    company             Company          @relation(fields: [companyId], references: [id])
+    status              QuoteStatus      @default(GENERATED)
+    primeNette          Decimal          @db.Decimal(15, 3)
+    frais               Decimal          @db.Decimal(15, 3)
+    taxes               Decimal          @db.Decimal(15, 3)
+    fpac                Decimal          @db.Decimal(15, 3)
+    fssr                Decimal          @db.Decimal(15, 3)
+    fg                  Decimal          @db.Decimal(15, 3)
+    totalAPayer         Decimal          @db.Decimal(15, 3)
+    fractionnement      String           @default("ANNUEL") // ANNUEL or SEMESTRIEL
+    pricingSnapshot     Json?
+    eligibilitySnapshot Json?            // { vehicleAge, maxAgeYears, ruleApplied }
+    pdfPath             String?
+    validatedById       String?
+    validatedBy         User?            @relation("QuoteValidator", fields: [validatedById], references: [id])
+    validationRole      Role?
+    validatedAt         DateTime?
+    rejectionReason     String?          @db.Text
+    modificationNote    String?          @db.Text
+    effectiveDate       DateTime?
+    comparisonGroupId   String?
+    comparisonGroup     QuoteComparison? @relation(fields: [comparisonGroupId], references: [id])
+    createdAt           DateTime         @default(now())
+    updatedAt           DateTime         @updatedAt
 
     items     QuoteItem[]
     contract  Contract?
@@ -395,13 +400,14 @@
   }
 
   model QuoteItem {
-    id          String    @id @default(uuid())
-    quoteId     String
-    quote       Quote     @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-    guaranteeId String
-    guarantee   Guarantee @relation(fields: [guaranteeId], references: [id])
-    capital     Decimal   @db.Decimal(15, 3)
-    prime       Decimal   @db.Decimal(15, 3)
+    id           String    @id @default(uuid())
+    quoteId      String
+    quote        Quote     @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+    guaranteeId  String
+    guarantee    Guarantee @relation(fields: [guaranteeId], references: [id])
+    capital      Decimal   @db.Decimal(15, 3)
+    prime        Decimal   @db.Decimal(15, 3)
+    isNotCovered Boolean   @default(false)
 
     @@map("quote_items")
   }
@@ -761,4 +767,23 @@
     @@index([usageId])
     @@index([companyId])
     @@map("usage_fee_configs")
+  }
+
+  model FormulaEligibilityAgeRule {
+    id          String       @id @default(uuid())
+    companyId   String
+    company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    usageId     String
+    usage       Usage        @relation(fields: [usageId], references: [id], onDelete: Cascade)
+    formulaType FormulaType
+    minAgeYears Int?         // Optional: Vehicle must be >= this age (e.g., 2 means age >= 2 years)
+    maxAgeYears Int?         // Optional: Vehicle must be < this age (e.g., 10 means age < 10 years)
+    description String?      @db.Text // Description of the rule
+    isActive    Boolean      @default(true)
+    createdAt   DateTime     @default(now())
+    updatedAt   DateTime     @updatedAt
+
+    @@unique([companyId, usageId, formulaType])
+    @@index([companyId, usageId, formulaType, isActive])
+    @@map("formula_eligibility_age_rules")
   }

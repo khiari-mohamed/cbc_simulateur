@@ -75,18 +75,8 @@ export const NewSimulationPage = () => {
   };
 
   useEffect(() => {
-    if (simulationData.vehicle?.firstCirculationDate && simulationData.formulaType) {
-      const vehicleAge = Math.floor(
-        (new Date().getTime() - new Date(simulationData.vehicle.firstCirculationDate).getTime()) /
-          (365.25 * 24 * 60 * 60 * 1000),
-      );
-      const isTousRisques = simulationData.formulaType.startsWith('TOUS_RISQUES');
-      const isDommagesCollision = simulationData.formulaType === 'DOMMAGES_COLLISIONS';
-
-      if ((isTousRisques && vehicleAge >= 2) || (isDommagesCollision && vehicleAge >= 10)) {
-        updateData({ formulaType: undefined, franchiseRate: undefined, dcCapitals: {} });
-      }
-    }
+    // Remove hardcoded age restrictions - now handled by backend API
+    // The eligibility will be checked dynamically in CoverageSelectionStep
   }, [simulationData.vehicle?.firstCirculationDate]);
 
   const canShowStep2 = () => {
@@ -176,6 +166,7 @@ export const NewSimulationPage = () => {
               firstCirculationDate={new Date(simulationData.vehicle.firstCirculationDate)}
               usageId={simulationData.usageId}
               companyIds={simulationData.companyIds}
+              marketValue={simulationData.vehicle.marketValue}
               onUpdate={(data) => updateData(data)}
               onNext={() => goToStep(3)}
               onBack={() => goToStep(1)}

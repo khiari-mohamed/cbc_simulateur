@@ -4,6 +4,7 @@ import { Plus, Trash2, Save, X } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { ConfirmationModal } from '../../components/ui/ConfirmationModal';
+import { DcCapitalTiersInfoModal } from './DcCapitalTiersInfoModal';
 import api from '../../lib/api/client';
 import toast from 'react-hot-toast';
 
@@ -272,10 +273,13 @@ export const DcCapitalTiersPage = () => {
             Configuration des paliers de capital pour Dommages Collision
           </p>
         </div>
-        <Button onClick={() => setShowAddForm(!showAddForm)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nouveau Palier
-        </Button>
+        <div className="flex items-center gap-3">
+          <DcCapitalTiersInfoModal />
+          <Button onClick={() => setShowAddForm(!showAddForm)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nouveau Palier
+          </Button>
+        </div>
       </div>
 
       {showAddForm && (

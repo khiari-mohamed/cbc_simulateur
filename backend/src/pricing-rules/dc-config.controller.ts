@@ -7,11 +7,10 @@ import { Role } from '@prisma/client';
 
 @Controller('dc-config')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMINISTRATEUR_ARS)
 export class DcConfigController {
   constructor(private dcConfigService: DcConfigService) {}
 
-  // DC Config endpoints
+  // DC Config endpoints - READ endpoints are public for clients
   @Get()
   findAllConfigs(@Query('companyId') companyId?: string, @Query('usageId') usageId?: string) {
     return this.dcConfigService.findAll(companyId, usageId);
@@ -22,16 +21,20 @@ export class DcConfigController {
     return this.dcConfigService.findById(id);
   }
 
+  // WRITE endpoints require ADMIN role
+  @Roles(Role.ADMINISTRATEUR_ARS)
   @Post()
   createConfig(@Body() data: any, @Request() req: any) {
     return this.dcConfigService.create(data, req.user.id);
   }
 
+  @Roles(Role.ADMINISTRATEUR_ARS)
   @Patch(':id')
   updateConfig(@Param('id') id: string, @Body() data: any, @Request() req: any) {
     return this.dcConfigService.update(id, data, req.user.id);
   }
 
+  @Roles(Role.ADMINISTRATEUR_ARS)
   @Delete(':id')
   deactivateConfig(@Param('id') id: string, @Request() req: any) {
     return this.dcConfigService.deactivate(id, req.user.id);

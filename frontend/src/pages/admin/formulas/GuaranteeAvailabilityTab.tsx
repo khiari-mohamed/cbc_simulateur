@@ -17,7 +17,7 @@ interface Guarantee {
   nameFr: string;
 }
 
-type AvailabilityStatus = 'GRATUIT' | 'NON_ACCORDEE' | 'DEFAULT';
+type AvailabilityStatus = 'GRATUIT' | 'NON_ACCORDEE' | 'DEFAULT' | 'HIDDEN';
 type FormulaType = 'STANDARD' | 'DOMMAGES_COLLISIONS' | 'TOUS_RISQUES_0' | null;
 
 interface GuaranteeAvailability {
@@ -270,9 +270,16 @@ export const GuaranteeAvailabilityTab = () => {
         );
       case 'NON_ACCORDEE':
         return (
-          <span className="px-3 py-1 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 text-xs font-bold rounded-full flex items-center gap-1">
-            <XCircle className="w-3 h-3" />
+          <span className="px-3 py-1 bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 text-xs font-bold rounded-full flex items-center gap-1">
+            <AlertCircle className="w-3 h-3" />
             NON ACCORDÉE
+          </span>
+        );
+      case 'HIDDEN':
+        return (
+          <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs font-bold rounded-full flex items-center gap-1">
+            <XCircle className="w-3 h-3" />
+            CACHÉE
           </span>
         );
       case 'DEFAULT':
@@ -378,7 +385,8 @@ export const GuaranteeAvailabilityTab = () => {
             <p className="font-semibold mb-1">💡 Comment ça fonctionne ?</p>
             <ul className="space-y-1 text-xs">
               <li><strong>GRATUIT:</strong> Garantie incluse gratuitement (prix = 0)</li>
-              <li><strong>NON ACCORDÉE:</strong> Garantie non disponible (cachée ou désactivée)</li>
+              <li><strong>NON ACCORDÉE:</strong> Garantie visible dans le devis avec label "NON ACCORDÉE"</li>
+              <li><strong>HIDDEN:</strong> Garantie complètement cachée (n'apparaît nulle part)</li>
               <li><strong>TARIF NORMAL:</strong> Utilise le module de tarification (comportement par défaut)</li>
             </ul>
           </div>
@@ -771,15 +779,35 @@ export const GuaranteeAvailabilityTab = () => {
                       value="NON_ACCORDEE"
                       checked={formData.status === 'NON_ACCORDEE'}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value as AvailabilityStatus })}
-                      className="w-4 h-4 text-red-600"
+                      className="w-4 h-4 text-orange-600"
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <XCircle className="w-4 h-4 text-red-600" />
+                        <AlertCircle className="w-4 h-4 text-orange-600" />
                         <span className="text-sm font-medium text-gray-900 dark:text-white">NON ACCORDÉE</span>
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Garantie non disponible (cachée ou désactivée)
+                        Visible dans le devis avec label "NON ACCORDÉE"
+                      </p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <input
+                      type="radio"
+                      name="status"
+                      value="HIDDEN"
+                      checked={formData.status === 'HIDDEN'}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as AvailabilityStatus })}
+                      className="w-4 h-4 text-gray-600"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <XCircle className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">CACHÉE</span>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Complètement cachée (n'apparaît nulle part)
                       </p>
                     </div>
                   </label>
@@ -1493,12 +1521,29 @@ export const GuaranteeAvailabilityTab = () => {
                       value="NON_ACCORDEE"
                       checked={formData.status === 'NON_ACCORDEE'}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value as AvailabilityStatus })}
-                      className="w-4 h-4 text-red-600"
+                      className="w-4 h-4 text-orange-600"
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <XCircle className="w-4 h-4 text-red-600" />
+                        <AlertCircle className="w-4 h-4 text-orange-600" />
                         <span className="text-sm font-medium text-gray-900 dark:text-white">NON ACCORDÉE</span>
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <input
+                      type="radio"
+                      name="status"
+                      value="HIDDEN"
+                      checked={formData.status === 'HIDDEN'}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as AvailabilityStatus })}
+                      className="w-4 h-4 text-gray-600"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <XCircle className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">CACHÉE</span>
                       </div>
                     </div>
                   </label>

@@ -19,8 +19,7 @@ async function main() {
     include: { organization: true },
   });
 
-  const vehicles = await prisma.vehicle.findMany({ take: 3 });
-  const usages = await prisma.usage.findMany({ take: 2 });
+  const usages = await prisma.usage.findMany();
   const guarantees = await prisma.guarantee.findMany({ take: 5 });
 
   if (conventions.length === 0) {
@@ -31,6 +30,23 @@ async function main() {
   if (users.length === 0) {
     console.log('❌ No users with organizations found!');
     return;
+  }
+
+  // Create sample vehicles if none exist
+  let vehicles = await prisma.vehicle.findMany({ take: 3 });
+  if (vehicles.length === 0) {
+    console.log('📦 Creating sample vehicles...');
+    const vehicleData = [
+      { registration: 'TUN-2020-001', fiscalHorsepower: 5, numberOfSeats: 5, newValue: 50000, marketValue: 40000, firstCirculationDate: new Date('2020-01-15') },
+      { registration: 'TUN-2018-002', fiscalHorsepower: 7, numberOfSeats: 5, newValue: 80000, marketValue: 60000, firstCirculationDate: new Date('2018-06-20') },
+      { registration: 'TUN-2022-003', fiscalHorsepower: 4, numberOfSeats: 5, newValue: 35000, marketValue: 32000, firstCirculationDate: new Date('2022-03-10') },
+    ];
+    
+    for (const vData of vehicleData) {
+      const vehicle = await prisma.vehicle.create({ data: vData });
+      vehicles.push(vehicle);
+    }
+    console.log('✅ Created 3 sample vehicles\n');
   }
 
   console.log(`📊 Found ${conventions.length} conventions and ${users.length} users\n`);
@@ -53,7 +69,18 @@ async function main() {
     const numSimulations = Math.floor(Math.random() * 2) + 2;
 
     for (let i = 0; i < numSimulations; i++) {
-      const vehicle = vehicles[Math.floor(Math.random() * vehicles.length)];
+      // Create vehicle for this simulation
+      const vehicle = await prisma.vehicle.create({
+        data: {
+          registration: `TUN-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`,
+          fiscalHorsepower: [4, 5, 6, 7, 8][Math.floor(Math.random() * 5)],
+          numberOfSeats: 5,
+          newValue: Math.floor(Math.random() * 50000) + 30000,
+          marketValue: Math.floor(Math.random() * 40000) + 25000,
+          firstCirculationDate: new Date(Date.now() - Math.floor(Math.random() * 5) * 365 * 24 * 60 * 60 * 1000),
+        },
+      });
+
       const usage = usages[Math.floor(Math.random() * usages.length)];
       const formulaType = [FormulaType.STANDARD, FormulaType.DOMMAGES_COLLISIONS, FormulaType.TOUS_RISQUES_0][
         Math.floor(Math.random() * 3)

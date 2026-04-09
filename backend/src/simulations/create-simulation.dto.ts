@@ -11,19 +11,19 @@ export enum FractionnementType {
 export class CreateSimulationDto {
   @ValidateNested()
   @Type(() => CreateVehicleDto)
-  vehicle: CreateVehicleDto;
+  vehicle!: CreateVehicleDto;
 
   @Transform(({ value }) => parseFloat(value))
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(1)
   @Max(8)
-  bonusMalus: number;
+  bonusMalus!: number;
 
   @IsString()
-  usageId: string;
+  usageId!: string;
 
   @IsEnum(FormulaType)
-  formulaType: FormulaType;
+  formulaType!: FormulaType;
 
   @IsOptional()
   @IsUUID()
@@ -46,6 +46,14 @@ export class CreateSimulationDto {
   dcCapitals?: Record<string, number>;
 
   @IsOptional()
+  acCapitals?: Record<string, number>;
+
+  @IsOptional()
   @IsEnum(FractionnementType)
   fractionnement?: FractionnementType;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  companyIds?: string[];
 }

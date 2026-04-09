@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { FormulaEligibilityService } from '../formula-eligibility/formula-eligibility.service';
 import { FormulaType, SimulationStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -13,6 +14,7 @@ export class SimulationsService {
     private vehiclesService: VehiclesService,
     private auditService: AuditService,
     private notificationsService: NotificationsService,
+    private formulaEligibilityService: FormulaEligibilityService,
   ) {}
 
   async create(userId: string, data: {
@@ -26,17 +28,16 @@ export class SimulationsService {
     bgLimit?: number;
     dcCapital?: number;
     dcCapitals?: Record<string, number>;
+    acCapitals?: Record<string, number>;
     fractionnement?: 'ANNUEL' | 'SEMESTRIEL';
+    companyIds?: string[]; // Add companyIds to validate against
   }) {
     const vehicle = await this.vehiclesService.create(data.vehicle);
     const vehicleAge = this.vehiclesService.calculateVehicleAge(vehicle.firstCirculationDate);
 
-    // Validate age restrictions
-    if (data.formulaType === FormulaType.TOUS_RISQUES_0 && vehicleAge >= 2) {
-      throw new BadRequestException('Tous Risques 0% is only available for vehicles less than 2 years old');
-    }
-    if (data.formulaType === FormulaType.DOMMAGES_COLLISIONS && vehicleAge >= 10) {
-      throw new BadRequestException('Dommages Collision is only available for vehicles less than 10 years old');
+    // Dynamic age validation using formula_eligibility_age_rules table
+    if (data.companyIds && data.companyIds.length > 0) {
+      await this.validateFormulaEligibility(data.companyIds, data.usageId, data.formulaType, vehicleAge);
     }
 
     const simulation = await this.prisma.simulation.create({
@@ -51,6 +52,7 @@ export class SimulationsService {
         bgLimit: data.bgLimit,
         dcCapital: data.dcCapital ? new Decimal(data.dcCapital) : null,
         dcCapitals: data.dcCapitals ? data.dcCapitals : undefined,
+        acCapitals: data.acCapitals ? data.acCapitals : undefined,
         fractionnement: data.fractionnement ?? 'ANNUEL', // Add fractionnement to database
       },
       include: { vehicle: true },
@@ -122,7 +124,9 @@ export class SimulationsService {
     bgLimit?: number;
     dcCapital?: number;
     dcCapitals?: Record<string, number>;
+    acCapitals?: Record<string, number>;
     fractionnement?: 'ANNUEL' | 'SEMESTRIEL';
+    companyIds?: string[]; // Add companyIds to validate against
   }) {
     const simulation = await this.findById(id);
 
@@ -134,14 +138,14 @@ export class SimulationsService {
       throw new BadRequestException('Cannot modify submitted simulation');
     }
 
-    // Validate formula change with vehicle age
-    if (data.formulaType && simulation.vehicle) {
+    // Dynamic age validation if formula or usage is being changed
+    if ((data.formulaType || data.usageId) && simulation.vehicle) {
       const vehicleAge = this.vehiclesService.calculateVehicleAge(simulation.vehicle.firstCirculationDate);
-      if (data.formulaType === FormulaType.TOUS_RISQUES_0 && vehicleAge >= 2) {
-        throw new BadRequestException('Tous Risques 0% is only available for vehicles less than 2 years old');
-      }
-      if (data.formulaType === FormulaType.DOMMAGES_COLLISIONS && vehicleAge >= 10) {
-        throw new BadRequestException('Dommages Collision is only available for vehicles less than 10 years old');
+      const formulaToCheck = data.formulaType || simulation.formulaType;
+      const usageToCheck = data.usageId || simulation.usageId;
+      
+      if (data.companyIds && data.companyIds.length > 0) {
+        await this.validateFormulaEligibility(data.companyIds, usageToCheck, formulaToCheck, vehicleAge);
       }
     }
 
@@ -154,6 +158,7 @@ export class SimulationsService {
     if (data.bgLimit !== undefined) updateData.bgLimit = data.bgLimit;
     if (data.dcCapital !== undefined) updateData.dcCapital = data.dcCapital ? new Decimal(data.dcCapital) : null;
     if (data.dcCapitals !== undefined) updateData.dcCapitals = data.dcCapitals ? data.dcCapitals : undefined;
+    if (data.acCapitals !== undefined) updateData.acCapitals = data.acCapitals ? data.acCapitals : undefined;
     if (data.fractionnement !== undefined) updateData.fractionnement = data.fractionnement; // Add fractionnement to update
 
     const updated = await this.prisma.simulation.update({
@@ -207,15 +212,7 @@ export class SimulationsService {
     if (!simulation.vehicle) {
       throw new BadRequestException('Vehicle data not found');
     }
-    const vehicleAge = this.vehiclesService.calculateVehicleAge(simulation.vehicle.firstCirculationDate);
-    
-    // Validate age restrictions
-    if (simulation.formulaType === FormulaType.TOUS_RISQUES_0 && vehicleAge >= 2) {
-      throw new BadRequestException('Tous Risques 0% is only available for vehicles less than 2 years old');
-    }
-    if (simulation.formulaType === FormulaType.DOMMAGES_COLLISIONS && vehicleAge >= 10) {
-      throw new BadRequestException('Dommages Collision is only available for vehicles less than 10 years old');
-    }
+    // Age validation is now handled dynamically by the pricing engine using formula_eligibility_age_rules table
 
     await this.auditService.log(
       userId,
@@ -328,5 +325,50 @@ export class SimulationsService {
     );
 
     return { message: 'Simulation deleted successfully' };
+  }
+
+  /**
+   * Validate formula eligibility against dynamic age rules for all selected companies
+   * Throws BadRequestException if any company has a rule that blocks the formula
+   */
+  private async validateFormulaEligibility(
+    companyIds: string[],
+    usageId: string,
+    formulaType: FormulaType,
+    vehicleAge: number,
+  ): Promise<void> {
+    const errors: string[] = [];
+
+    // Check eligibility for each company
+    for (const companyId of companyIds) {
+      const eligibility = await this.formulaEligibilityService.checkEligibility(
+        companyId,
+        usageId,
+        formulaType,
+        vehicleAge,
+      );
+
+      if (!eligibility.eligible) {
+        // Get company name for better error message
+        const company = await this.prisma.company.findUnique({
+          where: { id: companyId },
+          select: { name: true },
+        });
+        
+        const companyName = company?.name || 'Compagnie sélectionnée';
+        errors.push(`${companyName}: ${eligibility.reason}`);
+      }
+    }
+
+    // If any company blocks the formula, throw error with all reasons
+    if (errors.length > 0) {
+      if (errors.length === 1) {
+        throw new BadRequestException(errors[0]);
+      } else {
+        throw new BadRequestException(
+          `La formule ${formulaType} n'est pas disponible pour ce véhicule :\n${errors.join('\n')}`,
+        );
+      }
+    }
   }
 }

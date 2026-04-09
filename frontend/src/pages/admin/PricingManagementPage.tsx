@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/Tabs';
-import { Shield, Table, Calculator, FileSpreadsheet, HelpCircle, X, CheckCircle, Package } from 'lucide-react';
+import { Shield, Table, Calculator, FileSpreadsheet, HelpCircle, X, CheckCircle, Package, Calendar } from 'lucide-react';
 import { RcTableGrid } from '../../components/admin/pricing/RcTableGrid';
 import { GuaranteesConfig } from '../../components/admin/pricing/GuaranteesConfig';
 import { DcConfigTab } from './formulas/DcConfigTab';
 import { GuaranteeBundlingsTab } from './formulas/GuaranteeBundlingsTab';
 import { GuaranteeAvailabilityTab } from './formulas/GuaranteeAvailabilityTab';
 import { DcCapitalTiersPage } from './DcCapitalTiersPage';
+import { FormulaEligibilityPage } from './FormulaEligibilityPage';
 import { Button } from '../../components/ui/Button';
 
 export const PricingManagementPage = () => {
@@ -41,7 +42,7 @@ export const PricingManagementPage = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6 mb-6">
+        <TabsList className="grid w-full grid-cols-7 mb-6">
           <TabsTrigger value="rc-table" className="flex items-center gap-2">
             <Table className="w-4 h-4" />
             Tableau RC
@@ -65,6 +66,10 @@ export const PricingManagementPage = () => {
           <TabsTrigger value="availability" className="flex items-center gap-2">
             <Shield className="w-4 h-4" />
             Disponibilité
+          </TabsTrigger>
+          <TabsTrigger value="age-eligibility" className="flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            Âge Éligibilité
           </TabsTrigger>
         </TabsList>
 
@@ -90,6 +95,10 @@ export const PricingManagementPage = () => {
 
         <TabsContent value="availability">
           <GuaranteeAvailabilityTab />
+        </TabsContent>
+
+        <TabsContent value="age-eligibility">
+          <FormulaEligibilityPage />
         </TabsContent>
       </Tabs>
 

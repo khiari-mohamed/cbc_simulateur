@@ -38,6 +38,7 @@
       guaranteeId: string;
       capital: Decimal;
       prime: Decimal;
+      isNotCovered?: boolean;
     }>;
     breakdown: {
       primeRC: Decimal;
@@ -46,6 +47,11 @@
         taxe2Percent: Decimal;
       };
     };
+    reductions?: Record<string, {
+      originalPrime: number;
+      discountPercent: number;
+      finalPrime: number;
+    }>;
   }
 
   @Injectable()
@@ -71,18 +77,20 @@
       this.validateMandatoryInputs(vehicle, simulation);
       const vehicleAge = this.calculateVehicleAge(vehicle.firstCirculationDate);
 
-      // CDC Business Rules Validation
-      this.validateBusinessRules(simulation.formulaType, vehicleAge, simulation.selectedGuarantees);
+      // Dynamic age validation using formula eligibility rules
+      await this.validateBusinessRules(companyId, simulation.formulaType, simulation.usageId, vehicleAge, simulation.selectedGuarantees);
 
       const items: Array<{
         guaranteeCode: string;
         guaranteeId: string;
         capital: Decimal;
         prime: Decimal;
+        reductionInfo?: { originalPrime: number; discountPercent: number; finalPrime: number } | null;
       }> = [];
 
       let primeNette = new Decimal(0);
       let primeRC = new Decimal(0);
+      const reductions: Record<string, { originalPrime: number; discountPercent: number; finalPrime: number }> = {};
 
       // 1. RC (MANDATORY - Always included)
       const rcResult = await this.calculateRC(companyId, vehicle, simulation, conventionId);
@@ -104,16 +112,22 @@
       primeNette = primeNette.add(casResult.prime);
 
       // 3. VOL (MANDATORY - Always included)
-      const volResult = await this.calculateVOL(companyId, vehicle, conventionId);
+      const volResult = await this.calculateVOL(companyId, vehicle, conventionId, simulation.formulaType, simulation.usageId);
       console.log('✅ VOL calculated:', volResult.prime.toString());
       items.push(volResult);
       primeNette = primeNette.add(volResult.prime);
+      if (volResult.reductionInfo) {
+        reductions['VOL'] = volResult.reductionInfo;
+      }
 
       // 4. INCENDIE (MANDATORY - Always included)
-      const incendieResult = await this.calculateINCENDIE(companyId, vehicle, conventionId);
+      const incendieResult = await this.calculateINCENDIE(companyId, vehicle, conventionId, simulation.formulaType, simulation.usageId);
       console.log('✅ INCENDIE calculated:', incendieResult.prime.toString());
       items.push(incendieResult);
       primeNette = primeNette.add(incendieResult.prime);
+      if (incendieResult.reductionInfo) {
+        reductions['INCENDIE'] = incendieResult.reductionInfo;
+      }
 
       // 5. PERSONNES_TRANSPORTEES (MANDATORY - Always included)
       const selectedCapital = simulation.selectedCapitals?.['PERSONNES_TRANSPORTEES'];
@@ -137,11 +151,14 @@
       // 7. TOUS_RISQUES_0 (Only if formula is TOUS_RISQUES_0)
       if (simulation.formulaType === FormulaType.TOUS_RISQUES_0) {
         const franchiseRate = simulation.franchiseRate ?? 0;
-        const trResult = await this.calculateTOUS_RISQUES_0(companyId, vehicle, vehicleAge, simulation, franchiseRate, conventionId);
+        const trResult = await this.calculateTOUS_RISQUES_0(companyId, vehicle, vehicleAge, simulation, franchiseRate, conventionId, simulation.usageId);
         if (trResult) {
           console.log('✅ TOUS_RISQUES_0 calculated:', trResult.prime.toString());
           items.push(trResult);
           primeNette = primeNette.add(trResult.prime);
+          if (trResult.reductionInfo) {
+            reductions['TOUS_RISQUES_ZERO'] = trResult.reductionInfo;
+          }
         } else {
           console.log('❌ TOUS_RISQUES_0 NOT calculated - no pricing rule found');
         }
@@ -154,6 +171,9 @@
         if (dcResult) {
           items.push(dcResult);
           primeNette = primeNette.add(dcResult.prime);
+          if (dcResult.reductionInfo) {
+            reductions['DOMMAGES_COLLISIONS'] = dcResult.reductionInfo;
+          }
         }
       }
 
@@ -181,6 +201,9 @@
           if (bgResult) {
             items.push(bgResult);
             primeNette = primeNette.add(bgResult.prime);
+            if (bgResult.reductionInfo) {
+              reductions['BG'] = bgResult.reductionInfo;
+            }
           }
         }
       }
@@ -190,20 +213,58 @@
         const availability = await this.checkGuaranteeAvailability(companyId, 'OPTIONAL_INCENDIE_EMEUTES', simulation.formulaType);
         
         if (availability.isAvailable) {
-          const incendieEmeutesResult = await this.calculateINCENDIE_EMEUTES(companyId, vehicle, conventionId);
-          if (incendieEmeutesResult) {
-            // Override price if configured as GRATUIT
-            if (availability.isFree) {
-              incendieEmeutesResult.prime = new Decimal(0);
+          // If NON_ACCORDEE, create a dummy entry with 0 DT even if no pricing rule exists
+          if (availability.isNotCovered) {
+            const guarantee = await this.prisma.guarantee.findFirst({ 
+              where: { systemRole: 'OPTIONAL_INCENDIE_EMEUTES', isActive: true } 
+            });
+            if (guarantee) {
+              const incendieEmeutesResult = {
+                guaranteeCode: 'INCENDIE_EMEUTES',
+                guaranteeId: guarantee.id,
+                capital: vehicle.marketValue,
+                prime: new Decimal(0),
+                isNotCovered: true,
+              };
+              console.log('✅ INCENDIE_EMEUTES (NON ACCORDÉE) included:', incendieEmeutesResult.prime.toString());
+              items.push(incendieEmeutesResult);
             }
-            console.log('✅ INCENDIE_EMEUTES calculated:', incendieEmeutesResult.prime.toString());
-            items.push(incendieEmeutesResult);
-            primeNette = primeNette.add(incendieEmeutesResult.prime);
           } else {
-            console.log('❌ INCENDIE_EMEUTES NOT calculated - no pricing rule found');
+            // Normal case: try to calculate premium
+            const incendieEmeutesResult = await this.calculateINCENDIE_EMEUTES(companyId, vehicle, conventionId);
+            if (incendieEmeutesResult) {
+              // Override price if configured as GRATUIT
+              if (availability.isFree) {
+                incendieEmeutesResult.prime = new Decimal(0);
+              }
+              console.log('✅ INCENDIE_EMEUTES calculated:', incendieEmeutesResult.prime.toString());
+              items.push(incendieEmeutesResult);
+              primeNette = primeNette.add(incendieEmeutesResult.prime);
+            } else {
+              console.log('❌ INCENDIE_EMEUTES NOT calculated - no pricing rule found');
+            }
           }
         } else {
           console.log('❌ INCENDIE_EMEUTES NOT available - blocked by availability config');
+        }
+      } else {
+        // Check if it's NON_ACCORDEE - if so, include it automatically
+        const availability = await this.checkGuaranteeAvailability(companyId, 'OPTIONAL_INCENDIE_EMEUTES', simulation.formulaType);
+        if (availability.isNotCovered) {
+          const guarantee = await this.prisma.guarantee.findFirst({ 
+            where: { systemRole: 'OPTIONAL_INCENDIE_EMEUTES', isActive: true } 
+          });
+          if (guarantee) {
+            const incendieEmeutesResult = {
+              guaranteeCode: 'INCENDIE_EMEUTES',
+              guaranteeId: guarantee.id,
+              capital: vehicle.marketValue,
+              prime: new Decimal(0),
+              isNotCovered: true,
+            };
+            console.log('✅ INCENDIE_EMEUTES (NON ACCORDÉE - auto-included):', incendieEmeutesResult.prime.toString());
+            items.push(incendieEmeutesResult);
+          }
         }
       }
 
@@ -218,6 +279,8 @@
             if (availability.isFree) {
               catnatResult.prime = new Decimal(0);
             }
+            // Set isNotCovered flag from availability
+            catnatResult.isNotCovered = availability.isNotCovered;
             console.log('✅ CATASTROPHES_NATURELLES calculated:', catnatResult.prime.toString());
             items.push(catnatResult);
             primeNette = primeNette.add(catnatResult.prime);
@@ -226,6 +289,18 @@
           }
         } else {
           console.log('❌ CATASTROPHES_NATURELLES NOT available - blocked by availability config');
+        }
+      } else {
+        // Check if it's NON_ACCORDEE - if so, include it automatically
+        const availability = await this.checkGuaranteeAvailability(companyId, 'OPTIONAL_CATASTROPHES_NATURELLES', simulation.formulaType);
+        if (availability.isNotCovered) {
+          const catnatResult = await this.calculateCATNAT(companyId, vehicle, simulation.formulaType, conventionId);
+          if (catnatResult) {
+            catnatResult.prime = new Decimal(0);
+            catnatResult.isNotCovered = true;
+            console.log('✅ CATASTROPHES_NATURELLES (NON ACCORDÉE) included:', catnatResult.prime.toString());
+            items.push(catnatResult);
+          }
         }
       }
 
@@ -240,6 +315,8 @@
             if (availability.isFree) {
               dommagesEmeutesResult.prime = new Decimal(0);
             }
+            // Set isNotCovered flag from availability
+            dommagesEmeutesResult.isNotCovered = availability.isNotCovered;
             console.log('✅ DOMMAGES_EMEUTES calculated:', dommagesEmeutesResult.prime.toString());
             items.push(dommagesEmeutesResult);
             primeNette = primeNette.add(dommagesEmeutesResult.prime);
@@ -248,6 +325,18 @@
           }
         } else {
           console.log('❌ DOMMAGES_EMEUTES NOT available - blocked by availability config');
+        }
+      } else {
+        // Check if it's NON_ACCORDEE - if so, include it automatically
+        const availability = await this.checkGuaranteeAvailability(companyId, 'OPTIONAL_DOMMAGES_EMEUTES', simulation.formulaType);
+        if (availability.isNotCovered) {
+          const dommagesEmeutesResult = await this.calculateDOMMAGES_EMEUTES(companyId, vehicle, conventionId);
+          if (dommagesEmeutesResult) {
+            dommagesEmeutesResult.prime = new Decimal(0);
+            dommagesEmeutesResult.isNotCovered = true;
+            console.log('✅ DOMMAGES_EMEUTES (NON ACCORDÉE) included:', dommagesEmeutesResult.prime.toString());
+            items.push(dommagesEmeutesResult);
+          }
         }
       }
 
@@ -267,6 +356,29 @@
           }
         } else {
           console.log('❌ DEFENSE_RECOURS NOT available - blocked by availability config');
+        }
+      }
+
+      // 14. ASSURANCE_CONDUCTEUR (Optional) - Check availability
+      if (simulation.selectedGuarantees.includes('ASSURANCE_CONDUCTEUR')) {
+        const availability = await this.checkGuaranteeAvailability(companyId, 'OPTIONAL_ASSURANCE_CONDUCTEUR', simulation.formulaType);
+        
+        if (availability.isAvailable) {
+          const selectedCapital = simulation.selectedCapitals?.['ASSURANCE_CONDUCTEUR'];
+          const assuranceConducteurResult = await this.calculateASSURANCE_CONDUCTEUR(companyId, selectedCapital, conventionId);
+          if (assuranceConducteurResult) {
+            // Override price if configured as GRATUIT
+            if (availability.isFree) {
+              assuranceConducteurResult.prime = new Decimal(0);
+            }
+            console.log('✅ ASSURANCE_CONDUCTEUR calculated:', assuranceConducteurResult.prime.toString());
+            items.push(assuranceConducteurResult);
+            primeNette = primeNette.add(assuranceConducteurResult.prime);
+          } else {
+            console.log('❌ ASSURANCE_CONDUCTEUR NOT calculated - no pricing rule found');
+          }
+        } else {
+          console.log('❌ ASSURANCE_CONDUCTEUR NOT available - blocked by availability config');
         }
       }
 
@@ -338,6 +450,7 @@
             taxe2Percent,
           },
         },
+        reductions,
       };
     }
 
@@ -365,23 +478,49 @@
       }
     }
 
-    private validateBusinessRules(formulaType: FormulaType, vehicleAge: number, selectedGuarantees: string[]) {
+    private async validateBusinessRules(
+      companyId: string,
+      formulaType: FormulaType,
+      usageId: string,
+      vehicleAge: number,
+      selectedGuarantees: string[],
+    ) {
       // Rule 1: DOMMAGES_COLLISIONS and TOUS_RISQUES_0 are mutually exclusive
       if (formulaType === FormulaType.DOMMAGES_COLLISIONS && selectedGuarantees.includes('TOUS_RISQUES_ZERO')) {
         throw new BadRequestException('Dommages Collision cannot be combined with Tous Risques');
       }
 
-      // Rule 2: DOMMAGES_COLLISIONS only for vehicles < 10 years
-      if (formulaType === FormulaType.DOMMAGES_COLLISIONS && vehicleAge >= 10) {
-        throw new BadRequestException('Dommages Collision is only available for vehicles less than 10 years old');
+      // Rule 2: Dynamic age validation using formula eligibility rules
+      const eligibilityRule = await this.prisma.formulaEligibilityAgeRule.findFirst({
+        where: {
+          companyId,
+          usageId,
+          formulaType,
+          isActive: true,
+        },
+      });
+
+      if (eligibilityRule) {
+        // Check min age (if specified)
+        if (eligibilityRule.minAgeYears !== null && eligibilityRule.minAgeYears !== undefined) {
+          if (vehicleAge < eligibilityRule.minAgeYears) {
+            throw new BadRequestException(
+              `Le véhicule doit avoir au moins ${eligibilityRule.minAgeYears} an(s) pour la formule ${formulaType} (âge actuel: ${vehicleAge} an(s))`,
+            );
+          }
+        }
+
+        // Check max age (if specified)
+        if (eligibilityRule.maxAgeYears !== null && eligibilityRule.maxAgeYears !== undefined) {
+          if (vehicleAge >= eligibilityRule.maxAgeYears) {
+            throw new BadRequestException(
+              `Le véhicule doit avoir moins de ${eligibilityRule.maxAgeYears} an(s) pour la formule ${formulaType} (âge actuel: ${vehicleAge} an(s))`,
+            );
+          }
+        }
       }
 
-      // Rule 3: TOUS_RISQUES_0 only for vehicles < 2 years
-      if (formulaType === FormulaType.TOUS_RISQUES_0 && vehicleAge >= 2) {
-        throw new BadRequestException('Tous Risques 0% is only available for vehicles less than 2 years old');
-      }
-
-      // Rule 4: STANDARD formula excludes TOUS_RISQUES_ZERO and DOMMAGES_COLLISIONS
+      // Rule 3: STANDARD formula excludes TOUS_RISQUES_ZERO and DOMMAGES_COLLISIONS
       if (formulaType === FormulaType.STANDARD) {
         if (selectedGuarantees.includes('TOUS_RISQUES_ZERO') || selectedGuarantees.includes('DOMMAGES_COLLISIONS')) {
           throw new BadRequestException('Standard formula cannot include Tous Risques or Dommages Collision');
@@ -476,11 +615,12 @@
       };
     }
 
-    private async calculateVOL(companyId: string, vehicle: VehicleData, conventionId?: string): Promise<{
+    private async calculateVOL(companyId: string, vehicle: VehicleData, conventionId?: string, formulaType?: FormulaType, usageId?: string): Promise<{
       guaranteeCode: string;
       guaranteeId: string;
       capital: Decimal;
       prime: Decimal;
+      reductionInfo?: { originalPrime: number; discountPercent: number; finalPrime: number } | null;
     }> {
       const guarantee = await this.prisma.guarantee.findFirst({ 
         where: { systemRole: 'MANDATORY_VOL', isActive: true } 
@@ -573,15 +713,25 @@
       }
 
       // Apply convention reduction if exists
+      let reductionInfo = null;
       if (conventionId) {
+        // For TR 0%, use NEW_VALUE metric; for other formulas, use MARKET_VALUE
+        const metricValue = formulaType === FormulaType.TOUS_RISQUES_0 ? vehicle.newValue : vehicle.marketValue;
+        const metric = formulaType === FormulaType.TOUS_RISQUES_0 ? 'NEW_VALUE' : 'MARKET_VALUE';
         const discountPercent = await this.reductionRatesService.getReductionPercent(
           companyId,
           'MANDATORY_VOL',
           conventionId,
-          vehicle.marketValue,
-          'MARKET_VALUE' as ReductionMetric,
+          metricValue,
+          metric as ReductionMetric,
+          formulaType,
+          usageId,
         );
-        prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+        if (discountPercent > 0) {
+          const originalPrime = prime;
+          prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+          reductionInfo = { originalPrime: originalPrime.toNumber(), discountPercent, finalPrime: prime.toNumber() };
+        }
       }
 
       return {
@@ -589,14 +739,16 @@
         guaranteeId: guarantee.id,
         capital: referenceValue,
         prime,
+        reductionInfo,
       };
     }
 
-    private async calculateINCENDIE(companyId: string, vehicle: VehicleData, conventionId?: string): Promise<{
+    private async calculateINCENDIE(companyId: string, vehicle: VehicleData, conventionId?: string, formulaType?: FormulaType, usageId?: string): Promise<{
       guaranteeCode: string;
       guaranteeId: string;
       capital: Decimal;
       prime: Decimal;
+      reductionInfo?: { originalPrime: number; discountPercent: number; finalPrime: number } | null;
     }> {
       const guarantee = await this.prisma.guarantee.findFirst({ 
         where: { systemRole: 'MANDATORY_INCENDIE', isActive: true } 
@@ -689,15 +841,25 @@
       }
 
       // Apply convention reduction if exists
+      let reductionInfo = null;
       if (conventionId) {
+        // For TR 0%, use NEW_VALUE metric; for other formulas, use MARKET_VALUE
+        const metricValue = formulaType === FormulaType.TOUS_RISQUES_0 ? vehicle.newValue : vehicle.marketValue;
+        const metric = formulaType === FormulaType.TOUS_RISQUES_0 ? 'NEW_VALUE' : 'MARKET_VALUE';
         const discountPercent = await this.reductionRatesService.getReductionPercent(
           companyId,
           'MANDATORY_INCENDIE',
           conventionId,
-          vehicle.marketValue,
-          'MARKET_VALUE' as ReductionMetric,
+          metricValue,
+          metric as ReductionMetric,
+          formulaType,
+          usageId,
         );
-        prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+        if (discountPercent > 0) {
+          const originalPrime = prime;
+          prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+          reductionInfo = { originalPrime: originalPrime.toNumber(), discountPercent, finalPrime: prime.toNumber() };
+        }
       }
 
       return {
@@ -705,6 +867,7 @@
         guaranteeId: guarantee.id,
         capital: referenceValue,
         prime,
+        reductionInfo,
       };
     }
 
@@ -802,11 +965,12 @@
       };
     }
 
-    private async calculateTOUS_RISQUES_0(companyId: string, vehicle: VehicleData, vehicleAge: number, simulation: SimulationData, franchiseRate: number, conventionId?: string): Promise<{
+    private async calculateTOUS_RISQUES_0(companyId: string, vehicle: VehicleData, vehicleAge: number, simulation: SimulationData, franchiseRate: number, conventionId?: string, usageId?: string): Promise<{
       guaranteeCode: string;
       guaranteeId: string;
       capital: Decimal;
       prime: Decimal;
+      reductionInfo?: { originalPrime: number; discountPercent: number; finalPrime: number } | null;
     } | null> {
       const guarantee = await this.prisma.guarantee.findFirst({ 
         where: { systemRole: 'OPTIONAL_TOUS_RISQUES', isActive: true } 
@@ -895,6 +1059,7 @@
         }
       }
 
+      let reductionInfo = null;
       if (conventionId) {
         const discountPercent = await this.reductionRatesService.getReductionPercent(
           companyId,
@@ -903,8 +1068,13 @@
           vehicle.newValue,
           'NEW_VALUE' as ReductionMetric,
           FormulaType.TOUS_RISQUES_0,
+          usageId,
         );
-        prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+        if (discountPercent > 0) {
+          const originalPrime = prime;
+          prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+          reductionInfo = { originalPrime: originalPrime.toNumber(), discountPercent, finalPrime: prime.toNumber() };
+        }
       }
 
       return {
@@ -912,6 +1082,7 @@
         guaranteeId: guarantee.id,
         capital: vehicle.newValue,
         prime,
+        reductionInfo,
       };
     }
 
@@ -978,14 +1149,20 @@
         orderBy: { minAmount: 'asc' },
       });
 
+      console.log(`[validateCapitalStep] Capital: ${capital}, UsageId: ${usageId}`);
+      console.log(`[validateCapitalStep] Found ${tiers.length} tiers`);
+
       for (const tier of tiers) {
+        console.log(`[validateCapitalStep] Checking tier: min=${tier.minAmount}, max=${tier.maxAmount}, step=${tier.step}`);
         if (capital.gte(tier.minAmount) && (!tier.maxAmount || capital.lte(tier.maxAmount))) {
           const offset = capital.sub(tier.minAmount);
           const remainder = offset.mod(tier.step);
+          console.log(`[validateCapitalStep] Capital ${capital} in range: offset=${offset}, remainder=${remainder}`);
           return remainder.eq(0);
         }
       }
 
+      console.log(`[validateCapitalStep] ❌ Capital ${capital} not in any tier range`);
       return false;
     }
 
@@ -1050,6 +1227,7 @@
       }
 
       // Apply convention reduction
+      let reductionInfo = null;
       if (conventionId) {
         const discountPercent = await this.reductionRatesService.getReductionPercent(
           companyId,
@@ -1060,7 +1238,11 @@
           FormulaType.DOMMAGES_COLLISIONS,
           usageId,
         );
-        prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+        if (discountPercent > 0) {
+          const originalPrime = prime;
+          prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+          reductionInfo = { originalPrime: originalPrime.toNumber(), discountPercent, finalPrime: prime.toNumber() };
+        }
       }
 
       return {
@@ -1068,6 +1250,7 @@
         guaranteeId,
         capital,
         prime,
+        reductionInfo,
       };
     }
 
@@ -1197,6 +1380,7 @@
       }
 
       // Apply convention reduction
+      let reductionInfo = null;
       if (conventionId) {
         const discountPercent = await this.reductionRatesService.getReductionPercent(
           companyId,
@@ -1207,7 +1391,11 @@
           FormulaType.DOMMAGES_COLLISIONS,
           usageId,
         );
-        prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+        if (discountPercent > 0) {
+          const originalPrime = prime;
+          prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+          reductionInfo = { originalPrime: originalPrime.toNumber(), discountPercent, finalPrime: prime.toNumber() };
+        }
       }
 
       return {
@@ -1215,6 +1403,7 @@
         guaranteeId,
         capital,
         prime,
+        reductionInfo,
       };
     }
 
@@ -1225,7 +1414,13 @@
       selectedCapital?: Decimal,
       conventionId?: string,
       isBGExplicitlySelected?: boolean,
-    ) {
+    ): Promise<{
+      guaranteeCode: string;
+      guaranteeId: string;
+      capital: Decimal;
+      prime: Decimal;
+      reductionInfo?: { originalPrime: number; discountPercent: number; finalPrime: number } | null;
+    } | null> {
       const guarantee = await this.prisma.guarantee.findFirst({ 
         where: { systemRole: 'OPTIONAL_BRIS_GLACES', isActive: true } 
       });
@@ -1253,6 +1448,7 @@
           guaranteeId: guarantee.id,
           capital,
           prime: new Decimal(0),  // FREE for Tous Risques
+          reductionInfo: null,
         };
       }
 
@@ -1322,6 +1518,7 @@
       }
 
       // Apply convention reduction if exists
+      let reductionInfo = null;
       if (conventionId) {
         const discountPercent = await this.reductionRatesService.getReductionPercent(
           companyId,
@@ -1330,7 +1527,11 @@
           capital,
           'DC_CAPITAL' as ReductionMetric,  // Use DC_CAPITAL metric for BG capital
         );
-        prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+        if (discountPercent > 0) {
+          const originalPrime = prime;
+          prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+          reductionInfo = { originalPrime: originalPrime.toNumber(), discountPercent, finalPrime: prime.toNumber() };
+        }
       }
 
       return {
@@ -1338,6 +1539,7 @@
         guaranteeId: guarantee.id,
         capital,
         prime,
+        reductionInfo,
       };
     }
 
@@ -1392,19 +1594,19 @@
 
     /**
      * Check guarantee availability status using the new configurable system
-     * Returns: { isAvailable: boolean, isFree: boolean }
+     * Returns: { isAvailable: boolean, isFree: boolean, isNotCovered: boolean }
      */
     private async checkGuaranteeAvailability(
       companyId: string,
       systemRole: string,
       formulaType: FormulaType,
-    ): Promise<{ isAvailable: boolean; isFree: boolean; useDefault: boolean }> {
+    ): Promise<{ isAvailable: boolean; isFree: boolean; useDefault: boolean; isNotCovered: boolean }> {
       // Get guarantee by systemRole
       const guarantee = await this.prisma.guarantee.findFirst({ 
         where: { systemRole: systemRole as any, isActive: true } 
       });
       if (!guarantee) {
-        return { isAvailable: false, isFree: false, useDefault: false };
+        return { isAvailable: false, isFree: false, useDefault: false, isNotCovered: false };
       }
 
       // Resolve availability status
@@ -1416,14 +1618,19 @@
 
       // Interpret status
       switch (availability.status) {
+        case GuaranteeAvailabilityStatus.HIDDEN:
+          // HIDDEN = Completely hidden from UI and quotes
+          return { isAvailable: false, isFree: false, useDefault: false, isNotCovered: false };
         case GuaranteeAvailabilityStatus.NON_ACCORDEE:
-          return { isAvailable: false, isFree: false, useDefault: false };
+          // NON_ACCORDEE = Show in quote/PDF but mark as "NOT COVERED"
+          return { isAvailable: true, isFree: false, useDefault: false, isNotCovered: true };
         case GuaranteeAvailabilityStatus.GRATUIT:
-          return { isAvailable: true, isFree: true, useDefault: false };
+          // GRATUIT = Available and free
+          return { isAvailable: true, isFree: true, useDefault: false, isNotCovered: false };
         case GuaranteeAvailabilityStatus.DEFAULT:
         default:
-          // DEFAULT means: use existing logic (backward compatible)
-          return { isAvailable: true, isFree: false, useDefault: true };
+          // DEFAULT = Use existing logic (backward compatible)
+          return { isAvailable: true, isFree: false, useDefault: true, isNotCovered: false };
       }
     }
 
@@ -1462,6 +1669,7 @@
         guaranteeId: guarantee.id,
         capital: vehicle.marketValue,
         prime: new Decimal(rule.fixedPremium),
+        isNotCovered: false,
       };
     }
 
@@ -1474,16 +1682,10 @@
         return null;
       }
 
-      const isTousRisques = formulaType === FormulaType.TOUS_RISQUES_0;
-      
-      if (!isTousRisques) {
-        console.log('❌ CATNAT: Not Tous Risques formula:', formulaType);
-        return null;
-      }
-
-      // ✅ REMOVED HARDCODED COMPANY CHECK - Pricing rule determines availability
-      // If a company has a pricing rule for CATNAT, it's available. Otherwise, it's not.
-      // This makes the system flexible: admin can configure CATNAT for any company via pricing rules.
+      // ✅ REMOVED FORMULA RESTRICTION - CATNAT can now be available for any formula (STANDARD, TOUS_RISQUES_0, etc.)
+      // Availability is determined by:
+      // 1. Guarantee availability config (checkGuaranteeAvailability)
+      // 2. Pricing rule existence for the company/formula
 
       const conventionScope = conventionId ? { conventionId } : { conventionId: null };
 
@@ -1524,6 +1726,7 @@
         guaranteeId: guarantee.id,
         capital: vehicle.marketValue,
         prime: new Decimal(rule.fixedPremium),
+        isNotCovered: false,
       };
     }
 
@@ -1562,6 +1765,7 @@
         guaranteeId: guarantee.id,
         capital: vehicle.marketValue,
         prime: new Decimal(rule.fixedPremium),
+        isNotCovered: false,
       };
     }
 
@@ -1581,6 +1785,60 @@
         guaranteeId: guarantee.id,
         capital: new Decimal(0),
         prime: new Decimal(rule.fixedPremium),
+      };
+    }
+
+    private async calculateASSURANCE_CONDUCTEUR(companyId: string, selectedCapital?: Decimal, conventionId?: string) {
+      const guarantee = await this.prisma.guarantee.findFirst({ 
+        where: { systemRole: 'OPTIONAL_ASSURANCE_CONDUCTEUR', isActive: true } 
+      });
+      if (!guarantee) {
+        throw new BadRequestException('No guarantee configured for Assurance Conducteur (OPTIONAL_ASSURANCE_CONDUCTEUR)');
+      }
+
+      const conventionScope = conventionId ? { conventionId } : { conventionId: null };
+
+      let rules = await this.prisma.pricingRule.findMany({
+        where: {
+          companyId,
+          guaranteeId: guarantee.id,
+          isActive: true,
+          ...conventionScope,
+        },
+        orderBy: { minCapital: 'desc' },
+      });
+
+      if (!rules.length && conventionId) {
+        rules = await this.prisma.pricingRule.findMany({
+          where: {
+            companyId,
+            guaranteeId: guarantee.id,
+            isActive: true,
+            conventionId: null,
+          },
+          orderBy: { minCapital: 'desc' },
+        });
+      }
+
+      if (!rules.length) return null;
+
+      let matchedRule = rules[0];
+      if (selectedCapital) {
+        for (const rule of rules) {
+          if (rule.minCapital && selectedCapital.gte(rule.minCapital)) {
+            matchedRule = rule;
+            break;
+          }
+        }
+      }
+
+      if (matchedRule.fixedPremium === null || matchedRule.minCapital === null) return null;
+
+      return {
+        guaranteeCode: 'ASSURANCE_CONDUCTEUR',
+        guaranteeId: guarantee.id,
+        capital: new Decimal(matchedRule.minCapital),
+        prime: new Decimal(matchedRule.fixedPremium),
       };
     }
   }

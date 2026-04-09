@@ -366,14 +366,22 @@ export const QuotesPage = () => {
                               }
                               return true;
                             })
-                            .map((item: any) => (
+                            .map((item: any) => {
+                              const isNotCovered = item.isNotCovered || false;
+                              return (
                             <span
                               key={item.id}
                               className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-xs"
                             >
                               {item.guarantee.nameFr}
+                              {isNotCovered && (
+                                <span className="ml-1 text-red-600 dark:text-red-400 font-bold">
+                                  (NON ACCORDÉE)
+                                </span>
+                              )}
                             </span>
-                          ))}
+                          );}
+                          )}
                         </div>
                       </div>
                     )}

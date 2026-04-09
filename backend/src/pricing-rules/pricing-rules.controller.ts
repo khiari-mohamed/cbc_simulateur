@@ -6,6 +6,7 @@ import { UpdateReductionRateDto } from './update-reduction-rate.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/roles.guard';
 import { Roles } from '../common/roles.decorator';
+import { Public } from '../common/public.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('pricing-rules')
@@ -27,6 +28,15 @@ export class PricingRulesController {
   @Get('optional-guarantees')
   getOptionalGuaranteesRules(@Query('companyId') companyId?: string) {
     return this.pricingRulesService.getOptionalGuaranteesRules(companyId);
+  }
+
+  @Get('company/:companyId/guarantee/:systemRole')
+  @Public()
+  async getCapitalOptionsByGuarantee(
+    @Param('companyId') companyId: string,
+    @Param('systemRole') systemRole: string,
+  ) {
+    return this.pricingRulesService.getCapitalOptionsByGuarantee(companyId, systemRole);
   }
 
   @Get(':id')

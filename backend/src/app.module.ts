@@ -30,6 +30,7 @@ import { FranchiseValuesModule } from './franchise-values/franchise-values.modul
 import { BgCapitalLimitsModule } from './bg-capital-limits/bg-capital-limits.module';
 import { GuaranteeAvailabilityModule } from './guarantee-availability/guarantee-availability.module';
 import { DcCapitalTiersModule } from './dc-capital-tiers/dc-capital-tiers.module';
+import { FormulaEligibilityModule } from './formula-eligibility/formula-eligibility.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { DcCapitalTiersModule } from './dc-capital-tiers/dc-capital-tiers.module
     BgCapitalLimitsModule,
     GuaranteeAvailabilityModule,
     DcCapitalTiersModule,
+    FormulaEligibilityModule,
   ],
 })
 export class AppModule {}

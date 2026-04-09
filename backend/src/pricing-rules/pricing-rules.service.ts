@@ -316,4 +316,40 @@ export class PricingRulesService {
 
     return { success: true, count: createdRules.length };
   }
+
+  async getCapitalOptionsByGuarantee(companyId: string, systemRole: string) {
+    console.log('🔍 getCapitalOptionsByGuarantee called with:', { companyId, systemRole });
+    
+    // Get guarantee by systemRole
+    const guarantee = await this.prisma.guarantee.findFirst({
+      where: { systemRole: systemRole as any, isActive: true },
+    });
+
+    console.log('📋 Guarantee found:', guarantee ? { id: guarantee.id, code: guarantee.code } : 'NOT FOUND');
+
+    if (!guarantee) {
+      console.log('❌ No guarantee found, returning empty array');
+      return [];
+    }
+
+    // Get all pricing rules for this guarantee and company
+    const rules = await this.prisma.pricingRule.findMany({
+      where: {
+        companyId,
+        guaranteeId: guarantee.id,
+        isActive: true,
+        minCapital: { not: null },
+      },
+      include: {
+        company: { select: { id: true, name: true, code: true } },
+        guarantee: { select: { id: true, code: true, nameFr: true } },
+      },
+      orderBy: { minCapital: 'asc' },
+    });
+
+    console.log('✅ Found', rules.length, 'pricing rules');
+    console.log('📊 Rules:', JSON.stringify(rules.map(r => ({ id: r.id, minCapital: r.minCapital, company: r.company?.name })), null, 2));
+
+    return rules;
+  }
 }

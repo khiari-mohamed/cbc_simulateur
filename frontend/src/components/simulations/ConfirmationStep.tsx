@@ -168,6 +168,16 @@ export const ConfirmationStep = ({ simulationId, onBack }: ConfirmationStepProps
                       <span>VN: {simulation.vehicle.newValue.toLocaleString()} DT</span>
                       <span>VV: {simulation.vehicle.marketValue.toLocaleString()} DT</span>
                       <span>CV: {simulation.vehicle.fiscalHorsepower}</span>
+                      {quote.eligibilitySnapshot && (
+                        <span className="font-medium text-gray-700 dark:text-gray-300">
+                          Âge: {quote.eligibilitySnapshot.vehicleAge} an(s)
+                          {quote.eligibilitySnapshot.ruleApplied && (
+                            <span className="text-green-600 dark:text-green-400 ml-1">
+                              (✓ &lt; {quote.eligibilitySnapshot.maxAgeYears} ans)
+                            </span>
+                          )}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>

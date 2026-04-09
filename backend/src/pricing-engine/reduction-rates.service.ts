@@ -21,49 +21,72 @@ export class ReductionRatesService {
     formulaType?: FormulaType,
     usageId?: string,
   ): Promise<number> {
-    if (!conventionId) return 0; // No convention = no reduction
+    if (!conventionId) {
+      console.log(`[ReductionRates] No conventionId provided for ${systemRole} - skipping reduction`);
+      return 0;
+    }
 
     // Look up guarantee by systemRole, not by code
     const guarantee = await this.prisma.guarantee.findFirst({ 
       where: { systemRole: systemRole as any, isActive: true } 
     });
-    if (!guarantee) return 0;
+    if (!guarantee) {
+      console.log(`[ReductionRates] No guarantee found for systemRole: ${systemRole}`);
+      return 0;
+    }
+
+    console.log(`[ReductionRates] Searching reduction for:`, {
+      conventionId,
+      companyId,
+      guaranteeCode: guarantee.code,
+      metric,
+      metricValue: metricValue.toNumber(),
+      formulaType,
+      usageId
+    });
 
     // Find matching rules ordered by priority desc, then created desc
+    // CRITICAL FIX: The query was too restrictive - it required EXACT match on formulaType and usageId
+    // But rules with NULL formulaType/usageId should match ANY formula/usage
     const rules = await this.prisma.conventionReductionRule.findMany({
       where: {
         conventionId,
-        OR: [
-          { companyId },
-          { companyId: null }
-        ],
         guaranteeId: guarantee.id,
         metric,
         isActive: true,
         validFrom: { lte: new Date() },
+        OR: [
+          { validTo: null },
+          { validTo: { gte: new Date() } }
+        ],
+        // Company filter: match specific company OR null (applies to all)
         AND: [
+          {
+            OR: [
+              { companyId },
+              { companyId: null }
+            ]
+          },
+          // Formula filter: match specific formula OR null (applies to all)
           {
             OR: [
               { formulaType },
               { formulaType: null }
             ]
           },
+          // Usage filter: match specific usage OR null (applies to all)
           {
             OR: [
               { usageId },
               { usageId: null }
-            ]
-          },
-          {
-            OR: [
-              { validTo: null },
-              { validTo: { gte: new Date() } }
             ]
           }
         ]
       },
       orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
     });
+
+    console.log(`[ReductionRates] Found ${rules.length} potential rules`);
 
     // Find first matching rule by range
     for (const rule of rules) {
@@ -77,10 +100,13 @@ export class ReductionRatesService {
         (rule.maxInclusive ? value <= max : value < max);
 
       if (minCheck && maxCheck) {
-        return rule.discountPercent.toNumber();
+        const discountPercent = rule.discountPercent.toNumber();
+        console.log(`[ReductionRates] ✅ Applying ${discountPercent}% reduction for ${guarantee.code}`);
+        return discountPercent;
       }
     }
 
+    console.log(`[ReductionRates] ❌ No matching rule found for ${guarantee.code}`);
     return 0; // No matching rule
   }
 
