@@ -1,0 +1,87 @@
+Objet : ✅ NOTE : Âge de souscription - Fonctionnalité existante
+
+Bonjour,
+
+Suite à votre remarque "Je n'ai pas trouvé cette fonctionnalité", voici notre réponse.
+
+================================================================================
+🎯 RÉSULTAT : LA FONCTIONNALITÉ EXISTE ET EST ACCESSIBLE
+================================================================================
+
+✅ DIAGNOSTIC :
+La fonctionnalité existe complètement et est accessible dans l'interface.
+
+📍 OÙ LA TROUVER :
+Menu Admin → "Gestion Tarification" → Onglet "Âge Éligibilité" (7ème onglet)
+
+Chemin complet :
+1. Cliquez sur "Gestion Tarification" dans le menu latéral
+2. Vous verrez 7 onglets en haut de la page
+3. Cliquez sur le 7ème onglet : "Âge Éligibilité" (icône calendrier)
+
+
+================================================================================
+📋 FONCTIONNALITÉ : Règles d'Éligibilité par Âge
+================================================================================
+
+**Objectif** :
+Configurer les restrictions d'âge pour chaque formule par compagnie et usage.
+
+**Exemples d'utilisation** :
+
+1. Tous Risques 0% uniquement pour véhicules récents :
+   - Compagnie : LLOYD
+   - Usage : Promenade et Affaire
+   - Formule : Tous Risques 0%
+   - Âge maximum : 2 ans
+   → TR 0% disponible uniquement si véhicule < 2 ans
+
+2. Dommages Collision pour véhicules de 2 à 10 ans :
+   - Compagnie : AL BARAKA
+   - Usage : Promenade et Affaire
+   - Formule : Dommages Collision
+   - Âge minimum : 2 ans
+   - Âge maximum : 10 ans
+   → DC disponible uniquement si 2 ≤ âge < 10 ans
+
+**Fonctionnalités** :
+- ✅ Créer des règles d'âge
+- ✅ Définir âge minimum et/ou maximum
+- ✅ Filtrer par compagnie, usage, formule
+- ✅ Activer/désactiver les règles
+- ✅ Modifier et supprimer
+
+**Validation automatique** :
+Lors de la création d'une simulation, le système vérifie automatiquement
+l'âge du véhicule et bloque les formules non éligibles.
+
+
+================================================================================
+📍 NAVIGATION DÉTAILLÉE
+================================================================================
+
+Voici les 7 onglets de "Gestion Tarification" :
+
+1. Tableau RC
+2. Garanties
+3. Dommages Collision
+4. Paliers DC
+5. Garanties Groupées
+6. Disponibilité
+7. **Âge Éligibilité** ← C'EST ICI !
+
+
+================================================================================
+🎯 CONCLUSION
+================================================================================
+
+TYPE : Fonctionnalité existante et accessible
+LOCALISATION : Gestion Tarification → Onglet 7 "Âge Éligibilité"
+STATUS : ✅ DISPONIBLE
+
+La fonctionnalité est complète et prête à être utilisée.
+
+N'hésitez pas si vous avez besoin d'aide pour configurer vos premières règles.
+
+Cordialement,
+L'équipe technique

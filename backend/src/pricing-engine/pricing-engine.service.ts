@@ -281,9 +281,16 @@
             }
             // Set isNotCovered flag from availability
             catnatResult.isNotCovered = availability.isNotCovered;
+            // ✅ FIX NOTE 6: Force prime to 0 for NON_ACCORDEE guarantees
+            if (availability.isNotCovered) {
+              catnatResult.prime = new Decimal(0);
+            }
             console.log('✅ CATASTROPHES_NATURELLES calculated:', catnatResult.prime.toString());
             items.push(catnatResult);
-            primeNette = primeNette.add(catnatResult.prime);
+            // ✅ FIX NOTE 6: Only add to primeNette if NOT covered
+            if (!availability.isNotCovered) {
+              primeNette = primeNette.add(catnatResult.prime);
+            }
           } else {
             console.log('❌ CATASTROPHES_NATURELLES NOT calculated - no pricing rule found or not Tous Risques 0%');
           }
@@ -317,9 +324,16 @@
             }
             // Set isNotCovered flag from availability
             dommagesEmeutesResult.isNotCovered = availability.isNotCovered;
+            // ✅ FIX NOTE 6: Force prime to 0 for NON_ACCORDEE guarantees
+            if (availability.isNotCovered) {
+              dommagesEmeutesResult.prime = new Decimal(0);
+            }
             console.log('✅ DOMMAGES_EMEUTES calculated:', dommagesEmeutesResult.prime.toString());
             items.push(dommagesEmeutesResult);
-            primeNette = primeNette.add(dommagesEmeutesResult.prime);
+            // ✅ FIX NOTE 6: Only add to primeNette if NOT covered
+            if (!availability.isNotCovered) {
+              primeNette = primeNette.add(dommagesEmeutesResult.prime);
+            }
           } else {
             console.log('❌ DOMMAGES_EMEUTES NOT calculated - no pricing rule found');
           }

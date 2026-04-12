@@ -1,0 +1,72 @@
+Objet : ✅ NOTE 5 - Résolution : Configuration BG corrigée
+
+Bonjour,
+
+Nous avons analysé votre NOTE 5 concernant les primes TR avec franchise.
+
+================================================================================
+🎯 RÉSULTAT : 1 configuration incorrecte détectée et corrigée
+================================================================================
+
+📋 PROBLÈME IDENTIFIÉ :
+La garantie BG (Bris de Glaces) était configurée comme "GRATUIT" pour 
+Tous Risques 0%, ce qui ne correspond PAS à votre document formulas.md.
+
+Selon formulas.md :
+BG = (capital × taux) × réduction
+- LLOYD : capital × 6.5%
+- AL BARAKA : capital × 7%
+
+Résultat dans les devis :
+- Prime attendue : 130 DT (LLOYD) ou 140 DT (AL BARAKA) pour capital 2000 DT
+- Prime actuelle : 0 DT ❌
+
+
+🔍 CAUSE :
+Ce n'est PAS un bug dans le code.
+C'est une configuration incorrecte dans la base de données.
+
+Le code applique correctement la configuration définie, mais cette 
+configuration (BG = GRATUIT) ne correspond pas à formulas.md.
+
+
+✅ SOLUTION APPLIQUÉE :
+Nous avons corrigé la configuration :
+- AVANT : BG = GRATUIT → prime = 0 DT
+- APRÈS : BG = DEFAULT → prime calculée selon formulas.md
+
+
+📊 IMPACT :
+- Anciens devis : BG = 0 DT (restent inchangés)
+- Nouveaux devis : BG calculé correctement (130 DT ou 140 DT)
+
+
+🧪 POUR TESTER :
+Créez un nouveau devis TR 0% avec capital BG = 2000 DT
+Résultat attendu : BG = 130 DT (LLOYD) ou 140 DT (AL BARAKA)
+
+
+================================================================================
+📊 AUTRES GARANTIES ANALYSÉES :
+================================================================================
+
+✅ VOL : Réductions bien appliquées (35-45%)
+✅ INCENDIE : Réductions bien appliquées (45%)
+✅ RC : Calcul correct selon tableau (264 DT pour CV=15, BM=4)
+✅ TR 0% : Réductions bien appliquées (45%)
+
+Toutes les autres garanties fonctionnent correctement selon formulas.md.
+
+
+================================================================================
+🎯 CONCLUSION :
+================================================================================
+
+Type : Configuration incorrecte (pas un bug dans le code)
+Status : ✅ CORRIGÉ
+Action : Configuration BG changée de GRATUIT à DEFAULT
+
+Le système calcule maintenant BG selon formulas.md.
+
+Cordialement,
+L'équipe technique

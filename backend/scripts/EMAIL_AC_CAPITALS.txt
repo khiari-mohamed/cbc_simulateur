@@ -1,0 +1,142 @@
+Objet : ✅ NOTE : Assurance Conducteur - Configuration des capitaux
+
+Bonjour,
+
+Suite à votre remarque "Le palier Assurance conducteur ne donne pas le choix entre les capitaux injectés", voici notre analyse.
+
+================================================================================
+🎯 DIAGNOSTIC : Configuration incomplète (pas un bug)
+================================================================================
+
+✅ LE CODE FONCTIONNE CORRECTEMENT
+
+❌ MAIS : Un seul capital est configuré pour chaque compagnie
+
+📊 CONFIGURATION ACTUELLE :
+- AL BARAKA : 1 capital → 10000 DT (prime: 10 DT)
+- LLOYD : 1 capital → 10000 DT (prime: 10 DT)
+
+RÉSULTAT :
+L'utilisateur ne peut PAS choisir entre plusieurs capitaux car il n'y en a qu'un seul configuré.
+
+
+================================================================================
+🔍 POURQUOI CE N'EST PAS UN BUG
+================================================================================
+
+Le système fonctionne comme prévu :
+- Si 1 seul capital configuré → Pas de choix (capital par défaut)
+- Si plusieurs capitaux configurés → L'utilisateur peut choisir
+
+Actuellement, vous avez configuré UN SEUL capital (10000 DT) pour chaque compagnie.
+
+
+================================================================================
+✅ SOLUTION : Ajouter plusieurs capitaux
+================================================================================
+
+Pour permettre le choix entre plusieurs capitaux, vous devez ajouter plusieurs règles.
+
+📍 OÙ CONFIGURER :
+Menu Admin → "Garanties" → Sélectionner une compagnie → "Assurance Conducteur" → "Ajouter"
+
+📋 EXEMPLE DE CONFIGURATION :
+
+Pour AL BARAKA :
+1. Capital 5000 DT → Prime 5 DT
+2. Capital 10000 DT → Prime 10 DT (existe déjà)
+3. Capital 15000 DT → Prime 15 DT
+4. Capital 20000 DT → Prime 20 DT
+
+Pour LLOYD :
+1. Capital 5000 DT → Prime 5 DT
+2. Capital 10000 DT → Prime 10 DT (existe déjà)
+3. Capital 15000 DT → Prime 15 DT
+4. Capital 20000 DT → Prime 20 DT
+
+
+================================================================================
+📝 ÉTAPES POUR AJOUTER UN CAPITAL
+================================================================================
+
+1. Aller dans "Garanties" (onglet de Gestion Tarification)
+2. Sélectionner la compagnie (ex: AL BARAKA)
+3. Cliquer sur "Assurance Conducteur" pour développer
+4. Cliquer sur "Ajouter" en haut à droite
+5. Remplir le formulaire :
+   - Compagnie : AL BARAKA
+   - Type de formule : (laisser vide pour toutes)
+   - Capital minimum : 5000 (par exemple)
+   - Prime fixe : 5 (par exemple)
+6. Cliquer sur "Enregistrer"
+7. Répéter pour chaque capital souhaité
+
+
+================================================================================
+🧪 RÉSULTAT ATTENDU APRÈS CONFIGURATION
+================================================================================
+
+Une fois plusieurs capitaux configurés, l'utilisateur verra :
+
+Dans la simulation :
+┌─────────────────────────────────────┐
+│ Assurance Conducteur                │
+├─────────────────────────────────────┤
+│ AL BARAKA:                          │
+│ ○ 5000 DT                           │
+│ ○ 10000 DT (sélectionné)            │
+│ ○ 15000 DT                          │
+│ ○ 20000 DT                          │
+│                                     │
+│ LLOYD:                              │
+│ ○ 5000 DT                           │
+│ ○ 10000 DT (sélectionné)            │
+│ ○ 15000 DT                          │
+│ ○ 20000 DT                          │
+└─────────────────────────────────────┘
+
+
+================================================================================
+📊 VÉRIFICATION
+================================================================================
+
+Nous avons vérifié :
+✅ PROD : 1 capital configuré (10000 DT)
+✅ DEV : 1 capital configuré (10000 DT)
+✅ Code : Fonctionne correctement
+
+Le système est prêt à gérer plusieurs capitaux dès que vous les configurez.
+
+
+================================================================================
+💡 RECOMMANDATIONS
+================================================================================
+
+Capitaux suggérés selon les standards du marché :
+- 5000 DT (économique)
+- 10000 DT (standard) ← actuellement configuré
+- 15000 DT (confort)
+- 20000 DT (premium)
+- 25000 DT (haut de gamme)
+
+Vous pouvez configurer autant de capitaux que vous le souhaitez.
+
+
+================================================================================
+🎯 CONCLUSION
+================================================================================
+
+TYPE : Configuration incomplète (pas un bug)
+CAUSE : Un seul capital configuré par compagnie
+SOLUTION : Ajouter plusieurs règles AC avec capitaux différents
+STATUS : ⚠️ À CONFIGURER
+
+Le code fonctionne correctement. Il suffit d'ajouter les capitaux souhaités
+via l'interface admin pour que l'utilisateur puisse choisir.
+
+N'hésitez pas si vous avez besoin d'aide pour configurer les capitaux.
+
+Cordialement,
+L'équipe technique
+
+================================================================================

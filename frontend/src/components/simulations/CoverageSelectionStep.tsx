@@ -338,9 +338,14 @@ export const CoverageSelectionStep = ({
   
   // Check if a formula is eligible for ALL selected companies
   const isFormulaEligible = (formulaType: string): { eligible: boolean; reason?: string; loading?: boolean } => {
-    // If no usage or companies selected, disable all formulas
-    if (!usageId || selectedCompanies.length === 0) {
-      return { eligible: false, reason: 'Veuillez sélectionner un usage et une compagnie' };
+    // If no usage selected, disable all formulas
+    if (!usageId) {
+      return { eligible: false, reason: 'Veuillez sélectionner un usage' };
+    }
+    
+    // If no companies selected, allow selection but show warning
+    if (selectedCompanies.length === 0) {
+      return { eligible: true, reason: undefined };
     }
     
     // If still loading, show loading state
@@ -867,7 +872,12 @@ export const CoverageSelectionStep = ({
               </p>
               {!canSelectStandard && standardEligibility.reason && (
                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                  ⚠ {standardEligibility.reason}
+                  ⚠️ {standardEligibility.reason}
+                </p>
+              )}
+              {canSelectStandard && selectedCompanies.length === 0 && localFormula === FormulaType.STANDARD && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  ⚠️ Veuillez sélectionner une compagnie ci-dessous
                 </p>
               )}
             </div>
@@ -897,9 +907,14 @@ export const CoverageSelectionStep = ({
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Couverture des dommages en cas de collision avec un autre véhicule terrestre
               </p>
-              {!canSelectDommagesCollision && (
+              {!canSelectDommagesCollision && dommagesCollisionEligibility.reason && (
                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                  ⚠ {dommagesCollisionEligibility.reason || 'Non disponible pour ce véhicule'}
+                  ⚠️ {dommagesCollisionEligibility.reason}
+                </p>
+              )}
+              {canSelectDommagesCollision && selectedCompanies.length === 0 && localFormula === FormulaType.DOMMAGES_COLLISIONS && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  ⚠️ Veuillez sélectionner une compagnie ci-dessous
                 </p>
               )}
             </div>
@@ -929,12 +944,22 @@ export const CoverageSelectionStep = ({
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Couverture maximale
               </p>
-              {localFormula === FormulaType.TOUS_RISQUES_0 && (
+              {!canSelectTousRisques && tousRisquesEligibility.reason && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  ⚠️ {tousRisquesEligibility.reason}
+                </p>
+              )}
+              {canSelectTousRisques && selectedCompanies.length === 0 && localFormula === FormulaType.TOUS_RISQUES_0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  ⚠️ Veuillez sélectionner une compagnie ci-dessous
+                </p>
+              )}
+              {localFormula === FormulaType.TOUS_RISQUES_0 && selectedCompanies.length > 0 && (
                 <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                   Franchise: {localFranchiseRate === 0 ? 'Sans franchise (0%)' : `${localFranchiseRate}%`}
                 </p>
               )}
-              {isBrisDeGlacesFree && localFranchiseRate === 0 && localFormula === FormulaType.TOUS_RISQUES_0 && (
+              {isBrisDeGlacesFree && localFranchiseRate === 0 && localFormula === FormulaType.TOUS_RISQUES_0 && selectedCompanies.length > 0 && (
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                   ✓ Bris de Glaces GRATUIT avec cette formule
                 </p>
