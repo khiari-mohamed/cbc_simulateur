@@ -109,7 +109,7 @@ export const DocumentsPage = () => {
               {documents.map((doc: any) => (
                 <div
                   key={doc.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                 >
                   <div className="flex items-center gap-3">
                     <FileText className="w-5 h-5 text-gray-400" />
@@ -125,7 +125,7 @@ export const DocumentsPage = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {doc.isValidated ? (
                       <CheckCircle className="w-5 h-5 text-green-600" />
                     ) : (

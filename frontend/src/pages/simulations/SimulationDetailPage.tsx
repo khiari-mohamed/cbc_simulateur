@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MainLayout } from '../../components/layout/MainLayout';
 import { Button } from '../../components/ui/Button';
 import { ArrowLeft, Download, Send, Trash2 } from 'lucide-react';
 import api from '../../lib/api/client';
@@ -68,21 +67,17 @@ export const SimulationDetailPage = () => {
 
   if (isLoading) {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      </MainLayout>
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
     );
   }
 
   if (!simulation) {
     return (
-      <MainLayout>
-        <div className="text-center py-12">
-          <p className="text-gray-600 dark:text-gray-400">Simulation non trouvée</p>
-        </div>
-      </MainLayout>
+      <div className="text-center py-12">
+        <p className="text-gray-600 dark:text-gray-400">Simulation non trouvée</p>
+      </div>
     );
   }
 
@@ -90,8 +85,7 @@ export const SimulationDetailPage = () => {
   const hasGeneratedQuotes = simulation.quotes?.some((q: any) => q.status === 'GENERATED');
 
   return (
-    <MainLayout>
-      <div className="max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto">
         <Button
           variant="outline"
           onClick={() => navigate('/simulations')}
@@ -126,7 +120,7 @@ export const SimulationDetailPage = () => {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Puissance fiscale</p>
               <p className="font-semibold text-gray-900 dark:text-white">
@@ -196,7 +190,7 @@ export const SimulationDetailPage = () => {
           )}
 
           {isDraft && hasGeneratedQuotes && (
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               {/* <Button
                 variant="outline"
                 onClick={() => recalculateMutation.mutate()}
@@ -279,7 +273,7 @@ export const SimulationDetailPage = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                     <div>
                       <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Prime nette</p>
                       <p className="font-medium text-gray-900 dark:text-white">
@@ -314,7 +308,6 @@ export const SimulationDetailPage = () => {
             </div>
           </div>
         )}
-      </div>
-    </MainLayout>
+    </div>
   );
 };

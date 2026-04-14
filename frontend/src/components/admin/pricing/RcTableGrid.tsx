@@ -341,37 +341,41 @@ export const RcTableGrid = () => {
     <div className="space-y-4">
       <Card className="p-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center gap-4 w-full sm:w-auto">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Compagnie:
-            </label>
-            <select
-              value={selectedCompany}
-              onChange={(e) => {
-                setSelectedCompany(e.target.value);
-                setEditedCells(new Map());
-                setHasChanges(false);
-              }}
-              className="flex-1 sm:flex-none px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-            >
-              <option value="">Sélectionner une compagnie</option>
-              {companies.map((c: any) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <label className="ml-4 text-sm font-medium text-gray-700 dark:text-gray-300">
-              Usage:
-            </label>
-            <select
-              value={selectedUsage}
-              onChange={(e) => setSelectedUsage(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white max-w-[220px]"
-            >
-              <option value="">Tous les usages · affichage uniquement</option>
-              {usageTypes?.map((u: any) => (
-                <option key={u.id} value={u.id}>{u.nameFr}</option>
-              ))}
-            </select>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                Compagnie:
+              </label>
+              <select
+                value={selectedCompany}
+                onChange={(e) => {
+                  setSelectedCompany(e.target.value);
+                  setEditedCells(new Map());
+                  setHasChanges(false);
+                }}
+                className="flex-1 sm:flex-none px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="">Sélectionner une compagnie</option>
+                {companies.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                Usage:
+              </label>
+              <select
+                value={selectedUsage}
+                onChange={(e) => setSelectedUsage(e.target.value)}
+                className="flex-1 sm:flex-none px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white sm:max-w-[220px]"
+              >
+                <option value="">Tous les usages · affichage uniquement</option>
+                {usageTypes?.map((u: any) => (
+                  <option key={u.id} value={u.id}>{u.nameFr}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="flex gap-2 w-full sm:w-auto">

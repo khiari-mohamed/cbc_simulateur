@@ -217,7 +217,7 @@ export const PaymentCheckoutPage = () => {
     }
 
     if (isClosestWeekend(dateString)) {
-      toast.error('Le weekend le plus proche n\'est pas autorisé. Veuillez choisir une autre date.');
+      toast.error("La date choisie n'est pas disponible pour le moment. Merci de choisir une autre date.");
       return;
     }
     setEffectiveDate(dateString);
@@ -271,7 +271,7 @@ export const PaymentCheckoutPage = () => {
     }
 
     if (isClosestWeekend(effectiveDate)) {
-      toast.error('Le weekend le plus proche n\'est pas autorisé');
+      toast.error("La date choisie n'est pas disponible pour le moment. Merci de choisir une autre date.");
       return;
     }
 
@@ -358,7 +358,7 @@ export const PaymentCheckoutPage = () => {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+          <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">
             Finalisation de votre devis
           </h1>
           <p className="text-gray-600 dark:text-gray-400">

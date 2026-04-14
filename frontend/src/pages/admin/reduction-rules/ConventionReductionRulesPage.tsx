@@ -199,21 +199,21 @@ export const ConventionReductionRulesPage = () => {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Retour aux conventions
         </Button>
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Règles de Réduction</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Règles de Réduction</h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
               Convention: {convention?.name}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowPriorityHelp(true)} className="flex items-center gap-2">
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => setShowPriorityHelp(true)} className="flex items-center gap-2 flex-1 sm:flex-none">
               <HelpCircle className="w-5 h-5" />
-              Guide Priorité
+              <span className="whitespace-nowrap">Guide Priorité</span>
             </Button>
-            <Button onClick={() => openModal()} className="flex items-center gap-2">
+            <Button onClick={() => openModal()} className="flex items-center gap-2 flex-1 sm:flex-none">
               <Plus className="w-5 h-5" />
-              Nouvelle Règle
+              <span className="whitespace-nowrap">Nouvelle Règle</span>
             </Button>
           </div>
         </div>
@@ -1466,7 +1466,7 @@ export const ConventionReductionRulesPage = () => {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Type de Formule (optionnel)
@@ -1553,7 +1553,7 @@ export const ConventionReductionRulesPage = () => {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Input
                     label={isBGSelected || formData.metric === 'DC_CAPITAL' ? "Capital Min (DT) - optionnel" : "Valeur Min (optionnel)"}
@@ -1597,7 +1597,7 @@ export const ConventionReductionRulesPage = () => {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"

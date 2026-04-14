@@ -42,36 +42,38 @@ export const PricingManagementPage = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-7 mb-6">
-          <TabsTrigger value="rc-table" className="flex items-center gap-2">
-            <Table className="w-4 h-4" />
-            Tableau RC
-          </TabsTrigger>
-          <TabsTrigger value="guarantees" className="flex items-center gap-2">
-            <FileSpreadsheet className="w-4 h-4" />
-            Garanties
-          </TabsTrigger>
-          <TabsTrigger value="dc-config" className="flex items-center gap-2">
-            <Calculator className="w-4 h-4" />
-            Dommages Collision
-          </TabsTrigger>
-          <TabsTrigger value="dc-capitals" className="flex items-center gap-2">
-            <Calculator className="w-4 h-4" />
-            Paliers DC
-          </TabsTrigger>
-          <TabsTrigger value="bundlings" className="flex items-center gap-2">
-            <Package className="w-4 h-4" />
-            Garanties Groupées
-          </TabsTrigger>
-          <TabsTrigger value="availability" className="flex items-center gap-2">
-            <Shield className="w-4 h-4" />
-            Disponibilité
-          </TabsTrigger>
-          <TabsTrigger value="age-eligibility" className="flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
-            Âge Éligibilité
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 mb-6 scrollbar-hide">
+          <TabsList className="inline-flex w-max md:grid md:w-full md:grid-cols-7">
+            <TabsTrigger value="rc-table" className="flex items-center gap-2">
+              <Table className="w-4 h-4" />
+              <span className="whitespace-nowrap">Tableau RC</span>
+            </TabsTrigger>
+            <TabsTrigger value="guarantees" className="flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4" />
+              <span className="whitespace-nowrap">Garanties</span>
+            </TabsTrigger>
+            <TabsTrigger value="dc-config" className="flex items-center gap-2">
+              <Calculator className="w-4 h-4" />
+              <span className="whitespace-nowrap">Dommages Collision</span>
+            </TabsTrigger>
+            <TabsTrigger value="dc-capitals" className="flex items-center gap-2">
+              <Calculator className="w-4 h-4" />
+              <span className="whitespace-nowrap">Paliers DC</span>
+            </TabsTrigger>
+            <TabsTrigger value="bundlings" className="flex items-center gap-2">
+              <Package className="w-4 h-4" />
+              <span className="whitespace-nowrap">Garanties Groupées</span>
+            </TabsTrigger>
+            <TabsTrigger value="availability" className="flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              <span className="whitespace-nowrap">Disponibilité</span>
+            </TabsTrigger>
+            <TabsTrigger value="age-eligibility" className="flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              <span className="whitespace-nowrap">Âge Éligibilité</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="rc-table">
           <RcTableGrid />

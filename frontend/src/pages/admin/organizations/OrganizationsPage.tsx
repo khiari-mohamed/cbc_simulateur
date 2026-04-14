@@ -94,16 +94,16 @@ export const OrganizationsPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Organisations Clientes</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Organisations Clientes</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Gérez les organisations clientes (ex: ATB Bank, Entreprise X)
           </p>
         </div>
-        <Button onClick={() => openModal()} className="flex items-center gap-2">
+        <Button onClick={() => openModal()} className="flex items-center gap-2 w-full sm:w-auto">
           <Plus className="w-5 h-5" />
-          Nouvelle Organisation
+          <span className="whitespace-nowrap">Nouvelle Organisation</span>
         </Button>
       </div>
 

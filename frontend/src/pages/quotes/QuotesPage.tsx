@@ -312,7 +312,7 @@ export const QuotesPage = () => {
                           </h3>
                           {getStatusBadge(quote.status)}
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
                           <span className="flex items-center gap-1">
                             <Building2 className="w-4 h-4" />
                             {quote.company.name}
@@ -323,7 +323,7 @@ export const QuotesPage = () => {
                           </span>
                         </div>
                         {quote.simulation?.vehicle && (
-                          <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mt-2">
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-2">
                             {quote.simulation.vehicle.registration && (
                               <span className="font-semibold text-blue-600 dark:text-blue-400">Immat: {quote.simulation.vehicle.registration}</span>
                             )}

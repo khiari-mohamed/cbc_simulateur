@@ -108,10 +108,10 @@ export const ConventionsPage = () => {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Conventions</h1>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Conventions</h1>
             <span className="px-2 py-1 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 text-xs font-semibold rounded-full flex items-center gap-1">
               <Shield className="w-3 h-3" />
               MODULE PROTÉGÉ
@@ -121,19 +121,19 @@ export const ConventionsPage = () => {
             Conventions exclusives par organisation cliente
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           <Button 
             onClick={() => setIsHelpModalOpen(true)} 
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 flex-1 sm:flex-none"
             title="Guide d'utilisation du partage de conventions"
           >
             <HelpCircle className="w-4 h-4" />
             Guide
           </Button>
-          <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2">
+          <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 flex-1 sm:flex-none">
             <Plus className="w-4 h-4" />
-            Nouvelle Convention
+            <span className="whitespace-nowrap">Nouvelle Convention</span>
           </Button>
         </div>
       </div>
@@ -261,25 +261,25 @@ export const ConventionsPage = () => {
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => handleShare(convention)}
-                className="flex-1"
+                className="flex-1 min-w-0"
                 title="Partager avec d'autres organisations"
               >
                 <Users className="w-3 h-3 mr-1" />
-                Partager
+                <span className="truncate">Partager</span>
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => navigate(`/admin/conventions/${convention.id}/reduction-rules`)}
-                className="flex-1"
+                className="flex-1 min-w-0"
               >
                 <Sliders className="w-3 h-3 mr-1" />
-                Paliers
+                <span className="truncate">Paliers</span>
               </Button>
               <Button
                 size="sm"

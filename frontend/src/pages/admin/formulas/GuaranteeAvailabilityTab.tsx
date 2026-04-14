@@ -343,7 +343,7 @@ export const GuaranteeAvailabilityTab = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap justify-between items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">
             Disponibilité des Garanties
@@ -352,14 +352,14 @@ export const GuaranteeAvailabilityTab = () => {
             Configurez le statut des garanties par compagnie et formule
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <Button
             onClick={() => setIsHelpModalOpen(true)}
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 flex-1 sm:flex-none"
           >
             <HelpCircle className="w-4 h-4" />
-            Guide d'utilisation
+            <span className="whitespace-nowrap">Guide d'utilisation</span>
           </Button>
           <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <input
@@ -368,11 +368,11 @@ export const GuaranteeAvailabilityTab = () => {
               onChange={(e) => setShowInactive(e.target.checked)}
               className="w-4 h-4 text-blue-600 rounded"
             />
-            Afficher les désactivées
+            <span className="whitespace-nowrap">Afficher les désactivées</span>
           </label>
-          <Button onClick={openModal} className="flex items-center gap-2">
+          <Button onClick={openModal} className="flex items-center gap-2 flex-1 sm:flex-none">
             <Plus className="w-4 h-4" />
-            Nouvelle Configuration
+            <span className="whitespace-nowrap">Nouvelle Configuration</span>
           </Button>
         </div>
       </div>
@@ -436,7 +436,7 @@ export const GuaranteeAvailabilityTab = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     {/* NON ACCORDÉE */}
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-2">

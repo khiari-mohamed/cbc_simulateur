@@ -184,7 +184,7 @@ export const ContractDetailPage = () => {
           >
             ← Retour
           </button>
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+          <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">
             {contract.contractNumber}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
@@ -274,7 +274,7 @@ export const ContractDetailPage = () => {
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
                 Détails du contrat
               </h2>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Date de début</p>
                   <p className="text-lg font-semibold text-gray-900 dark:text-white">

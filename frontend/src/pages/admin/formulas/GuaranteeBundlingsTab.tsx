@@ -259,7 +259,7 @@ export const GuaranteeBundlingsTab = () => {
   return (
     <div className="space-y-6">
       {/* Header with Help Button Only */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">
             Règles de Groupement Configurées
@@ -268,18 +268,18 @@ export const GuaranteeBundlingsTab = () => {
             Gérez les garanties automatiquement incluses dans d'autres garanties
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <Button
             variant="outline"
             onClick={() => setIsHelpModalOpen(true)}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 flex-1 sm:flex-none"
           >
             <HelpCircle className="w-4 h-4" />
-            Guide Complet
+            <span className="whitespace-nowrap">Guide Complet</span>
           </Button>
-          <Button onClick={() => openModal()} className="flex items-center gap-2">
+          <Button onClick={() => openModal()} className="flex items-center gap-2 flex-1 sm:flex-none">
             <Plus className="w-4 h-4" />
-            Nouvelle Règle
+            <span className="whitespace-nowrap">Nouvelle Règle</span>
           </Button>
         </div>
       </div>
@@ -342,9 +342,9 @@ export const GuaranteeBundlingsTab = () => {
                         </p>
                       </div>
                     )}
-                    <div className="flex items-start justify-between mb-3">
+                    <div className="flex flex-col sm:flex-row items-start justify-between gap-3 mb-3">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
                           <span className="text-sm font-semibold text-gray-900 dark:text-white">
                             📦 Garantie Principale:
                           </span>
@@ -405,10 +405,10 @@ export const GuaranteeBundlingsTab = () => {
                           setViewingCompany(companyGroup.company);
                           setIsViewDetailsModalOpen(true);
                         }}
-                        className="flex items-center gap-2 ml-4"
+                        className="flex items-center gap-2 w-full sm:w-auto"
                       >
                         <Eye className="w-4 h-4" />
-                        Voir Détails
+                        <span className="whitespace-nowrap">Voir Détails</span>
                       </Button>
                     </div>
                   </div>
@@ -841,18 +841,18 @@ export const GuaranteeBundlingsTab = () => {
                       Avec Groupement (Exemple: Lloyd)
                     </p>
                     <div className="flex items-center gap-3 flex-wrap">
-                      <div className="bg-blue-100 dark:bg-blue-900 px-4 py-3 rounded-lg border-2 border-blue-500 min-w-[200px]">
+                      <div className="bg-blue-100 dark:bg-blue-900 px-4 py-3 rounded-lg border-2 border-blue-500 min-w-[160px] sm:min-w-[200px]">
                         <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold mb-1">Garantie Principale</p>
                         <p className="text-sm font-bold text-blue-900 dark:text-blue-100">Dommages suite émeutes</p>
                         <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">Prix: 30 DT</p>
                       </div>
-                      <ArrowRight className="w-6 h-6 text-green-600 dark:text-green-400" />
-                      <div className="bg-green-100 dark:bg-green-900 px-4 py-3 rounded-lg border-2 border-green-500 min-w-[200px]">
+                      <ArrowRight className="w-6 h-6 text-green-600 dark:text-green-400 hidden sm:block" />
+                      <div className="bg-green-100 dark:bg-green-900 px-4 py-3 rounded-lg border-2 border-green-500 min-w-[160px] sm:min-w-[200px]">
                         <p className="text-xs text-green-600 dark:text-green-400 font-semibold mb-1">✓ Inclus Automatiquement</p>
                         <p className="text-sm font-bold text-green-900 dark:text-green-100">Catastrophes Naturelles</p>
                         <p className="text-xs text-green-700 dark:text-green-300 mt-1">Prix: 0 DT (inclus)</p>
                       </div>
-                      <div className="ml-auto bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2 rounded-lg">
+                      <div className="w-full sm:w-auto sm:ml-auto bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2 rounded-lg">
                         <p className="text-xs font-semibold">Total Client</p>
                         <p className="text-lg font-bold">30 DT</p>
                       </div>
@@ -866,18 +866,18 @@ export const GuaranteeBundlingsTab = () => {
                       Sans Groupement (Exemple: Amana)
                     </p>
                     <div className="flex items-center gap-3 flex-wrap">
-                      <div className="bg-blue-100 dark:bg-blue-900 px-4 py-3 rounded-lg border-2 border-blue-500 min-w-[200px]">
+                      <div className="bg-blue-100 dark:bg-blue-900 px-4 py-3 rounded-lg border-2 border-blue-500 min-w-[160px] sm:min-w-[200px]">
                         <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold mb-1">Garantie 1</p>
                         <p className="text-sm font-bold text-blue-900 dark:text-blue-100">Dommages suite émeutes</p>
                         <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">Prix: 30 DT</p>
                       </div>
-                      <Plus className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-                      <div className="bg-purple-100 dark:bg-purple-900 px-4 py-3 rounded-lg border-2 border-purple-500 min-w-[200px]">
+                      <Plus className="w-6 h-6 text-orange-600 dark:text-orange-400 hidden sm:block" />
+                      <div className="bg-purple-100 dark:bg-purple-900 px-4 py-3 rounded-lg border-2 border-purple-500 min-w-[160px] sm:min-w-[200px]">
                         <p className="text-xs text-purple-600 dark:text-purple-400 font-semibold mb-1">Garantie 2 (Séparée)</p>
                         <p className="text-sm font-bold text-purple-900 dark:text-purple-100">Catastrophes Naturelles</p>
                         <p className="text-xs text-purple-700 dark:text-purple-300 mt-1">Prix: 40 DT</p>
                       </div>
-                      <div className="ml-auto bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 py-2 rounded-lg">
+                      <div className="w-full sm:w-auto sm:ml-auto bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 py-2 rounded-lg">
                         <p className="text-xs font-semibold">Total Client</p>
                         <p className="text-lg font-bold">70 DT</p>
                       </div>

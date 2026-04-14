@@ -365,7 +365,7 @@ export const DcCapitalTiersPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
             Paliers de Capital DC
@@ -374,11 +374,11 @@ export const DcCapitalTiersPage = () => {
             Configuration des paliers de capital pour Dommages Collision
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <DcCapitalTiersInfoModal />
-          <Button onClick={() => setShowAddForm(!showAddForm)}>
+          <Button onClick={() => setShowAddForm(!showAddForm)} className="flex-1 sm:flex-none">
             <Plus className="w-4 h-4 mr-2" />
-            Nouveau Palier
+            <span className="whitespace-nowrap">Nouveau Palier</span>
           </Button>
         </div>
       </div>
@@ -792,7 +792,7 @@ export const DcCapitalTiersPage = () => {
                           </span>
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-2 flex-wrap">
                             <Button
                               size="sm"
                               variant="outline"
@@ -821,7 +821,7 @@ export const DcCapitalTiersPage = () => {
                                 setSelectedCompaniesForCopy([]);
                               }}
                             >
-                              Copier vers...
+                              <span className="whitespace-nowrap">Copier vers...</span>
                             </Button>
                             {tier.isActive ? (
                               <Button

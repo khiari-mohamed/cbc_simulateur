@@ -320,16 +320,17 @@ export const GuaranteesConfig = () => {
               )}
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
               {selectedCompany && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowBulkModal(true)}
                   disabled={!allRules || allRules.length === 0}
+                  className="flex-1 sm:flex-none"
                 >
                   <Copy className="w-4 h-4 mr-2" />
-                  Appliquer à d'autres compagnies
+                  <span className="whitespace-nowrap">Appliquer à d'autres compagnies</span>
                 </Button>
               )}
               <Button
@@ -337,9 +338,10 @@ export const GuaranteesConfig = () => {
                 size="sm"
                 onClick={handleExportAll}
                 disabled={!selectedCompany || !allRules || allRules.length === 0}
+                className="flex-1 sm:flex-none"
               >
                 <Download className="w-4 h-4 mr-2" />
-                Exporter tout
+                <span className="whitespace-nowrap">Exporter tout</span>
               </Button>
             </div>
           </div>

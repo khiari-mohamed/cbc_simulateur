@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MainLayout } from '../../components/layout/MainLayout';
 import { Button } from '../../components/ui/Button';
 import { ArrowLeft, Download, Check, X } from 'lucide-react';
 import api from '../../lib/api/client';
@@ -40,24 +39,20 @@ export const QuoteComparisonPage = () => {
 
   if (isLoading) {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      </MainLayout>
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
     );
   }
 
   if (!quotes || quotes.length === 0) {
     return (
-      <MainLayout>
-        <div className="text-center py-12">
-          <p className="text-gray-600 dark:text-gray-400">Aucun devis à comparer</p>
-          <Button onClick={() => navigate('/quotes')} className="mt-4">
-            Retour aux devis
-          </Button>
-        </div>
-      </MainLayout>
+      <div className="text-center py-12">
+        <p className="text-gray-600 dark:text-gray-400">Aucun devis à comparer</p>
+        <Button onClick={() => navigate('/quotes')} className="mt-4">
+          Retour aux devis
+        </Button>
+      </div>
     );
   }
 
@@ -80,8 +75,7 @@ export const QuoteComparisonPage = () => {
   const bestPrice = Math.min(...quotes.map((q: any) => q.totalAPayer));
 
   return (
-    <MainLayout>
-      <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto">
         <Button
           variant="outline"
           onClick={() => navigate('/quotes')}
@@ -92,7 +86,7 @@ export const QuoteComparisonPage = () => {
         </Button>
 
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
             Comparaison de devis
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -284,7 +278,6 @@ export const QuoteComparisonPage = () => {
             Vérifiez les garanties incluses et choisissez la couverture qui correspond le mieux à vos besoins.
           </p>
         </div>
-      </div>
-    </MainLayout>
+    </div>
   );
 };

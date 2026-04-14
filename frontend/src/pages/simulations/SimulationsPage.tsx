@@ -82,15 +82,15 @@ export const SimulationsPage = () => {
                 className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow cursor-pointer"
                 onClick={() => navigate(`/simulations/${simulation.id}`)}
               >
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4 gap-2">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                         {simulation.vehicle.registration || 'Véhicule sans immatriculation'}
                       </h3>
                       {getStatusBadge(simulation.status)}
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
                       <span className="flex items-center gap-1">
                         <TrendingUp className="w-4 h-4" />
                         {simulation.vehicle.fiscalHorsepower} CV
@@ -105,7 +105,7 @@ export const SimulationsPage = () => {
                       </span>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="sm:text-right">
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Formule</p>
                     <p className="font-semibold text-gray-900 dark:text-white">
                       {getFormulaLabel(simulation.formulaType)}
