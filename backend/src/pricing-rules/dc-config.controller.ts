@@ -134,4 +134,15 @@ export class DcConfigController {
   upsertMatrixPrice(@Body() data: any, @Request() req: any) {
     return this.dcConfigService.upsertMatrixPrice(data, req.user.id);
   }
+
+  // Get available DC capitals for a specific company/usage/VV
+  @Get('available-capitals/:companyId/:usageId')
+  getAvailableCapitals(
+    @Param('companyId') companyId: string,
+    @Param('usageId') usageId: string,
+    @Query('marketValue') marketValue?: string,
+  ) {
+    const vv = marketValue ? parseFloat(marketValue) : undefined;
+    return this.dcConfigService.getAvailableCapitals(companyId, usageId, vv);
+  }
 }

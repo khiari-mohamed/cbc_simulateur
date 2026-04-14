@@ -68,6 +68,49 @@ export class GuaranteeAvailabilityService {
     source: 'config' | 'fallback';
     configId?: string;
   }> {
+    return this.resolveAvailabilityInternal(companyId, guaranteeId, formulaType);
+  }
+
+  /**
+   * Resolve guarantee availability with franchise rate consideration (for BG)
+   */
+  async resolveAvailabilityWithFranchise(
+    companyId: string,
+    guaranteeId: string,
+    formulaType: FormulaType,
+    franchiseRate: number,
+  ): Promise<{
+    status: GuaranteeAvailabilityStatus;
+    source: 'config' | 'fallback';
+    configId?: string;
+  }> {
+    const result = await this.resolveAvailabilityInternal(companyId, guaranteeId, formulaType);
+    
+    // Special rule: BG is only free at 0% franchise for TOUS_RISQUES_0
+    if (result.status === GuaranteeAvailabilityStatus.GRATUIT && 
+        formulaType === FormulaType.TOUS_RISQUES_0 && 
+        franchiseRate !== 0) {
+      return {
+        ...result,
+        status: GuaranteeAvailabilityStatus.DEFAULT, // Not free, must pay
+      };
+    }
+    
+    return result;
+  }
+
+  /**
+   * Internal method for resolving availability
+   */
+  private async resolveAvailabilityInternal(
+    companyId: string,
+    guaranteeId: string,
+    formulaType?: FormulaType | null,
+  ): Promise<{
+    status: GuaranteeAvailabilityStatus;
+    source: 'config' | 'fallback';
+    configId?: string;
+  }> {
     // Build OR conditions for formula matching
     const formulaConditions = [];
     
@@ -183,7 +226,7 @@ export class GuaranteeAvailabilityService {
       );
 
       return config;
-    } catch (error) {
+    } catch (error: any) {
       // Handle race condition: unique constraint violation
       if (error.code === 'P2002') {
         throw new ConflictException('Cette configuration existe déjà (créée par une autre requête)');
@@ -219,7 +262,7 @@ export class GuaranteeAvailabilityService {
       );
 
       return updated;
-    } catch (error) {
+    } catch (error: any) {
       // Handle Prisma unique constraint violation
       if (error.code === 'P2002') {
         throw new ConflictException('Une configuration avec cette combinaison compagnie/garantie/formule existe déjà');
@@ -394,7 +437,7 @@ export class GuaranteeAvailabilityService {
           });
 
           results.created.push(config);
-        } catch (error) {
+        } catch (error: any) {
           results.errors.push({
             data,
             error: error.message || 'Erreur inconnue',
@@ -432,6 +475,7 @@ export class GuaranteeAvailabilityService {
     companyId: string,
     guaranteeCodes: string[],
     formulaType: FormulaType,
+    franchiseRate?: number,
   ): Promise<Record<string, { isAvailable: boolean; isFree: boolean }>> {
     const result: Record<string, { isAvailable: boolean; isFree: boolean }> = {};
 
@@ -502,7 +546,13 @@ export class GuaranteeAvailabilityService {
             result[code] = { isAvailable: false, isFree: false };
             break;
           case GuaranteeAvailabilityStatus.GRATUIT:
-            result[code] = { isAvailable: true, isFree: true };
+            // 🔥 SPECIAL RULE: BG is only free at 0% franchise for TOUS_RISQUES_0
+            if (code === 'BG' && formulaType === FormulaType.TOUS_RISQUES_0) {
+              const isFree = franchiseRate === 0;
+              result[code] = { isAvailable: true, isFree };
+            } else {
+              result[code] = { isAvailable: true, isFree: true };
+            }
             break;
           case GuaranteeAvailabilityStatus.DEFAULT:
           default:

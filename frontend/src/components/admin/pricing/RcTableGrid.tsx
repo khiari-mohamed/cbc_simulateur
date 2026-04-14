@@ -224,6 +224,17 @@ export const RcTableGrid = () => {
     const key = getCellKey(classNum, powerRange);
     const numValue = parseNumberInput(value);
     
+    // ✅ VALIDATION: Warn if value seems too large (likely entered with comma as thousands separator)
+    // RC premiums for CV ≥15 should typically be under 10,000 DT
+    if (powerRange.minPower >= 15 && numValue > 10000) {
+      toast.error(
+        `⚠️ Valeur suspecte: ${formatNumber(numValue)} DT semble trop élevée!\n` +
+        `Pour CV ≥15, les primes RC sont généralement < 10,000 DT.\n` +
+        `Avez-vous entré ${formatNumber(numValue / 100)} par erreur?`,
+        { duration: 8000 }
+      );
+    }
+    
     const newEdited = new Map(editedCells);
     newEdited.set(key, numValue);
     setEditedCells(newEdited);
@@ -455,12 +466,16 @@ export const RcTableGrid = () => {
                         const key = getCellKey(classNum, range);
                         const isEdited = editedCells.has(key);
                         const numValue = typeof value === 'number' ? value : 0;
+                        // ✅ VALIDATION: Flag suspiciously large values
+                        const isSuspicious = range.minPower >= 15 && numValue > 10000;
                         
                         return (
                           <td
                             key={range.label}
                             className={`border border-gray-300 dark:border-gray-600 p-0 ${
                               isEdited ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                            } ${
+                              isSuspicious ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-600' : ''
                             }`}
                           >
                             {focusedCell === key ? (
@@ -511,6 +526,7 @@ export const RcTableGrid = () => {
               <ul className="list-disc list-inside space-y-1">
                 <li>Saisissez les primes directement dans les cellules (comme Excel)</li>
                 <li>Les cellules modifiées sont surlignées en bleu</li>
+                <li><strong className="text-red-600 dark:text-red-400">⚠️ Les cellules avec des valeurs suspectes (&gt; 10,000 DT pour CV ≥15) sont surlignées en rouge</strong></li>
                 <li>Cliquez sur "Sauvegarder" pour appliquer les modifications</li>
                 <li>Utilisez "Exporter" pour télécharger en CSV</li>
                 <li>Utilisez "Importer Excel" pour charger un fichier Excel (.xlsx, .xls) ou CSV</li>

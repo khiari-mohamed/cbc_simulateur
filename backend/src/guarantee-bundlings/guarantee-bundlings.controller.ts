@@ -34,6 +34,7 @@ export class GuaranteeBundlingsController {
   }
 
   @Get('company/:companyId')
+  @Roles(Role.ADMINISTRATEUR_ARS, Role.CLIENT_ADHERENT) // Allow clients to read bundlings
   findByCompany(@Param('companyId') companyId: string) {
     return this.service.findByCompany(companyId);
   }

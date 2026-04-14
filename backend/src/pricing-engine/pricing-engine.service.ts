@@ -179,16 +179,14 @@
 
       // 9. BG (Bris de Glaces) - Check availability config
       if (simulation.selectedGuarantees.includes('BG') || simulation.formulaType === FormulaType.TOUS_RISQUES_0) {
-        const bgAvailability = await this.checkGuaranteeAvailability(companyId, 'OPTIONAL_BRIS_GLACES', simulation.formulaType);
+        const bgAvailability = await this.checkGuaranteeAvailability(companyId, 'OPTIONAL_BRIS_GLACES', simulation.formulaType, simulation.franchiseRate);
         
         if (bgAvailability.isAvailable) {
           const selectedCapital = simulation.selectedCapitals?.['BG'];
           
-          // Determine if BG should be free:
-          // 1. If config says GRATUIT → free
-          // 2. If config says DEFAULT and TR0% → free (backward compatible)
-          const isFree = bgAvailability.isFree || 
-                        (bgAvailability.useDefault && simulation.formulaType === FormulaType.TOUS_RISQUES_0);
+          // 🔥 IMPORTANT: Trust ONLY the availability config from backend
+          // Backend now handles franchise rate logic - BG is only free when config says GRATUIT AND franchiseRate === 0
+          const isFree = bgAvailability.isFree;
           
           const bgResult = await this.calculateBG(
             companyId,
@@ -1133,13 +1131,17 @@
       }
 
       // Rule: capital <= min(maxCapitalPercent * VV, maxCapitalAbsolute)
-      const percentCeiling = vv.mul(dcConfig.maxCapitalPercent.div(100));
-      const effectiveCeiling = percentCeiling.lt(dcConfig.maxCapitalAbsolute) 
-        ? percentCeiling 
-        : dcConfig.maxCapitalAbsolute;
-      
-      if (requestedCapital.gt(effectiveCeiling)) {
-        throw new BadRequestException(`Capital cannot exceed ${effectiveCeiling.toFixed(2)} DT`);
+      // ⚠️ IMPORTANT: This validation applies ONLY to PROGRESSIVE method (LLOYD)
+      // For MATRIX method (AL BARAKA), the matrix itself defines available capitals
+      if (!dcConfig.useMatrix) {
+        const percentCeiling = vv.mul(dcConfig.maxCapitalPercent.div(100));
+        const effectiveCeiling = percentCeiling.lt(dcConfig.maxCapitalAbsolute) 
+          ? percentCeiling 
+          : dcConfig.maxCapitalAbsolute;
+        
+        if (requestedCapital.gt(effectiveCeiling)) {
+          throw new BadRequestException(`Capital cannot exceed ${effectiveCeiling.toFixed(2)} DT`);
+        }
       }
 
       // Validate capital steps
@@ -1240,22 +1242,64 @@
         prime = prime.mul(multiplier);
       }
 
-      // Apply convention reduction
+      // Apply convention reduction - check which metric is configured
       let reductionInfo = null;
       if (conventionId) {
-        const discountPercent = await this.reductionRatesService.getReductionPercent(
-          companyId,
-          'OPTIONAL_DOMMAGES_COLLISIONS',
-          conventionId,
-          capital,
-          'DC_CAPITAL' as ReductionMetric,
-          FormulaType.DOMMAGES_COLLISIONS,
-          usageId,
-        );
-        if (discountPercent > 0) {
-          const originalPrime = prime;
-          prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
-          reductionInfo = { originalPrime: originalPrime.toNumber(), discountPercent, finalPrime: prime.toNumber() };
+        const guarantee = await this.prisma.guarantee.findFirst({
+          where: { systemRole: 'OPTIONAL_DOMMAGES_COLLISIONS', isActive: true }
+        });
+
+        if (guarantee) {
+          const dcCapitalRule = await this.prisma.conventionReductionRule.findFirst({
+            where: {
+              conventionId,
+              guaranteeId: guarantee.id,
+              metric: 'DC_CAPITAL',
+              isActive: true,
+              validFrom: { lte: new Date() },
+              OR: [{ validTo: null }, { validTo: { gte: new Date() } }]
+            }
+          });
+
+          const marketValueRule = await this.prisma.conventionReductionRule.findFirst({
+            where: {
+              conventionId,
+              guaranteeId: guarantee.id,
+              metric: 'MARKET_VALUE',
+              isActive: true,
+              validFrom: { lte: new Date() },
+              OR: [{ validTo: null }, { validTo: { gte: new Date() } }]
+            }
+          });
+
+          let discountPercent = 0;
+          if (dcCapitalRule) {
+            discountPercent = await this.reductionRatesService.getReductionPercent(
+              companyId,
+              'OPTIONAL_DOMMAGES_COLLISIONS',
+              conventionId,
+              capital,
+              'DC_CAPITAL' as ReductionMetric,
+              FormulaType.DOMMAGES_COLLISIONS,
+              usageId,
+            );
+          } else if (marketValueRule) {
+            discountPercent = await this.reductionRatesService.getReductionPercent(
+              companyId,
+              'OPTIONAL_DOMMAGES_COLLISIONS',
+              conventionId,
+              vv,
+              'MARKET_VALUE' as ReductionMetric,
+              FormulaType.DOMMAGES_COLLISIONS,
+              usageId,
+            );
+          }
+
+          if (discountPercent > 0) {
+            const originalPrime = prime;
+            prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+            reductionInfo = { originalPrime: originalPrime.toNumber(), discountPercent, finalPrime: prime.toNumber() };
+          }
         }
       }
 
@@ -1393,22 +1437,64 @@
         prime = prime.mul(multiplier);
       }
 
-      // Apply convention reduction
+      // Apply convention reduction - check which metric is configured
       let reductionInfo = null;
       if (conventionId) {
-        const discountPercent = await this.reductionRatesService.getReductionPercent(
-          companyId,
-          'OPTIONAL_DOMMAGES_COLLISIONS',
-          conventionId,
-          capital,
-          'DC_CAPITAL' as ReductionMetric,
-          FormulaType.DOMMAGES_COLLISIONS,
-          usageId,
-        );
-        if (discountPercent > 0) {
-          const originalPrime = prime;
-          prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
-          reductionInfo = { originalPrime: originalPrime.toNumber(), discountPercent, finalPrime: prime.toNumber() };
+        const guarantee = await this.prisma.guarantee.findFirst({
+          where: { systemRole: 'OPTIONAL_DOMMAGES_COLLISIONS', isActive: true }
+        });
+
+        if (guarantee) {
+          const dcCapitalRule = await this.prisma.conventionReductionRule.findFirst({
+            where: {
+              conventionId,
+              guaranteeId: guarantee.id,
+              metric: 'DC_CAPITAL',
+              isActive: true,
+              validFrom: { lte: new Date() },
+              OR: [{ validTo: null }, { validTo: { gte: new Date() } }]
+            }
+          });
+
+          const marketValueRule = await this.prisma.conventionReductionRule.findFirst({
+            where: {
+              conventionId,
+              guaranteeId: guarantee.id,
+              metric: 'MARKET_VALUE',
+              isActive: true,
+              validFrom: { lte: new Date() },
+              OR: [{ validTo: null }, { validTo: { gte: new Date() } }]
+            }
+          });
+
+          let discountPercent = 0;
+          if (dcCapitalRule) {
+            discountPercent = await this.reductionRatesService.getReductionPercent(
+              companyId,
+              'OPTIONAL_DOMMAGES_COLLISIONS',
+              conventionId,
+              capital,
+              'DC_CAPITAL' as ReductionMetric,
+              FormulaType.DOMMAGES_COLLISIONS,
+              usageId,
+            );
+          } else if (marketValueRule) {
+            discountPercent = await this.reductionRatesService.getReductionPercent(
+              companyId,
+              'OPTIONAL_DOMMAGES_COLLISIONS',
+              conventionId,
+              vv,
+              'MARKET_VALUE' as ReductionMetric,
+              FormulaType.DOMMAGES_COLLISIONS,
+              usageId,
+            );
+          }
+
+          if (discountPercent > 0) {
+            const originalPrime = prime;
+            prime = this.reductionRatesService.applyDiscount(prime, discountPercent);
+            reductionInfo = { originalPrime: originalPrime.toNumber(), discountPercent, finalPrime: prime.toNumber() };
+          }
         }
       }
 
@@ -1614,6 +1700,7 @@
       companyId: string,
       systemRole: string,
       formulaType: FormulaType,
+      franchiseRate?: number,
     ): Promise<{ isAvailable: boolean; isFree: boolean; useDefault: boolean; isNotCovered: boolean }> {
       // Get guarantee by systemRole
       const guarantee = await this.prisma.guarantee.findFirst({ 
@@ -1623,12 +1710,10 @@
         return { isAvailable: false, isFree: false, useDefault: false, isNotCovered: false };
       }
 
-      // Resolve availability status
-      const availability = await this.guaranteeAvailabilityService.resolveAvailability(
-        companyId,
-        guarantee.id,
-        formulaType,
-      );
+      // Resolve availability status with franchise rate for BG
+      const availability = systemRole === 'OPTIONAL_BRIS_GLACES' && franchiseRate !== undefined
+        ? await this.guaranteeAvailabilityService.resolveAvailabilityWithFranchise(companyId, guarantee.id, formulaType, franchiseRate)
+        : await this.guaranteeAvailabilityService.resolveAvailability(companyId, guarantee.id, formulaType);
 
       // Interpret status
       switch (availability.status) {

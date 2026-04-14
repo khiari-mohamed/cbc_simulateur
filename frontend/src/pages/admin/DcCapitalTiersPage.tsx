@@ -46,6 +46,15 @@ export const DcCapitalTiersPage = () => {
     },
   });
 
+  // Fetch DC configs to check which companies use MATRIX method
+  const { data: dcConfigs } = useQuery({
+    queryKey: ['dc-configs-all'],
+    queryFn: async () => {
+      const { data } = await api.get('/dc-config');
+      return data;
+    },
+  });
+
   const { data: companies } = useQuery({
     queryKey: ['companies'],
     queryFn: async () => {
@@ -60,6 +69,93 @@ export const DcCapitalTiersPage = () => {
       const { data } = await api.get('/usage-types');
       return data;
     },
+  });
+
+  // Fetch matrix data for preview (VV ranges, capitals, prices) - AFTER companies and usageTypes
+  const { data: matrixVvRanges } = useQuery({
+    queryKey: ['matrix-vv-ranges-all', companies, usageTypes],
+    queryFn: async () => {
+      // Fetch for all companies/usages
+      const allRanges: any[] = [];
+      if (companies && usageTypes) {
+        for (const company of companies) {
+          for (const usage of usageTypes) {
+            try {
+              const { data } = await api.get(`/dc-config/matrix-vv-ranges/${company.id}/${usage.id}`);
+              allRanges.push(...data);
+            } catch (e) {
+              // Ignore errors for companies without matrix config
+            }
+          }
+        }
+      }
+      return allRanges;
+    },
+    enabled: !!companies && !!usageTypes,
+  });
+
+  const { data: matrixCapitals } = useQuery({
+    queryKey: ['matrix-capitals-all', companies, usageTypes],
+    queryFn: async () => {
+      const allCapitals: any[] = [];
+      if (companies && usageTypes) {
+        for (const company of companies) {
+          for (const usage of usageTypes) {
+            try {
+              const { data } = await api.get(`/dc-config/matrix-capitals/${company.id}/${usage.id}`);
+              allCapitals.push(...data);
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+        }
+      }
+      return allCapitals;
+    },
+    enabled: !!companies && !!usageTypes,
+  });
+
+  const { data: matrixPrices } = useQuery({
+    queryKey: ['matrix-prices-all', companies, usageTypes],
+    queryFn: async () => {
+      const allPrices: any[] = [];
+      if (companies && usageTypes) {
+        for (const company of companies) {
+          for (const usage of usageTypes) {
+            try {
+              const { data } = await api.get(`/dc-config/matrix-prices/${company.id}/${usage.id}`);
+              allPrices.push(...data);
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+        }
+      }
+      return allPrices;
+    },
+    enabled: !!companies && !!usageTypes,
+  });
+
+  // Fetch progressive tiers for preview
+  const { data: progressiveTiers } = useQuery({
+    queryKey: ['progressive-tiers-all', companies, usageTypes],
+    queryFn: async () => {
+      const allTiers: any[] = [];
+      if (companies && usageTypes) {
+        for (const company of companies) {
+          for (const usage of usageTypes) {
+            try {
+              const { data } = await api.get(`/dc-config/progressive-tiers/${company.id}/${usage.id}`);
+              allTiers.push(...data);
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+        }
+      }
+      return allTiers;
+    },
+    enabled: !!companies && !!usageTypes,
   });
 
   const createMutation = useMutation({
@@ -252,10 +348,15 @@ export const DcCapitalTiersPage = () => {
   const groupedTiers = tiers?.reduce((acc: any, tier: any) => {
     const key = `${tier.company.name}-${tier.usage.nameFr}`;
     if (!acc[key]) {
+      // Check if this company/usage uses MATRIX method
+      const config = dcConfigs?.find(
+        (c: any) => c.companyId === tier.companyId && c.usageId === tier.usageId
+      );
       acc[key] = {
         company: tier.company,
         usage: tier.usage,
         tiers: [],
+        useMatrix: config?.useMatrix || false,
       };
     }
     acc[key].tiers.push(tier);
@@ -326,7 +427,35 @@ export const DcCapitalTiersPage = () => {
                   ))}
                 </select>
               </div>
+            </div>
 
+            {/* Display method badge when both company and usage are selected */}
+            {formData.companyId && formData.usageId && (() => {
+              const selectedConfig = dcConfigs?.find(
+                (config: any) => config.companyId === formData.companyId && config.usageId === formData.usageId
+              );
+              const useMatrix = selectedConfig?.useMatrix || false;
+              const companyName = companies?.find((c: any) => c.id === formData.companyId)?.name || '';
+
+              return (
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-blue-900 dark:text-blue-200">
+                      Méthode détectée pour {companyName}:
+                    </span>
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                      useMatrix 
+                        ? 'bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200'
+                        : 'bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200'
+                    }`}>
+                      {useMatrix ? 'MATRICE' : 'PROGRESSIVE'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Montant Min (DT) *
@@ -369,6 +498,189 @@ export const DcCapitalTiersPage = () => {
               </div>
             </div>
 
+            {/* Preview section based on method */}
+            {formData.companyId && formData.usageId && (() => {
+              const selectedConfig = dcConfigs?.find(
+                (config: any) => config.companyId === formData.companyId && config.usageId === formData.usageId
+              );
+              const useMatrix = selectedConfig?.useMatrix || false;
+
+              if (useMatrix) {
+                // Filter matrix data for this company/usage
+                const companyVvRanges = matrixVvRanges?.filter(
+                  (r: any) => r.companyId === formData.companyId && r.usageId === formData.usageId && r.isActive
+                ) || [];
+                const companyCapitals = matrixCapitals?.filter(
+                  (c: any) => c.companyId === formData.companyId && c.usageId === formData.usageId && c.isActive
+                ) || [];
+                const companyPrices = matrixPrices?.filter(
+                  (p: any) => p.companyId === formData.companyId && p.usageId === formData.usageId
+                ) || [];
+
+                return (
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                        📊 Aperçu - Configuration MATRICE
+                      </h4>
+                      <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                        🔒 Lecture seule
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                      ℹ️ La matrice de prix complète se configure dans l'onglet <strong>"Dommages Collision"</strong>.
+                    </p>
+                    <div className="bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-600">
+                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Matrice de prix (lecture seule)
+                      </p>
+                      {companyVvRanges.length > 0 && companyCapitals.length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-gray-200 dark:border-gray-700">
+                                <th className="text-left py-2 px-2 text-gray-600 dark:text-gray-400">VV (DT)</th>
+                                {companyCapitals.sort((a: any, b: any) => a.order - b.order).map((cap: any) => (
+                                  <th key={cap.id} className="text-left py-2 px-2 text-gray-600 dark:text-gray-400">
+                                    {Number(cap.amount).toLocaleString('fr-FR')}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {companyVvRanges.sort((a: any, b: any) => Number(a.minVv) - Number(b.minVv)).map((vvRange: any) => (
+                                <tr key={vvRange.id} className="border-b border-gray-100 dark:border-gray-800">
+                                  <td className="py-2 px-2 text-gray-700 dark:text-gray-300 font-medium">
+                                    {Number(vvRange.minVv).toLocaleString('fr-FR')} - {vvRange.maxVv ? Number(vvRange.maxVv).toLocaleString('fr-FR') : '∞'}
+                                  </td>
+                                  {companyCapitals.sort((a: any, b: any) => a.order - b.order).map((cap: any) => {
+                                    const price = companyPrices.find(
+                                      (p: any) => p.vvRangeId === vvRange.id && p.capitalId === cap.id
+                                    );
+                                    return (
+                                      <td key={cap.id} className="py-2 px-2 text-gray-700 dark:text-gray-300">
+                                        {price ? Number(price.prime).toLocaleString('fr-FR') : '-'}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-400 dark:text-gray-500 italic">
+                          La matrice VV × Capital sera affichée ici après configuration dans l'onglet "Dommages Collision".
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              } else {
+                // Filter progressive tiers for this company/usage
+                const companyProgressiveTiers = progressiveTiers?.filter(
+                  (t: any) => t.companyId === formData.companyId && t.usageId === formData.usageId && t.isActive
+                ) || [];
+
+                return (
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                        📊 Aperçu - Configuration PROGRESSIVE
+                      </h4>
+                      <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                        🔒 Lecture seule
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                      ℹ️ Les taux progressifs se configurent dans l'onglet <strong>"Dommages Collision"</strong>.
+                    </p>
+                    
+                    {/* Paliers de Capital (read-only) */}
+                    <div className="bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-600 mb-3">
+                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Paliers de Capital (lecture seule)
+                      </p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-gray-200 dark:border-gray-700">
+                              <th className="text-left py-2 px-2 text-gray-600 dark:text-gray-400">Min (DT)</th>
+                              <th className="text-left py-2 px-2 text-gray-600 dark:text-gray-400">Max (DT)</th>
+                              <th className="text-left py-2 px-2 text-gray-600 dark:text-gray-400">Pas (DT)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {tiers
+                              ?.filter((t: any) => t.companyId === formData.companyId && t.usageId === formData.usageId && t.isActive)
+                              .map((tier: any) => (
+                                <tr key={tier.id} className="border-b border-gray-100 dark:border-gray-800">
+                                  <td className="py-2 px-2 text-gray-700 dark:text-gray-300">
+                                    {Number(tier.minAmount).toLocaleString('fr-FR')}
+                                  </td>
+                                  <td className="py-2 px-2 text-gray-700 dark:text-gray-300">
+                                    {tier.maxAmount ? Number(tier.maxAmount).toLocaleString('fr-FR') : '∞'}
+                                  </td>
+                                  <td className="py-2 px-2 text-gray-700 dark:text-gray-300">
+                                    {Number(tier.step).toLocaleString('fr-FR')}
+                                  </td>
+                                </tr>
+                              ))}
+                            {(!tiers || tiers.filter((t: any) => t.companyId === formData.companyId && t.usageId === formData.usageId && t.isActive).length === 0) && (
+                              <tr>
+                                <td colSpan={3} className="py-3 px-2 text-center text-gray-400 dark:text-gray-500 italic">
+                                  Aucun palier configuré
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Taux Progressifs (read-only) */}
+                    <div className="bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-600">
+                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Taux Progressifs (lecture seule)
+                      </p>
+                      {companyProgressiveTiers.length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-gray-200 dark:border-gray-700">
+                                <th className="text-left py-2 px-2 text-gray-600 dark:text-gray-400">Tranche</th>
+                                <th className="text-left py-2 px-2 text-gray-600 dark:text-gray-400">Taux</th>
+                                <th className="text-left py-2 px-2 text-gray-600 dark:text-gray-400">%</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {companyProgressiveTiers.sort((a: any, b: any) => a.tierNumber - b.tierNumber).map((tier: any) => (
+                                <tr key={tier.id} className="border-b border-gray-100 dark:border-gray-800">
+                                  <td className="py-2 px-2 text-gray-700 dark:text-gray-300">
+                                    Tranche {tier.tierNumber}
+                                  </td>
+                                  <td className="py-2 px-2 text-gray-700 dark:text-gray-300">
+                                    {Number(tier.tierRate).toFixed(3)}
+                                  </td>
+                                  <td className="py-2 px-2 text-gray-700 dark:text-gray-300">
+                                    {(Number(tier.tierRate) * 100).toFixed(2)}%
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-400 dark:text-gray-500 italic">
+                          Les taux par tranche seront affichés ici après configuration dans l'onglet "Dommages Collision".
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+            })()}
+
             <div className="flex gap-3">
               <Button type="submit" disabled={createMutation.isPending}>
                 <Save className="w-4 h-4 mr-2" />
@@ -399,12 +711,37 @@ export const DcCapitalTiersPage = () => {
           {Object.entries(groupedTiers || {}).map(([key, group]: [string, any]) => (
             <Card key={key} className="p-6">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                  {group.company.name}
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Usage: {group.usage.nameFr}
-                </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                      {group.company.name}
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Usage: {group.usage.nameFr}
+                    </p>
+                  </div>
+                  {group.useMatrix && (
+                    <div className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-lg">
+                      <span className="text-xs font-semibold text-blue-800 dark:text-blue-200">
+                        Méthode: MATRICE
+                      </span>
+                    </div>
+                  )}
+                  {!group.useMatrix && (
+                    <div className="px-3 py-1 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-lg">
+                      <span className="text-xs font-semibold text-green-800 dark:text-green-200">
+                        Méthode: PROGRESSIVE
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {group.useMatrix && (
+                  <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      ⚠️ <strong>Attention:</strong> Cette compagnie utilise la méthode MATRICE. Les paliers DC affichés ci-dessous ne sont pas utilisés dans les calculs. Configurez la matrice dans l'onglet <strong>"Dommages Collision"</strong>.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="overflow-x-auto">

@@ -16,6 +16,7 @@ export const QuotesPage = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedCV, setSelectedCV] = useState<string>('');
+  const [selectedFormula, setSelectedFormula] = useState<string>('');
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const itemsPerPage = 20;
 
@@ -39,7 +40,7 @@ export const QuotesPage = () => {
 
   const transformedQuotes = quotes?.filter((q: any) => q.status === QuoteStatus.TRANSFORMED_TO_CONTRACT) || [];
 
-  // Filter quotes by date range and CV and exclude TRANSFORMED_TO_CONTRACT
+  // Filter quotes by date range, CV, formula and exclude TRANSFORMED_TO_CONTRACT
   const filteredQuotes = quotes?.filter((quote: any) => {
     // Exclude quotes that have been transformed to contracts
     if (quote.status === QuoteStatus.TRANSFORMED_TO_CONTRACT) {
@@ -82,7 +83,14 @@ export const QuotesPage = () => {
       }
     }
     
-    return dateMatch && cvMatch;
+    // Formula filter
+    let formulaMatch = true;
+    if (selectedFormula) {
+      const quoteFormula = quote.simulation?.formulaType;
+      formulaMatch = quoteFormula === selectedFormula;
+    }
+    
+    return dateMatch && cvMatch && formulaMatch;
   }) || [];
 
   // Pagination
@@ -236,12 +244,31 @@ export const QuotesPage = () => {
                 <option value="15+">≥ 15 CV</option>
               </select>
             </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Formule
+              </label>
+              <select
+                value={selectedFormula}
+                onChange={(e) => {
+                  setSelectedFormula(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="">Toutes les formules</option>
+                <option value="STANDARD">Standard</option>
+                <option value="TOUS_RISQUES_0">Tous Risques 0%</option>
+                <option value="DOMMAGES_COLLISIONS">Dommages Collisions</option>
+              </select>
+            </div>
             <Button
               variant="outline"
               onClick={() => {
                 setStartDate('');
                 setEndDate('');
                 setSelectedCV('');
+                setSelectedFormula('');
                 setCurrentPage(1);
               }}
             >

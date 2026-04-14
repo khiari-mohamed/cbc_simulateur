@@ -77,9 +77,10 @@ export class GuaranteeAvailabilityController {
   }
 
   @Post('resolve-bulk')
+  @Roles(Role.CLIENT_ADHERENT, Role.ADMINISTRATEUR_ARS, Role.GESTIONNAIRE_VALIDATION_ARS) // Allow all authenticated users
   resolveBulk(
-    @Body() dto: { companyId: string; guaranteeCodes: string[]; formulaType: FormulaType },
+    @Body() dto: { companyId: string; guaranteeCodes: string[]; formulaType: FormulaType; franchiseRate?: number },
   ) {
-    return this.service.resolveBulk(dto.companyId, dto.guaranteeCodes, dto.formulaType);
+    return this.service.resolveBulk(dto.companyId, dto.guaranteeCodes, dto.formulaType, dto.franchiseRate);
   }
 }

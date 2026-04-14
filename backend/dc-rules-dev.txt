@@ -1,0 +1,28 @@
+                  id                  |        code         |      name_fr       |         system_role          | is_active 
+--------------------------------------+---------------------+--------------------+------------------------------+-----------
+ b57e16df-36f8-4db5-b58e-6ed2f4664a54 | DOMMAGES_COLLISIONS | Dommages Collision | OPTIONAL_DOMMAGES_COLLISIONS | t
+(1 row)
+
+                  id                  |   company_name   | company_code | convention_name |   guarantee_code    |   guarantee_name   | discount_percent |    metric    |    formula_type     |               usage_id               |   usage_name   | min_value | max_value | min_inclusive | max_inclusive | priority | is_active |       valid_from        | valid_to |       created_at        
+--------------------------------------+------------------+--------------+-----------------+---------------------+--------------------+------------------+--------------+---------------------+--------------------------------------+----------------+-----------+-----------+---------------+---------------+----------+-----------+-------------------------+----------+-------------------------
+ 21927ad0-a669-4f1d-86bb-7c3bafc771b6 | AL BARAKA        | 180          | Convention OIT  | DOMMAGES_COLLISIONS | Dommages Collision |            35.00 | MARKET_VALUE | DOMMAGES_COLLISIONS | ba202b29-4b6f-4a15-b9ee-19e7b274eb2d | Privé/Affaires |           |           | t             | f             |        0 | t         | 2026-04-04 11:22:05.175 |          | 2026-04-04 11:22:05.177
+ a78205dd-157e-4459-b396-dad8d131903d | LLOYD Assurances | 917          | Convention OIT  | DOMMAGES_COLLISIONS | Dommages Collision |            30.00 | MARKET_VALUE | DOMMAGES_COLLISIONS | ba202b29-4b6f-4a15-b9ee-19e7b274eb2d | Privé/Affaires |           |           | t             | f             |        0 | t         | 2026-04-04 11:19:05.597 |          | 2026-04-04 11:19:05.598
+(2 rows)
+
+ id | company_name | convention_name | guarantee_code | discount_percent | metric | formula_type | usage_name | min_value | max_value | priority | is_active 
+----+--------------+-----------------+----------------+------------------+--------+--------------+------------+-----------+-----------+----------+-----------
+(0 rows)
+
+ id | company_name | convention_name | guarantee_code | discount_percent | metric | formula_type | usage_name | min_value | max_value | priority | is_active 
+----+--------------+-----------------+----------------+------------------+--------+--------------+------------+-----------+-----------+----------+-----------
+(0 rows)
+
+ guarantee_code | company_name | convention_name | discount_percent | metric | formula_type | usage_name | min_value | max_value | priority | is_active 
+----------------+--------------+-----------------+------------------+--------+--------------+------------+-----------+-----------+----------+-----------
+(0 rows)
+
+ total_dc_rules | companies_with_rules | conventions_with_rules 
+----------------+----------------------+------------------------
+              2 |                    2 |                      1
+(1 row)
+

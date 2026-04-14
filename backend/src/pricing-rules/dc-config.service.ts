@@ -227,8 +227,8 @@ export class DcConfigService {
         companyId: data.companyId,
         usageId: data.usageId,
         minVv: new Decimal(data.minVv),
-        maxVv: data.maxVv !== undefined ? new Decimal(data.maxVv) : null,
-        reductionRate: data.reductionRate !== undefined ? new Decimal(data.reductionRate) : null,
+        maxVv: data.maxVv !== undefined && data.maxVv !== null ? new Decimal(data.maxVv) : null,
+        reductionRate: data.reductionRate !== undefined && data.reductionRate !== null ? new Decimal(data.reductionRate) : null,
       },
     });
     await this.auditService.log(userId, 'DC_MATRIX_VV_RANGE_CREATED', 'DcMatrixVvRange', range.id, null, data);
@@ -357,5 +357,132 @@ export class DcConfigService {
     });
     await this.auditService.log(userId, 'DC_MATRIX_PRICE_UPSERTED', 'DcMatrixPrice', price.id, null, data);
     return price;
+  }
+
+  /**
+   * Get available DC capitals for a specific company/usage/VV
+   * Returns capitals based on the method (MATRIX or PROGRESSIVE)
+   */
+  async getAvailableCapitals(companyId: string, usageId: string, marketValue?: number) {
+    // Get DC config
+    const dcConfig = await this.prisma.dcConfig.findFirst({
+      where: { companyId, usageId, isActive: true },
+    });
+
+    if (!dcConfig) {
+      return { method: 'NONE', capitals: [] };
+    }
+
+    if (dcConfig.useMatrix) {
+      // MATRIX METHOD (AL BARAKA)
+      // Return only capitals that have a price in the matrix for the given VV range
+      if (!marketValue) {
+        // No VV provided - return all capitals
+        const allCapitals = await this.prisma.dcMatrixCapital.findMany({
+          where: { companyId, usageId, isActive: true },
+          orderBy: { order: 'asc' },
+        });
+        return {
+          method: 'MATRIX',
+          capitals: allCapitals.map(c => ({
+            value: c.amount.toNumber(),
+            label: `${c.amount.toNumber().toLocaleString('fr-FR')} DT`,
+          })),
+        };
+      }
+
+      // Find matching VV range
+      const vvRange = await this.prisma.dcMatrixVvRange.findFirst({
+        where: {
+          companyId,
+          usageId,
+          minVv: { lte: new Decimal(marketValue) },
+          OR: [
+            { maxVv: { gte: new Decimal(marketValue) } },
+            { maxVv: null },
+          ],
+          isActive: true,
+        },
+      });
+
+      if (!vvRange) {
+        return { method: 'MATRIX', capitals: [] };
+      }
+
+      // Get all capitals that have a price for this VV range
+      const pricesWithCapitals = await this.prisma.dcMatrixPrice.findMany({
+        where: {
+          companyId,
+          usageId,
+          vvRangeId: vvRange.id,
+        },
+        include: {
+          capital: true,
+        },
+        orderBy: {
+          capital: { order: 'asc' },
+        },
+      });
+
+      return {
+        method: 'MATRIX',
+        capitals: pricesWithCapitals
+          .filter(p => p.capital.isActive)
+          .map(p => ({
+            value: p.capital.amount.toNumber(),
+            label: `${p.capital.amount.toNumber().toLocaleString('fr-FR')} DT`,
+          })),
+      };
+    } else {
+      // PROGRESSIVE METHOD (LLOYD)
+      // Generate capitals from tiers and apply maxCapitalPercent filter
+      const tiers = await this.prisma.dcCapitalTier.findMany({
+        where: { companyId, usageId, isActive: true },
+        orderBy: { minAmount: 'asc' },
+      });
+
+      if (!tiers.length) {
+        return { method: 'PROGRESSIVE', capitals: [] };
+      }
+
+      // Generate all options from tiers
+      const allOptions: Array<{ value: number; label: string }> = [];
+      const seen = new Set<number>();
+
+      for (const tier of tiers) {
+        const step = tier.step.toNumber();
+        const max = tier.maxAmount ? tier.maxAmount.toNumber() : null;
+        const min = tier.minAmount.toNumber();
+        
+        if (!max || step <= 0) continue;
+
+        const start = Math.round(min / step) * step;
+        const end = Math.floor(max / step) * step;
+
+        for (let value = start; value <= end; value += step) {
+          if (!seen.has(value) && value >= min && value <= max) {
+            seen.add(value);
+            allOptions.push({ value, label: `${value.toLocaleString('fr-FR')} DT` });
+          }
+        }
+      }
+
+      // Apply maxCapitalPercent filter if marketValue is provided
+      let filteredOptions = allOptions;
+      if (marketValue) {
+        const maxCapitalPercent = dcConfig.maxCapitalPercent.toNumber();
+        const plafondAbsolu = dcConfig.maxCapitalAbsolute.toNumber();
+        const effectiveCeiling = Math.min(
+          marketValue * (maxCapitalPercent / 100),
+          plafondAbsolu
+        );
+        filteredOptions = allOptions.filter(opt => opt.value <= effectiveCeiling);
+      }
+
+      return {
+        method: 'PROGRESSIVE',
+        capitals: filteredOptions.sort((a, b) => a.value - b.value),
+      };
+    }
   }
 }

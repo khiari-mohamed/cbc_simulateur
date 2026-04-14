@@ -143,6 +143,91 @@ export const DcCapitalTiersInfoModal = () => {
 
                 <div className="ml-9 space-y-3">
                   <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                    Cette section définit <strong>comment calculer le prix</strong> de la garantie DC. Il existe <strong>deux méthodes de calcul</strong> différentes selon la compagnie d'assurance.
+                  </p>
+
+                  {/* Method Comparison */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* PROGRESSIVE Method */}
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-xl p-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Sliders className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        <span className="text-sm font-bold text-green-700 dark:text-green-300">Méthode PROGRESSIVE</span>
+                      </div>
+                      <p className="text-xs text-green-700 dark:text-green-300 leading-relaxed">
+                        Utilisée par <strong>LLOYD Assurances</strong>
+                      </p>
+                      <div className="space-y-1.5">
+                        <div className="flex items-start gap-1.5">
+                          <ChevronRight className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            Le prix est calculé avec des <strong>taux dégressifs par tranche</strong> de 10% de la VV
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <ChevronRight className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            Les capitaux disponibles sont <strong>filtrés automatiquement</strong> selon la VV (max 50% de la VV)
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <ChevronRight className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            Configuration : <strong>Taux Progressifs</strong> dans l'onglet DC
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* MATRIX Method */}
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Settings className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <span className="text-sm font-bold text-blue-700 dark:text-blue-300">Méthode MATRICE</span>
+                      </div>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+                        Utilisée par <strong>AL BARAKA</strong>
+                      </p>
+                      <div className="space-y-1.5">
+                        <div className="flex items-start gap-1.5">
+                          <ChevronRight className="w-3 h-3 text-blue-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-blue-600 dark:text-blue-400">
+                            Le prix est défini dans une <strong>matrice VV × Capital</strong> avec des prix fixes
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <ChevronRight className="w-3 h-3 text-blue-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-blue-600 dark:text-blue-400">
+                            Les capitaux disponibles sont <strong>définis directement dans la matrice</strong> selon la tranche de VV
+                          </p>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <ChevronRight className="w-3 h-3 text-blue-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-blue-600 dark:text-blue-400">
+                            Configuration : <strong>Matrice de Prix</strong> dans l'onglet DC
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Important Note */}
+                  <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-xl p-4">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-purple-600 dark:text-purple-400 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-purple-700 dark:text-purple-300">Différence clé pour les Paliers DC :</p>
+                        <p className="text-xs text-purple-600 dark:text-purple-400 leading-relaxed">
+                          • <strong>PROGRESSIVE</strong> : Les paliers DC définissent les capitaux disponibles, qui sont ensuite <strong>filtrés selon la VV</strong><br />
+                          • <strong>MATRICE</strong> : Les paliers DC définissent uniquement les <strong>colonnes de la matrice</strong>, les capitaux disponibles sont définis dans la matrice elle-même
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="ml-9 space-y-3">
+                  <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
                     Cette section définit les <strong>règles de calcul et les limites</strong> qui s'appliquent en fonction de la valeur du véhicule du client. C'est ici que vous contrôlez jusqu'où peut aller le capital assuré, indépendamment des paliers configurés ci-dessus.
                   </p>
 

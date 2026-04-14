@@ -98,20 +98,7 @@ export const CoverageSelectionStep = ({
 
   // Get user's organization conventions (primary conventions owned by the organization)
   const userOrgConventions = user?.organization?.conventions?.filter(c => c.status === 'ACTIVE') || [];
-  
-  // Debug logging
-  console.log('🔍 Convention Debug - FULL DATA:', {
-    userExists: !!user,
-    userEmail: user?.email,
-    hasOrganization: !!user?.organization,
-    organizationId: user?.organization?.id,
-    organizationName: user?.organization?.name,
-    organizationCode: user?.organization?.code,
-    allConventions: user?.organization?.conventions,
-    activeConventions: userOrgConventions,
-    conventionsCount: userOrgConventions.length,
-  });
-  
+
   // Auto-select organization's first convention if user has exactly 1 convention and no convention is selected yet
   useEffect(() => {
     if (userOrgConventions.length === 1 && !localConvention) {
@@ -251,22 +238,7 @@ export const CoverageSelectionStep = ({
     },
   });
 
-  // Fetch DC capital tiers from API (admin-configurable)
-  const { data: dcCapitalTiers } = useQuery({
-    queryKey: ['dc-capital-tiers'],
-    queryFn: async () => {
-      const { data } = await api.get('/dc-capital-tiers');
-      return data as Array<{ 
-        id: string; 
-        minAmount: number; 
-        maxAmount: number | null; 
-        step: number; 
-        isActive: boolean;
-        company: { id: string; name: string; code: string };
-        usage: { id: string; code: string; nameFr: string };
-      }>;
-    },
-  });
+  // Note: DC capital tiers are now fetched dynamically per company via availableDcCapitals query
 
   // Fetch DC Config for the modal company to get maxCapitalPercent and plafondAbsolu
   const { data: dcConfig } = useQuery({
@@ -278,6 +250,19 @@ export const CoverageSelectionStep = ({
       });
       // Returns array, get first active config
       return data && data.length > 0 ? data[0] : null;
+    },
+    enabled: !!dcModalCompanyId && !!usageId,
+  });
+
+  // Fetch available DC capitals from backend (dynamic per company/usage/VV)
+  const { data: availableDcCapitals, isLoading: isLoadingDcCapitals } = useQuery({
+    queryKey: ['available-dc-capitals', dcModalCompanyId, usageId, marketValue],
+    queryFn: async () => {
+      if (!dcModalCompanyId || !usageId) return null;
+      const { data } = await api.get(`/dc-config/available-capitals/${dcModalCompanyId}/${usageId}`, {
+        params: { marketValue: marketValue || undefined }
+      });
+      return data;
     },
     enabled: !!dcModalCompanyId && !!usageId,
   });
@@ -540,13 +525,53 @@ export const CoverageSelectionStep = ({
     const isTogglingAssuranceConducteur = assuranceConducteurGuarantee && guaranteeId === assuranceConducteurGuarantee.id;
     const willBeSelected = !localGuarantees.includes(guaranteeId);
     
-    // Check if we need to show BG modal (now for ALL formulas including TR 0%)
-    const needsBgModal = isTogglingBg && willBeSelected;
+    // Check if BG is FREE (GRATUIT) based on current company + formula configuration
+    // Backend now handles the franchise rate logic - BG is only free at 0% for TR
+    const isBgFreeNow = isGuaranteeFree('BG');
+    
+    // 🔍 DEBUG: Log availability check
+    if (isTogglingBg && willBeSelected) {
+      console.log('🔍 BG Toggle Debug:', {
+        selectedCompanies,
+        localFormula,
+        localFranchiseRate,
+        availabilityMap,
+        isBgFreeNow,
+      });
+    }
+    
+    // Check if we need to show BG modal
+    // Skip modal if BG is GRATUIT (free) - directly add the guarantee
+    // BG modal should only open ONCE (not per company like DC/AC)
+    const needsBgModal = isTogglingBg && willBeSelected && !isBgFreeNow;
     
     if (needsBgModal) {
-      // Open modal instead of directly toggling
+      // Open modal for capital selection (BG is NOT free)
+      // BG limit is shared across all companies, so modal opens only once
       setTempBgLimit(localBgLimit || 1000);
       setShowBgModal(true);
+      return;
+    }
+    
+    // If BG is FREE, add it directly without modal
+    if (isTogglingBg && willBeSelected && isBgFreeNow) {
+      const updatedGuarantees = [...localGuarantees, guaranteeId];
+      setLocalGuarantees(updatedGuarantees);
+      // Set bgLimit to null when BG is free to avoid sending a value to backend
+      setLocalBgLimit(0);
+      
+      if (localFormula) {
+        onUpdate({
+          formulaType: localFormula as FormulaType,
+          selectedGuarantees: updatedGuarantees,
+          conventionId: localConvention || undefined,
+          franchiseRate: localFranchiseRate,
+          bgLimit: 0, // Send 0 when BG is free
+          dcCapitals: localDcCapitals,
+          acCapitals: localAssuranceConducteurCapitals,
+          fractionnement: localFractionnement,
+        });
+      }
       return;
     }
     
@@ -591,7 +616,7 @@ export const CoverageSelectionStep = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (localFormula) {
-      onUpdate({
+      const payload = {
         formulaType: localFormula as FormulaType,
         selectedGuarantees: localGuarantees,
         conventionId: localConvention || undefined,
@@ -601,7 +626,25 @@ export const CoverageSelectionStep = ({
         acCapitals: localAssuranceConducteurCapitals,
         fractionnement: localFractionnement,
         companyIds: selectedCompanies,
-      });
+      };
+      
+      // 🔍 BIG DEBUG LOG: Show complete payload being sent
+      console.log('🚀 ============================================');
+      console.log('🚀 PAYLOAD SENT TO BACKEND (handleSubmit)');
+      console.log('🚀 ============================================');
+      console.log('📋 Formula Type:', payload.formulaType);
+      console.log('📋 Franchise Rate:', payload.franchiseRate, '%');
+      console.log('📋 BG Limit:', payload.bgLimit, 'DT');
+      console.log('📋 Selected Guarantees:', payload.selectedGuarantees);
+      console.log('📋 DC Capitals:', payload.dcCapitals);
+      console.log('📋 AC Capitals:', payload.acCapitals);
+      console.log('📋 Companies:', payload.companyIds);
+      console.log('📋 Convention ID:', payload.conventionId);
+      console.log('📋 Fractionnement:', payload.fractionnement);
+      console.log('🔍 Full Payload Object:', JSON.stringify(payload, null, 2));
+      console.log('🚀 ============================================');
+      
+      onUpdate(payload);
       onNext();
     }
   };
@@ -632,49 +675,8 @@ export const CoverageSelectionStep = ({
 
   const isBrisDeGlacesFree = isGuaranteeFree('BG');
 
-  // Helper: Performance safeguard for tier generation
-  const MAX_OPTIONS_PER_TIER = 200;
-
-  // Helper: Generate DC capital options from all tiers with deduplication
-  const generateAllDcOptions = (tiers: any[]) => {
-    const allOptions: Array<{ value: number; label: string }> = [];
-    const seen = new Set<number>();
-
-    // Sort tiers by minAmount
-    const sorted = [...tiers].sort((a, b) => Number(a.minAmount) - Number(b.minAmount));
-
-    for (const tier of sorted) {
-      const step = Number(tier.step);
-      const max = tier.maxAmount ? Number(tier.maxAmount) : null;
-      const min = Number(tier.minAmount);
-      
-      if (!max || step <= 0) continue;
-
-      // Check if this would create too many options
-      const numberOfOptions = Math.floor((max - min) / step) + 1;
-      if (numberOfOptions > MAX_OPTIONS_PER_TIER) {
-        console.warn(
-          `Tier [${tier.company?.name} / ${tier.usage?.nameFr}] has ${numberOfOptions} options (min=${min}, max=${max}, step=${step}). ` +
-          `Skipping to avoid performance issues. Please adjust the step or range in admin panel.`
-        );
-        continue;
-      }
-
-      // Round min to nearest step boundary (handles overlapping tiers like 10001)
-      // e.g., min=10001, step=5000 → start=10000
-      const start = Math.round(min / step) * step;
-      const end = Math.floor(max / step) * step;
-
-      for (let value = start; value <= end; value += step) {
-        if (!seen.has(value) && value >= min && value <= max) {
-          seen.add(value);
-          allOptions.push({ value, label: `${value.toLocaleString('fr-FR')} DT` });
-        }
-      }
-    }
-
-    return allOptions.sort((a, b) => a.value - b.value);
-  };
+  // Note: DC capital generation is now handled by backend via /dc-config/available-capitals endpoint
+  // This ensures dynamic filtering based on company method (MATRIX vs PROGRESSIVE)
 
   return (
     <>
@@ -959,7 +961,7 @@ export const CoverageSelectionStep = ({
                   Franchise: {localFranchiseRate === 0 ? 'Sans franchise (0%)' : `${localFranchiseRate}%`}
                 </p>
               )}
-              {isBrisDeGlacesFree && localFranchiseRate === 0 && localFormula === FormulaType.TOUS_RISQUES_0 && selectedCompanies.length > 0 && (
+              {isBrisDeGlacesFree && localFormula === FormulaType.TOUS_RISQUES_0 && selectedCompanies.length > 0 && (
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                   ✓ Bris de Glaces GRATUIT avec cette formule
                 </p>
@@ -1145,7 +1147,7 @@ export const CoverageSelectionStep = ({
               .map((guarantee) => {
                 const isDisabled = false;
                 const isFree = isGuaranteeFree(guarantee.code);
-                const isBgWithLimit = guarantee.code === 'BG' && localGuarantees.includes(guarantee.id) && localBgLimit;
+                const isBgWithLimit = guarantee.code === 'BG' && localGuarantees.includes(guarantee.id) && localBgLimit && localBgLimit > 0;
                 const isAssuranceConducteur = guarantee.code === 'ASSURANCE_CONDUCTEUR';
                 const hasAllACCapitals = isAssuranceConducteur && selectedCompanies.every(cid => localAssuranceConducteurCapitals[cid] !== undefined && localAssuranceConducteurCapitals[cid] > 0);
 
@@ -1172,7 +1174,7 @@ export const CoverageSelectionStep = ({
                     <div className="flex-1">
                       <div className="font-medium text-gray-900 dark:text-white">
                         {guarantee.nameFr}
-                        {isBgWithLimit && (
+                        {isBgWithLimit && !isFree && selectedCompanies.length > 0 && (
                           <span className="ml-2 text-sm font-normal text-blue-600 dark:text-blue-400">
                             {localBgLimit.toLocaleString('fr-FR')} DT
                           </span>
@@ -1278,84 +1280,51 @@ export const CoverageSelectionStep = ({
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Capital assuré (DT)
             </label>
-            <select
-              value={tempDcCapital.toString()}
-              onChange={(e) => setTempDcCapital(Number(e.target.value))}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-            >
-              {(() => {
-                const filteredTiers = dcCapitalTiers?.filter(
-                  tier => tier.isActive 
-                    && tier.company.id === dcModalCompanyId
-                    && tier.usage.id === usageId
-                );
+            {isLoadingDcCapitals ? (
+              <div className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
+                <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Chargement...</span>
+              </div>
+            ) : (
+              <select
+                value={tempDcCapital.toString()}
+                onChange={(e) => setTempDcCapital(Number(e.target.value))}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+              >
+                {(() => {
+                  // Use backend-provided capitals (dynamic per company/usage/VV)
+                  if (!availableDcCapitals || !availableDcCapitals.capitals || availableDcCapitals.capitals.length === 0) {
+                    return (
+                      <option value="" disabled>
+                        Aucun capital disponible pour ce véhicule
+                      </option>
+                    );
+                  }
 
-                if (!filteredTiers || filteredTiers.length === 0) {
-                  return (
-                    <option value="" disabled>
-                      Aucun palier configuré
+                  return availableDcCapitals.capitals.map((opt: any) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
                     </option>
-                  );
-                }
-
-                // Generate all options from tiers (handles overlapping boundaries)
-                let allOptions = generateAllDcOptions(filteredTiers);
-                
-                // Apply DC Config limits: maxCapitalPercent and plafondAbsolu
-                if (dcConfig && marketValue) {
-                  const maxCapitalPercent = Number(dcConfig.maxCapitalPercent || 100);
-                  const plafondAbsolu = Number(dcConfig.maxCapitalAbsolute || Infinity);
-                  const effectiveCeiling = Math.min(
-                    marketValue * (maxCapitalPercent / 100),
-                    plafondAbsolu
-                  );
-                  
-                  allOptions = allOptions.filter(opt => opt.value <= effectiveCeiling);
-                }
-                
-                if (allOptions.length === 0) {
-                  return (
-                    <option value="" disabled>
-                      Aucune option disponible pour ce véhicule
-                    </option>
-                  );
-                }
-
-                return allOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ));
-              })()}
-            </select>
+                  ));
+                })()}
+              </select>
+            )}
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Sélectionnez le capital assuré pour cette compagnie
+              {availableDcCapitals && availableDcCapitals.method === 'MATRIX' && (
+                <span className="block text-blue-600 dark:text-blue-400 mt-1">
+                  ℹ️ Capitaux basés sur la matrice de prix pour cette valeur de véhicule
+                </span>
+              )}
+              {availableDcCapitals && availableDcCapitals.method === 'PROGRESSIVE' && dcConfig && (
+                <span className="block text-blue-600 dark:text-blue-400 mt-1">
+                  ℹ️ Capitaux limités à {dcConfig.maxCapitalPercent}% de la valeur vénale
+                </span>
+              )}
             </p>
-            {(() => {
-              // Calculate effective ceiling from DC Config
-              let effectiveCeiling = marketValue ? marketValue * 0.8 : 0;
-              
-              if (dcConfig && marketValue) {
-                const maxCapitalPercent = Number(dcConfig.maxCapitalPercent || 100);
-                const plafondAbsolu = Number(dcConfig.maxCapitalAbsolute || Infinity);
-                effectiveCeiling = Math.min(
-                  marketValue * (maxCapitalPercent / 100),
-                  plafondAbsolu
-                );
-              }
-              
-              if (tempDcCapital > effectiveCeiling && marketValue && marketValue > 0) {
-                const maxCapitalPercent = dcConfig ? Number(dcConfig.maxCapitalPercent || 80) : 80;
-                return (
-                  <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
-                    <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                      ⚠️ <strong>Attention:</strong> Le capital sélectionné ({tempDcCapital.toLocaleString('fr-FR')} DT) dépasse {maxCapitalPercent}% de la valeur vénale ({effectiveCeiling.toFixed(0)} DT max). Cela pourrait être rejeté lors de la génération du devis.
-                    </p>
-                  </div>
-                );
-              }
-              return null;
-            })()}
           </div>
 
           <div className="flex gap-3 mt-6">

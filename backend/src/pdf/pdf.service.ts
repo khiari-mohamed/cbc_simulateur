@@ -104,12 +104,16 @@ export class PdfService {
     const logoPath = path.join(process.cwd(), '..', 'frontend', 'public', 'Image1.png');
     const logoBase64 = fs.existsSync(logoPath) ? fs.readFileSync(logoPath).toString('base64') : '';
 
-    const formulaLabel =
-      quote.simulation.formulaType === 'STANDARD'
-        ? 'Standard'
-        : quote.simulation.formulaType === 'DOMMAGES_COLLISIONS'
-        ? 'Dommages Collision'
-        : 'Tous Risques 0%';
+    // Dynamic formula label with franchise rate
+    let formulaLabel = '';
+    if (quote.simulation.formulaType === 'STANDARD') {
+      formulaLabel = 'Standard';
+    } else if (quote.simulation.formulaType === 'DOMMAGES_COLLISIONS') {
+      formulaLabel = 'Dommages Collision';
+    } else if (quote.simulation.formulaType === 'TOUS_RISQUES_0') {
+      const franchiseRate = quote.simulation.franchiseRate || 0;
+      formulaLabel = `Tous Risques ${franchiseRate}%`;
+    }
 
     return `
 <!DOCTYPE html>
