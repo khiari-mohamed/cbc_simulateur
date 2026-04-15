@@ -1208,10 +1208,15 @@
               return true;
             }
             
-            const offset = capital.sub(tier.minAmount);
-            const remainder = offset.mod(tier.step);
-            console.log(`[validateCapitalStep] Capital ${capital} in range: offset=${offset}, remainder=${remainder}`);
-            return remainder.eq(0);
+            // ✅ FIX: Calculate offset from the FIRST valid value in the tier (rounded down to step)
+            // For tier 20001-50000 with step 10000, first valid value is 30000 (not 20001)
+            const step = tier.step.toNumber();
+            const minAmount = tier.minAmount.toNumber();
+            const firstValidValue = Math.ceil(minAmount / step) * step;
+            const offset = capital.toNumber() - firstValidValue;
+            const remainder = offset % step;
+            console.log(`[validateCapitalStep] Capital ${capital} in range: firstValid=${firstValidValue}, offset=${offset}, remainder=${remainder}`);
+            return remainder === 0;
           }
         }
 
