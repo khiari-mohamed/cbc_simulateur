@@ -123,12 +123,15 @@ export const CoverageSelectionStep = ({
     queryKey: ['guarantees'],
     queryFn: async () => {
       const { data } = await api.get('/guarantees');
+      console.log('📦 All guarantees fetched from API:', data);
       return data as Guarantee[];
     },
   });
 
   const mandatoryGuarantees = guarantees?.filter(g => !g.isOptional && g.isActive) || [];
   const optionalGuarantees = guarantees?.filter(g => g.isOptional && g.isActive) || [];
+  
+  console.log('📋 Optional guarantees:', optionalGuarantees.map(g => ({ code: g.code, name: g.nameFr })));
 
   const { data: companies } = useQuery({
     queryKey: ['companies', 'active'],
@@ -139,10 +142,15 @@ export const CoverageSelectionStep = ({
   });
 
   // Fetch bundled guarantees dynamically from API
+  // TEMPORARILY DISABLED: Bundling check commented out to show all guarantees
+  /*
   const { data: bundlingRules } = useQuery({
     queryKey: ['bundled-guarantees', selectedCompanies, localFormula],
     queryFn: async () => {
-      if (selectedCompanies.length === 0) return { includedGuarantees: new Set<string>(), parentGuarantees: new Set<string>() };
+      if (selectedCompanies.length === 0) {
+        console.log('📦 No companies selected - returning empty bundling rules');
+        return { includedGuarantees: new Set<string>(), parentGuarantees: new Set<string>() };
+      }
       
       const includedGuarantees = new Set<string>();
       const parentGuarantees = new Set<string>();
@@ -166,10 +174,15 @@ export const CoverageSelectionStep = ({
         }
       }
       
+      console.log('📦 Bundling rules result:', { 
+        includedGuarantees: Array.from(includedGuarantees), 
+        parentGuarantees: Array.from(parentGuarantees) 
+      });
       return { includedGuarantees, parentGuarantees };
     },
     enabled: selectedCompanies.length > 0,
   });
+  */
 
   // Get first selected company for availability check
   const firstSelectedCompanyId = selectedCompanies.length > 0 ? selectedCompanies[0] : undefined;
@@ -1074,6 +1087,14 @@ export const CoverageSelectionStep = ({
           <div className="space-y-2">
             {optionalGuarantees
               .filter((guarantee) => {
+                // 🔍 DEBUG: Log each guarantee being filtered
+                console.log('🔍 Filtering guarantee:', {
+                  code: guarantee.code,
+                  name: guarantee.nameFr,
+                  formula: localFormula,
+                  isAvailable: isGuaranteeAvailable(guarantee.code),
+                  availabilityMap: availabilityMap?.[guarantee.code],
+                });
                 // Case 1: Formula = Dommages Collision
                 // Hide: Tous Risques (any variation) AND Dommages Collision itself
                 if (localFormula === FormulaType.DOMMAGES_COLLISIONS) {
@@ -1125,7 +1146,8 @@ export const CoverageSelectionStep = ({
                   // Also check by name (case-insensitive)
                   const nameLower = guarantee.nameFr?.toLowerCase() || '';
                   if (nameLower.includes('tous risques') && !nameLower.includes('bris')) return false;
-                  if (nameLower.includes('dommages collision')) return false;
+                  // ✅ FIX: Only hide "dommages collision", NOT "dommages émeutes"
+                  if (nameLower === 'dommages collision' || nameLower === 'dommages collisions') return false;
                 }
                 
                 // ALWAYS filter these - they are not guarantees
@@ -1133,14 +1155,17 @@ export const CoverageSelectionStep = ({
                 
                 // ✅ Check availability from backend
                 if (!isGuaranteeAvailable(guarantee.code)) {
+                  console.log('❌ Guarantee hidden by availability:', guarantee.code, guarantee.nameFr);
                   return false;
                 }
                 
                 // ✅ Check if guarantee is an INCLUDED guarantee in a bundle (hide it)
                 // Do NOT hide parent guarantees - they act as the combined option
-                if (bundlingRules && bundlingRules.includedGuarantees.has(guarantee.code)) {
-                  return false; // Hide included guarantees only
-                }
+                // 🚨 TEMPORARY: Disable bundling check to show all guarantees
+                // if (bundlingRules && bundlingRules.includedGuarantees.has(guarantee.code)) {
+                //   console.log('  ❌ Hidden: included in bundle -', guarantee.code);
+                //   return false; // Hide included guarantees only
+                // }
                 
                 return true;
               })

@@ -1160,26 +1160,64 @@
     }
 
     private async validateCapitalStep(companyId: string, usageId: string, capital: Decimal): Promise<boolean> {
-      const tiers = await this.prisma.dcCapitalTier.findMany({
+      // Check if company uses MATRIX or PROGRESSIVE method
+      const dcConfig = await this.prisma.dcConfig.findFirst({
         where: { companyId, usageId, isActive: true },
-        orderBy: { minAmount: 'asc' },
       });
 
-      console.log(`[validateCapitalStep] Capital: ${capital}, UsageId: ${usageId}`);
-      console.log(`[validateCapitalStep] Found ${tiers.length} tiers`);
-
-      for (const tier of tiers) {
-        console.log(`[validateCapitalStep] Checking tier: min=${tier.minAmount}, max=${tier.maxAmount}, step=${tier.step}`);
-        if (capital.gte(tier.minAmount) && (!tier.maxAmount || capital.lte(tier.maxAmount))) {
-          const offset = capital.sub(tier.minAmount);
-          const remainder = offset.mod(tier.step);
-          console.log(`[validateCapitalStep] Capital ${capital} in range: offset=${offset}, remainder=${remainder}`);
-          return remainder.eq(0);
-        }
+      if (!dcConfig) {
+        console.log(`[validateCapitalStep] ❌ No DC config found`);
+        return false;
       }
 
-      console.log(`[validateCapitalStep] ❌ Capital ${capital} not in any tier range`);
-      return false;
+      console.log(`[validateCapitalStep] Capital: ${capital}, UsageId: ${usageId}, Method: ${dcConfig.useMatrix ? 'MATRIX' : 'PROGRESSIVE'}`);
+
+      if (dcConfig.useMatrix) {
+        // MATRIX METHOD: Check if capital exists in dcMatrixCapital table
+        const capitalEntry = await this.prisma.dcMatrixCapital.findFirst({
+          where: {
+            companyId,
+            usageId,
+            amount: capital,
+            isActive: true,
+          },
+        });
+
+        if (capitalEntry) {
+          console.log(`[validateCapitalStep] ✅ Capital ${capital} found in matrix`);
+          return true;
+        } else {
+          console.log(`[validateCapitalStep] ❌ Capital ${capital} NOT found in matrix`);
+          return false;
+        }
+      } else {
+        // PROGRESSIVE METHOD: Check against capital tiers
+        const tiers = await this.prisma.dcCapitalTier.findMany({
+          where: { companyId, usageId, isActive: true },
+          orderBy: { minAmount: 'asc' },
+        });
+
+        console.log(`[validateCapitalStep] Found ${tiers.length} tiers`);
+
+        for (const tier of tiers) {
+          console.log(`[validateCapitalStep] Checking tier: min=${tier.minAmount}, max=${tier.maxAmount}, step=${tier.step}`);
+          if (capital.gte(tier.minAmount) && (!tier.maxAmount || capital.lte(tier.maxAmount))) {
+            // ✅ FIX: Accept capital if it equals maxAmount exactly (edge case for 50% ceiling)
+            if (tier.maxAmount && capital.eq(tier.maxAmount)) {
+              console.log(`[validateCapitalStep] ✅ Capital ${capital} equals maxAmount - VALID`);
+              return true;
+            }
+            
+            const offset = capital.sub(tier.minAmount);
+            const remainder = offset.mod(tier.step);
+            console.log(`[validateCapitalStep] Capital ${capital} in range: offset=${offset}, remainder=${remainder}`);
+            return remainder.eq(0);
+          }
+        }
+
+        console.log(`[validateCapitalStep] ❌ Capital ${capital} not in any tier range`);
+        return false;
+      }
     }
 
     private async calculateDC_Matrix(companyId: string, guaranteeId: string, vv: Decimal, capital: Decimal, dcConfig: any, usageId: string, conventionId?: string) {

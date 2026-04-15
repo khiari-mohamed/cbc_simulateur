@@ -23,11 +23,24 @@ export class DocumentsService {
       throw new Error('userId is required for document upload');
     }
 
-    // Documents are linked to USER, not quote - this allows sharing across all user's quotes
+    // CARTE_GRISE is vehicle-specific (linked to quote), other docs are user-specific
+    const isVehicleSpecific = type === 'CARTE_GRISE';
+    
+    if (isVehicleSpecific && !quoteId) {
+      throw new Error('quoteId is required for vehicle-specific documents (CARTE_GRISE)');
+    }
+
+    // Find existing document
     const existingDoc = await this.prisma.document.findFirst({
-      where: {
+      where: isVehicleSpecific ? {
+        // Vehicle-specific: unique per quote + type
+        quoteId,
+        type,
+      } : {
+        // User-specific: unique per user + type (shared across all quotes)
         userId,
         type,
+        quoteId: null, // Only match user-level documents
       },
     });
 
@@ -44,9 +57,15 @@ export class DocumentsService {
       console.log(`  ✅ Document REPLACED: ID=${document.id}`);
     } else {
       console.log(`  ✅ No existing document for type ${type} - CREATING NEW`);
-      // Create new document linked to USER (not quote)
+      // Create new document
       document = await this.prisma.document.create({
-        data: { userId, type, fileName, filePath },
+        data: { 
+          userId, 
+          quoteId: isVehicleSpecific ? quoteId : null, // Link to quote only if vehicle-specific
+          type, 
+          fileName, 
+          filePath 
+        },
       });
       console.log(`  ✅ Document CREATED: ID=${document.id}`);
     }
@@ -56,6 +75,7 @@ export class DocumentsService {
     console.log(`     Type: ${document.type}`);
     console.log(`     FileName: ${document.fileName}`);
     console.log(`     FilePath: ${document.filePath}`);
+    console.log(`     QuoteId: ${document.quoteId || 'N/A (user-level)'}`);
     console.log('');
 
     // Notify staff about document upload
@@ -91,8 +111,18 @@ export class DocumentsService {
       return [];
     }
     
-    // Return all documents for this user (shared across all their quotes)
-    return this.prisma.document.findMany({ where: { userId: quote.userId } });
+    // Return:
+    // 1. Documents linked to this specific quote (vehicle-specific like CARTE_GRISE)
+    // 2. User-level documents (CIN, PERMIS, etc.) that are shared across all quotes
+    return this.prisma.document.findMany({ 
+      where: {
+        userId: quote.userId,
+        OR: [
+          { quoteId: quoteId },        // Quote-specific documents
+          { quoteId: null },           // User-level documents
+        ]
+      }
+    });
   }
 
   async findByUser(userId: string) {
@@ -119,7 +149,7 @@ export class DocumentsService {
         userId: decoded.sub || decoded.userId,
         role: decoded.role,
       };
-    } catch (err) {
+    } catch (err: any) {
       console.error('Token verification error:', err.message);
       throw err;
     }
