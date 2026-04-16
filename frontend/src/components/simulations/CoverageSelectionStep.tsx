@@ -1153,11 +1153,8 @@ export const CoverageSelectionStep = ({
                 // ALWAYS filter these - they are not guarantees
                 if (guarantee.code === 'DEFENSE_RECOURS') return false;
                 
-                // ✅ Check availability from backend
-                if (!isGuaranteeAvailable(guarantee.code)) {
-                  console.log('❌ Guarantee hidden by availability:', guarantee.code, guarantee.nameFr);
-                  return false;
-                }
+                // ✅ Don't hide NON_ACCORDEE guarantees - they will be shown as disabled
+                // Removed: if (!isGuaranteeAvailable(guarantee.code)) return false;
                 
                 // ✅ Check if guarantee is an INCLUDED guarantee in a bundle (hide it)
                 // Do NOT hide parent guarantees - they act as the combined option
@@ -1170,7 +1167,8 @@ export const CoverageSelectionStep = ({
                 return true;
               })
               .map((guarantee) => {
-                const isDisabled = false;
+               // const isAvailable = isGuaranteeAvailable(guarantee.code);
+                const isDisabled = false; // Allow selection even if NON_ACCORDEE
                 const isFree = isGuaranteeFree(guarantee.code);
                 const isBgWithLimit = guarantee.code === 'BG' && localGuarantees.includes(guarantee.id) && localBgLimit && localBgLimit > 0;
                 const isAssuranceConducteur = guarantee.code === 'ASSURANCE_CONDUCTEUR';
@@ -1199,6 +1197,11 @@ export const CoverageSelectionStep = ({
                     <div className="flex-1">
                       <div className="font-medium text-gray-900 dark:text-white">
                         {guarantee.nameFr}
+                        {/* {!isAvailable && (
+                          <span className="ml-2 text-xs text-red-600 dark:text-red-400 font-normal">
+                            (NON ACCORDÉE)
+                          </span>
+                        )} */}
                         {isBgWithLimit && !isFree && selectedCompanies.length > 0 && (
                           <span className="ml-2 text-sm font-normal text-blue-600 dark:text-blue-400">
                             {localBgLimit.toLocaleString('fr-FR')} DT
