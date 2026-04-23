@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { CheckCircle, AlertCircle, Loader } from 'lucide-react';
@@ -11,8 +12,10 @@ export const PaymentSuccessPage = () => {
   
   const paymentId = searchParams.get('paymentId');
   const quoteId = searchParams.get('quoteId');
+  const flouciPaymentId = searchParams.get('payment_id'); // Get Flouci payment ID from URL
+  const [verificationAttempted, setVerificationAttempted] = useState(false);
 
-  const { data: payment, isLoading } = useQuery({
+  const { data: payment, isLoading, refetch } = useQuery({
     queryKey: ['payment', paymentId],
     queryFn: async () => {
       if (!paymentId) return null;
@@ -20,9 +23,39 @@ export const PaymentSuccessPage = () => {
       return data;
     },
     enabled: !!paymentId,
-    refetchInterval: 2000, // Poll every 2 seconds for payment confirmation
+    refetchInterval: (query) => {
+      // Stop polling if payment is confirmed as PAID
+      if (query.state.data?.status === 'PAID') return false;
+      // Poll every 2 seconds for up to 30 seconds
+      return 2000;
+    },
     refetchIntervalInBackground: true,
   });
+
+  // Attempt to verify payment with Flouci API if still pending after 5 seconds
+  useEffect(() => {
+    if (!verificationAttempted && payment && payment.status === 'PENDING' && paymentId && flouciPaymentId) {
+      const timer = setTimeout(async () => {
+        try {
+          console.log('🔍 Attempting to verify payment with Flouci API...');
+          console.log('   Payment ID:', paymentId);
+          console.log('   Flouci Payment ID:', flouciPaymentId);
+          
+          await api.post(`/payments/${paymentId}/verify-with-flouci`, {
+            flouciPaymentId: flouciPaymentId,
+          });
+          
+          setVerificationAttempted(true);
+          // Refetch payment status after verification
+          refetch();
+        } catch (error) {
+          console.error('Failed to verify payment:', error);
+        }
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [payment, paymentId, flouciPaymentId, verificationAttempted, refetch]);
 
   if (isLoading) {
     return (

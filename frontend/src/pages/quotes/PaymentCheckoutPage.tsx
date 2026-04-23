@@ -238,7 +238,9 @@ export const PaymentCheckoutPage = () => {
       }
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Erreur lors de l\'initialisation du paiement');
+      console.error('Payment initialization error:', error);
+      const errorMessage = error.response?.data?.message || 'Erreur lors de l\'initialisation du paiement';
+      toast.error(errorMessage, { duration: 5000 });
       setPaymentInProgress(false);
     },
   });

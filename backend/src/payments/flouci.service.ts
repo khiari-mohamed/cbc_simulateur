@@ -14,6 +14,7 @@ interface FlouciPaymentRequest {
   success_link: string;
   fail_link: string;
   developer_tracking_id: string;
+  webhook?: string;
 }
 
 interface FlouciPaymentResponse {
@@ -115,6 +116,8 @@ export class FlouciService {
       },
     });
 
+    const backendUrl = this.config.get('BACKEND_URL');
+    
     const flouciRequest: FlouciPaymentRequest = {
       app_token: this.flouciAppToken,
       app_secret: this.flouciAppSecret,
@@ -126,10 +129,17 @@ export class FlouciService {
       developer_tracking_id: orderId,
     };
 
+    // Only add webhook if BACKEND_URL is configured and not localhost
+    if (backendUrl && !backendUrl.includes('localhost')) {
+      flouciRequest.webhook = `${backendUrl}/payments/webhook`;
+    }
+
     // Validate amount doesn't exceed Flouci limit
     if (flouciRequest.amount > 9999999) {
       throw new BadRequestException(`Le montant ${totalAmount} DT dépasse la limite de Flouci (9999.999 DT)`);
     }
+
+    console.log('🔍 Attempting Flouci API call with payload:', JSON.stringify(flouciRequest, null, 2));
 
     try {
       const response = await this.axiosInstance.post<FlouciPaymentResponse>(
@@ -137,9 +147,10 @@ export class FlouciService {
         flouciRequest,
       );
 
-      console.log('✅ Flouci API Response:', response.data);
+      console.log('✅ Flouci API Response:', JSON.stringify(response.data, null, 2));
 
       if (!response.data?.result?.link) {
+        console.error('❌ Invalid Flouci response structure:', response.data);
         throw new InternalServerErrorException('Invalid Flouci API response');
       }
 
@@ -166,7 +177,13 @@ export class FlouciService {
         orderId,
       };
     } catch (error: any) {
-      console.error('❌ Flouci API Error:', error.response?.data || error.message);
+      console.error('❌ Flouci API Error Details:');
+      console.error('  - Status:', error.response?.status);
+      console.error('  - Status Text:', error.response?.statusText);
+      console.error('  - Error Data:', JSON.stringify(error.response?.data, null, 2));
+      console.error('  - Error Message:', error.message);
+      console.error('  - Error Code:', error.code);
+      console.error('  - Full Error:', error);
       
       await this.auditService.log(
         userId,
@@ -177,6 +194,8 @@ export class FlouciService {
         {
           quoteId,
           error: error.response?.data || error.message,
+          errorCode: error.code,
+          errorStatus: error.response?.status,
         },
       );
 
@@ -185,14 +204,19 @@ export class FlouciService {
         data: { status: 'FAILED' },
       });
 
+      // Return more detailed error message
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message;
       throw new InternalServerErrorException(
-        `Failed to initialize payment with Flouci: ${error.message}`,
+        `Failed to initialize payment with Flouci: ${errorMsg}`,
       );
     }
   }
 
   async handleWebhookCallback(payload: FlouciWebhookPayload) {
+    console.log('🔔 Webhook received from Flouci:', JSON.stringify(payload, null, 2));
+
     if (!payload.developer_tracking_id || !payload.payment_id) {
+      console.error('❌ Invalid webhook payload - missing required fields');
       throw new BadRequestException('Invalid webhook payload');
     }
 
@@ -205,7 +229,11 @@ export class FlouciService {
       return { status: 'not_found' };
     }
 
-    if (payload.status === 'SUCCESS') {
+    console.log('📦 Found payment:', payment.id, '- Current status:', payment.status);
+
+    if (payload.status === 'SUCCESS' || payload.status === 'success') {
+      console.log('✅ Payment successful - updating status to PAID');
+      
       await this.prisma.payment.update({
         where: { id: payment.id },
         data: {
@@ -267,10 +295,14 @@ export class FlouciService {
           quote.user.email,
           contractNumber,
         ).catch(err => console.error('Failed to send contract email:', err));
+
+        console.log('🎉 Contract created successfully:', contractNumber);
       }
 
       return { status: 'success', paymentId: payment.id };
     } else {
+      console.log('❌ Payment failed or cancelled - updating status to FAILED');
+      
       await this.prisma.payment.update({
         where: { id: payment.id },
         data: { status: 'FAILED' },
@@ -306,22 +338,42 @@ export class FlouciService {
     };
   }
 
-  async verifyPaymentWithFlouci(paymentId: string): Promise<boolean> {
+  async verifyPaymentWithFlouci(flouciPaymentId: string): Promise<{ verified: boolean; status?: string; data?: any }> {
     if (!this.flouciAppToken) {
       throw new BadRequestException('Payment gateway not configured');
     }
 
+    console.log('🔍 Verifying payment with Flouci API:', flouciPaymentId);
+
     try {
-      const response = await this.axiosInstance.get(`/verify_payment/${paymentId}`, {
+      const response = await this.axiosInstance.get(`/verify_payment/${flouciPaymentId}`, {
         params: {
           app_token: this.flouciAppToken,
         },
+        headers: {
+          'apppublic': this.flouciAppToken,
+          'appsecret': this.flouciAppSecret,
+        },
       });
 
-      return response.data?.result?.status === 'SUCCESS';
+      console.log('✅ Flouci verification response:', JSON.stringify(response.data, null, 2));
+
+      const status = response.data?.result?.status;
+      const isSuccess = status === 'SUCCESS' || status === 'success';
+
+      return {
+        verified: isSuccess,
+        status: status,
+        data: response.data,
+      };
     } catch (error: any) {
-      console.error('Failed to verify payment with Flouci:', error.message);
-      return false;
+      console.error('❌ Failed to verify payment with Flouci:', error.message);
+      console.error('Error details:', error.response?.data);
+      return {
+        verified: false,
+        status: 'ERROR',
+        data: error.response?.data,
+      };
     }
   }
 
