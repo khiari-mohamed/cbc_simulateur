@@ -111,6 +111,12 @@ export const PaymentCheckoutPage = () => {
     if (quote?.simulation?.vehicle?.firstCirculationDate && serverTime) {
       const now = serverTime;
       const hour = now.getHours();
+      const currentDay = now.getDay();
+      
+      console.log('🕐 Date Calculation Debug:');
+      console.log('  Server Time:', now.toISOString());
+      console.log('  Current Hour:', hour);
+      console.log('  Current Day:', currentDay, '(0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat)');
       
       let calculatedMinDate: Date;
       
@@ -131,12 +137,20 @@ export const PaymentCheckoutPage = () => {
       }
       
       calculatedMinDate.setHours(0, 0, 0, 0);
-      const minDateStr = calculatedMinDate.toISOString().split('T')[0];
+      // Use local date string to avoid timezone conversion issues
+      const year = calculatedMinDate.getFullYear();
+      const month = String(calculatedMinDate.getMonth() + 1).padStart(2, '0');
+      const day = String(calculatedMinDate.getDate()).padStart(2, '0');
+      const minDateStr = `${year}-${month}-${day}`;
+      console.log('  📆 Final Min Date:', minDateStr, '(Day:', calculatedMinDate.getDay(), ')');
       setMinDate(minDateStr);
       
       // Auto-set to minimum date if not already set
       if (!effectiveDate) {
+        console.log('  ✅ Setting effective date to:', minDateStr);
         setEffectiveDate(minDateStr);
+      } else {
+        console.log('  ℹ️ Effective date already set:', effectiveDate);
       }
     }
   }, [quote, serverTime]);
