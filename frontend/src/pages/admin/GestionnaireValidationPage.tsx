@@ -231,7 +231,7 @@ export const GestionnaireValidationPage = () => {
                 </div>
                 <div className="text-left sm:text-right">
                   <p className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    {quote.totalAPayer.toLocaleString()} DT
+                    {Number(quote.totalAPayer).toFixed(3)} DT
                   </p>
                 </div>
               </div>
@@ -328,7 +328,7 @@ export const GestionnaireValidationPage = () => {
                   </div>
                   <div className="text-left sm:text-right">
                     <p className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">
-                      {quote.totalAPayer.toLocaleString()} DT
+                      {Number(quote.totalAPayer).toFixed(3)} DT
                     </p>
                   </div>
                 </div>
@@ -726,7 +726,7 @@ export const GestionnaireValidationPage = () => {
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Montant:</span>
                     <span className="font-bold text-green-600 dark:text-green-400">
-                      {selectedQuote.totalAPayer.toLocaleString()} DT
+                      {Number(selectedQuote.totalAPayer).toFixed(3)} DT
                     </span>
                   </div>
                 </div>
@@ -825,7 +825,7 @@ export const GestionnaireValidationPage = () => {
                         <div className="text-right">
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Montant</p>
                           <p className="text-xl font-bold text-gray-600 dark:text-gray-400">
-                            {quote.totalAPayer.toLocaleString()} DT
+                            {Number(quote.totalAPayer).toFixed(3)} DT
                           </p>
                         </div>
                       </div>

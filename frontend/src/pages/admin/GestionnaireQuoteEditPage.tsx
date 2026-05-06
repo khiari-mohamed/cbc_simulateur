@@ -209,10 +209,10 @@ export const GestionnaireQuoteEditPage = () => {
                 </span>
                 <div className="text-right">
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Capital: {item.capital.toLocaleString()} DT
+                    Capital: {Number(item.capital).toFixed(3)} DT
                   </div>
                   <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                    Prime: {item.prime.toLocaleString()} DT
+                    Prime: {Number(item.prime).toFixed(3)} DT
                   </div>
                 </div>
               </div>

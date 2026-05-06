@@ -434,27 +434,16 @@ export const UsersManagementPage = () => {
                       </div>
                     </div>
 
-                    {user.conventions && user.conventions.length > 0 && (
+                    {user.organization?.conventions && user.organization.conventions.length > 0 && (
                       <div className="mb-3">
                         <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Conventions:</p>
                         <div className="flex flex-wrap gap-2">
-                          {user.conventions.map((uc: any) => (
+                          {user.organization.conventions.map((conv: any) => (
                             <span
-                              key={uc.convention.id}
-                              className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-xs flex items-center gap-1"
+                              key={conv.id}
+                              className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-xs"
                             >
-                              {uc.convention.name}
-                              <button
-                                onClick={() =>
-                                  removeConventionMutation.mutate({
-                                    userId: user.id,
-                                    conventionId: uc.convention.id,
-                                  })
-                                }
-                                className="ml-1 hover:text-red-600"
-                              >
-                                ×
-                              </button>
+                              {conv.name}
                             </span>
                           ))}
                         </div>
@@ -507,6 +496,22 @@ export const UsersManagementPage = () => {
                         <UserPlus className="w-3 h-3 mr-1" />
                         Assigner convention
                       </Button>
+                      {user.organizationId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 hover:text-red-700 hover:border-red-600"
+                          onClick={() =>
+                            removeConventionMutation.mutate({
+                              userId: user.id,
+                              conventionId: user.organizationId,
+                            })
+                          }
+                        >
+                          <XCircle className="w-3 h-3 mr-1" />
+                          Retirer convention
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
