@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Mail, Phone, Calendar, Shield, CheckCircle, XCircle, UserPlus, Trash2, Download } from 'lucide-react';
+import { Mail, Phone, Calendar, Shield, CheckCircle, XCircle, UserPlus, Trash2, Download, History } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { ConfirmationModal } from '../../../components/ui/ConfirmationModal';
@@ -13,6 +13,7 @@ export const UsersManagementPage = () => {
   const queryClient = useQueryClient();
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [showConventionModal, setShowConventionModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     type: 'deactivate' | 'reactivate' | 'delete' | null;
@@ -42,6 +43,15 @@ export const UsersManagementPage = () => {
       const { data } = await api.get('/conventions');
       return data;
     },
+  });
+
+  const { data: assignmentHistory } = useQuery({
+    queryKey: ['assignment-history'],
+    queryFn: async () => {
+      const { data } = await api.get('/users/assignment-history');
+      return data;
+    },
+    enabled: showHistoryModal,
   });
 
   const toggle2FAMutation = useMutation({
@@ -243,14 +253,23 @@ export const UsersManagementPage = () => {
                 Gérer les utilisateurs, rôles, conventions et 2FA
               </p>
             </div>
-            <Button
-              onClick={handleExport}
-              disabled={!filteredUsers || filteredUsers.length === 0}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
-            >
-              <Download className="w-4 h-4" />
-              Exporter Excel
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setShowHistoryModal(true)}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <History className="w-4 h-4" />
+                Historique
+              </Button>
+              <Button
+                onClick={handleExport}
+                disabled={!filteredUsers || filteredUsers.length === 0}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Download className="w-4 h-4" />
+                Exporter Excel
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -575,7 +594,7 @@ export const UsersManagementPage = () => {
 
         {showConventionModal && selectedUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
               <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                   Assigner une convention
@@ -583,23 +602,43 @@ export const UsersManagementPage = () => {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   {selectedUser.firstName} {selectedUser.lastName}
                 </p>
+                {conventions && conventions.length > 0 && (
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                    {conventions.length} convention(s) disponible(s)
+                  </p>
+                )}
               </div>
-              <div className="p-6 space-y-3">
-                {conventions?.map((conv: any) => (
-                  <button
-                    key={conv.id}
-                    onClick={() =>
-                      assignConventionMutation.mutate({
-                        userId: selectedUser.id,
-                        conventionId: conv.id,
-                      })
-                    }
-                    className="w-full p-3 text-left rounded-lg border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 transition-colors"
-                  >
-                    <p className="font-medium text-gray-900 dark:text-white">{conv.name}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{conv.company.name}</p>
-                  </button>
-                ))}
+              <div className="p-6 space-y-3 overflow-y-auto flex-1">
+                {conventions && conventions.length > 0 ? (
+                  conventions.map((conv: any) => (
+                    <button
+                      key={conv.id}
+                      onClick={() =>
+                        assignConventionMutation.mutate({
+                          userId: selectedUser.id,
+                          conventionId: conv.id,
+                        })
+                      }
+                      className="w-full p-3 text-left rounded-lg border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                    >
+                      <p className="font-medium text-gray-900 dark:text-white">{conv.name}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {conv.companies?.length > 0 
+                          ? conv.companies.map((cc: any) => cc.company.name).join(', ')
+                          : 'Aucune compagnie'}
+                      </p>
+                      {conv.organization && (
+                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                          Organisation: {conv.organization.name}
+                        </p>
+                      )}
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-center text-gray-500 dark:text-gray-400 py-4">
+                    Aucune convention disponible
+                  </p>
+                )}
               </div>
               <div className="p-6 border-t border-gray-200 dark:border-gray-700">
                 <Button
@@ -637,6 +676,115 @@ export const UsersManagementPage = () => {
           variant="danger"
           isLoading={false}
         />
+
+        {/* Assignment History Modal */}
+        {showHistoryModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Historique des assignations
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Historique des assignations et retraits de conventions
+                </p>
+              </div>
+              <div className="p-6 overflow-y-auto flex-1">
+                {!assignmentHistory ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : assignmentHistory.length > 0 ? (
+                  <div className="space-y-3">
+                    {assignmentHistory.map((log: any) => {
+                      const isAssignment = log.action === 'CONVENTION_ASSIGNED';
+                      const newValue = log.newValue || {};
+                      const targetUser = users?.find((u: any) => u.id === log.entityId);
+                      
+                      return (
+                        <div
+                          key={log.id}
+                          className="p-4 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <span
+                                  className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                    isAssignment
+                                      ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                                      : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
+                                  }`}
+                                >
+                                  {isAssignment ? 'Assignation' : 'Retrait'}
+                                </span>
+                                {newValue.conventionName && (
+                                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
+                                    {newValue.conventionName}
+                                  </span>
+                                )}
+                                {newValue.organizationName && (
+                                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                                    {newValue.organizationName}
+                                  </span>
+                                )}
+                                {newValue.userRole && (
+                                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                                    {newValue.userRole === 'CLIENT_ADHERENT' ? 'Client' : 
+                                     newValue.userRole === 'GESTIONNAIRE_VALIDATION_ARS' ? 'Gestionnaire' : 'Admin'}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-900 dark:text-white font-medium">
+                                {newValue.userName || (targetUser ? `${targetUser.firstName} ${targetUser.lastName}` : 'Utilisateur inconnu')}
+                                {targetUser && (
+                                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                                    ({targetUser.email})
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                Par: {log.user ? `${log.user.firstName} ${log.user.lastName}` : 'Système'}
+                              </p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {new Date(log.createdAt).toLocaleDateString('fr-FR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                })}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {new Date(log.createdAt).toLocaleTimeString('fr-FR', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-center text-gray-500 dark:text-gray-400 py-8">
+                    Aucun historique d'assignation
+                  </p>
+                )}
+              </div>
+              <div className="p-6 border-t border-gray-200 dark:border-gray-700">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowHistoryModal(false)}
+                  className="w-full"
+                >
+                  Fermer
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
   );
 };

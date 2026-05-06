@@ -6,6 +6,7 @@ import { RegisterDto } from './register.dto';
 import { VerifyOtpDto } from './verify-otp.dto';
 import { ForgotPasswordDto } from './forgot-password.dto';
 import { ResetPasswordDto } from './reset-password.dto';
+import { ChangePasswordDto } from './change-password.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { GoogleAuthGuard } from './google-auth.guard';
 
@@ -61,6 +62,12 @@ export class AuthController {
   @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  changePassword(@Request() req: any, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(req.user.id, dto.currentPassword, dto.newPassword);
   }
 
   @Get('google')

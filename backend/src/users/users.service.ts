@@ -1,10 +1,14 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { Role } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditService: AuditService,
+  ) {}
 
   async create(data: {
     email: string;
@@ -177,21 +181,88 @@ export class UsersService {
     });
   }
 
-  async assignConvention(userId: string, conventionId: string) {
-    const convention = await this.prisma.convention.findUnique({ where: { id: conventionId } });
-    if (!convention) throw new Error('Convention not found');
+  async assignConvention(userId: string, conventionId: string, assignedBy?: string) {
+    // Validate user exists
+    const user = await this.prisma.user.findUnique({ 
+      where: { id: userId },
+      select: { id: true, organizationId: true, firstName: true, lastName: true, role: true }
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    // Validate convention exists
+    const convention = await this.prisma.convention.findUnique({ 
+      where: { id: conventionId },
+      include: { organization: true }
+    });
+    if (!convention) throw new NotFoundException('Convention not found');
+    if (!convention.isActive) throw new ConflictException('Convention is not active');
     
-    return this.prisma.user.update({
+    const oldOrgId = user.organizationId;
+    
+    // Update user organization
+    const result = await this.prisma.user.update({
       where: { id: userId },
       data: { organizationId: convention.organizationId },
     });
+
+    // Log assignment (non-blocking)
+    if (assignedBy) {
+      this.auditService.log(
+        assignedBy,
+        'CONVENTION_ASSIGNED',
+        'User',
+        userId,
+        { organizationId: oldOrgId },
+        { 
+          organizationId: convention.organizationId, 
+          organizationName: convention.organization.name,
+          conventionId, 
+          conventionName: convention.name,
+          userRole: user.role,
+          userName: `${user.firstName} ${user.lastName}`
+        },
+      ).catch(err => console.error('Failed to log assignment:', err));
+    }
+
+    return result;
   }
 
-  async removeConvention(userId: string, conventionId: string) {
-    return this.prisma.user.update({
+  async removeConvention(userId: string, conventionId: string, removedBy?: string) {
+    // Validate user exists
+    const user = await this.prisma.user.findUnique({ 
+      where: { id: userId },
+      select: { id: true, organizationId: true, firstName: true, lastName: true, role: true, organization: { select: { name: true } } }
+    });
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.organizationId) throw new ConflictException('User has no organization assigned');
+
+    const oldOrgId = user.organizationId;
+    const oldOrgName = user.organization?.name;
+    
+    // Update user organization
+    const result = await this.prisma.user.update({
       where: { id: userId },
       data: { organizationId: null },
     });
+
+    // Log removal (non-blocking)
+    if (removedBy) {
+      this.auditService.log(
+        removedBy,
+        'CONVENTION_REMOVED',
+        'User',
+        userId,
+        { organizationId: oldOrgId, organizationName: oldOrgName },
+        { 
+          organizationId: null, 
+          conventionId,
+          userRole: user.role,
+          userName: `${user.firstName} ${user.lastName}`
+        },
+      ).catch(err => console.error('Failed to log removal:', err));
+    }
+
+    return result;
   }
 
   async getUserConventions(userId: string) {
@@ -264,5 +335,41 @@ export class UsersService {
     // Hard delete - Prisma will cascade delete system records (auditLogs, notifications, etc.)
     await this.prisma.user.delete({ where: { id: userId } });
     return { message: 'User deleted permanently' };
+  }
+
+  async getAssignmentHistory(limit: number = 100) {
+    const logs = await this.prisma.auditLog.findMany({
+      where: {
+        action: { in: ['CONVENTION_ASSIGNED', 'CONVENTION_REMOVED'] },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(limit, 1000), // Max 1000 records
+    });
+
+    // Parse JSON fields safely
+    return logs.map(log => ({
+      ...log,
+      oldValue: this.safeJsonParse(log.oldValue),
+      newValue: this.safeJsonParse(log.newValue),
+    }));
+  }
+
+  private safeJsonParse(value: string | null): any {
+    if (!value) return null;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
   }
 }

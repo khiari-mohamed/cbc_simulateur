@@ -301,6 +301,43 @@ export class AuthService {
     return { message: 'Password reset successfully' };
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.usersService.findById(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
+      await this.auditService.log(
+        userId,
+        'PASSWORD_CHANGE_FAILED',
+        'User',
+        userId,
+        null,
+        { reason: 'Invalid current password' },
+      );
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    // Hash and update new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.usersService.updatePassword(userId, hashedPassword);
+
+    await this.auditService.log(
+      userId,
+      'PASSWORD_CHANGED',
+      'User',
+      userId,
+      null,
+      { email: user.email },
+    );
+
+    return { message: 'Password changed successfully' };
+  }
+
   async googleLogin(googleUser: any) {
     let user = await this.usersService.findByEmail(googleUser.email);
 

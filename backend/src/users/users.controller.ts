@@ -58,15 +58,30 @@ export class UsersController {
   @Post(':id/conventions/:conventionId')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMINISTRATEUR_ARS)
-  assignConvention(@Param('id') userId: string, @Param('conventionId') conventionId: string) {
-    return this.usersService.assignConvention(userId, conventionId);
+  assignConvention(
+    @Param('id') userId: string,
+    @Param('conventionId') conventionId: string,
+    @Request() req: any,
+  ) {
+    return this.usersService.assignConvention(userId, conventionId, req.user.id);
   }
 
   @Delete(':id/conventions/:conventionId')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMINISTRATEUR_ARS)
-  removeConvention(@Param('id') userId: string, @Param('conventionId') conventionId: string) {
-    return this.usersService.removeConvention(userId, conventionId);
+  removeConvention(
+    @Param('id') userId: string,
+    @Param('conventionId') conventionId: string,
+    @Request() req: any,
+  ) {
+    return this.usersService.removeConvention(userId, conventionId, req.user.id);
+  }
+
+  @Get('assignment-history')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMINISTRATEUR_ARS)
+  getAssignmentHistory() {
+    return this.usersService.getAssignmentHistory();
   }
 
   @Post('toggle-2fa')
