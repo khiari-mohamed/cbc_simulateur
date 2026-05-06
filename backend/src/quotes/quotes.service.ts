@@ -248,6 +248,15 @@ export class QuotesService {
       data: updateData,
       include: { user: true },
     });
+
+    // Send notification email when quote is validated
+    if (data.status === QuoteStatus.VALIDATED) {
+      this.notificationsService.notifyQuoteValidated(
+        quote.user,
+        quote.quoteNumber,
+      ).catch(err => console.error('Failed to send validation notification:', err.message));
+    }
+
     return quote;
   }
 

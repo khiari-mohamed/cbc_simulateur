@@ -113,7 +113,7 @@ export class NotificationsService {
   async sendQuoteValidated(to: string, quoteNumber: string, clientName: string) {
     const logoUrl = `${this.config.get('FRONTEND_URL')}/Image1.png`;
     await this.transporter.sendMail({
-      from: this.config.get('SMTP_FROM'),
+      from: `"ARS Tunisia" <${this.config.get('SMTP_FROM')}>`,
       to,
       subject: 'Devis validé - ARS',
       html: `
@@ -506,7 +506,7 @@ export class NotificationsService {
     // Try to send email (non-blocking)
     try {
       await this.sendQuoteModified(user.email, quoteNumber, `${user.firstName} ${user.lastName}`, note);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to send email notification:', err.message);
     }
   }

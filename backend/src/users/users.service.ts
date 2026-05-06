@@ -119,6 +119,7 @@ export class UsersService {
         role: true,
         isActive: true,
         otpEnabled: true,
+        organizationId: true,
         createdAt: true,
         driverProfile: true,
         organization: {
